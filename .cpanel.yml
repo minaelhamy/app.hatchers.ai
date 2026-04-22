@@ -1,0 +1,24 @@
+---
+deployment:
+  tasks:
+    - /bin/mkdir -p /home/hatchwan/app.hatchers.ai
+    - /bin/mkdir -p /home/hatchwan/app.hatchers.ai/storage/framework/sessions
+    - /bin/mkdir -p /home/hatchwan/app.hatchers.ai/storage/framework/views
+    - /bin/mkdir -p /home/hatchwan/app.hatchers.ai/storage/framework/cache/data
+    - /bin/mkdir -p /home/hatchwan/app.hatchers.ai/storage/logs
+    - /bin/mkdir -p /home/hatchwan/app.hatchers.ai/bootstrap/cache
+    - /bin/rsync -a --delete --chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r --exclude '.git' --exclude '.github' --exclude '.cpanel.yml' --exclude '.env' --exclude '.env.local' --exclude '.env.production' --exclude 'node_modules/' --exclude 'vendor/' --exclude 'database/database.sqlite' --exclude 'storage/logs/*' --exclude 'error_log' --exclude 'php/error_log' ./ /home/hatchwan/app.hatchers.ai/
+    - /bin/mkdir -p /home/hatchwan/app.hatchers.ai/storage/framework/sessions
+    - /bin/mkdir -p /home/hatchwan/app.hatchers.ai/storage/framework/views
+    - /bin/mkdir -p /home/hatchwan/app.hatchers.ai/storage/framework/cache/data
+    - /bin/mkdir -p /home/hatchwan/app.hatchers.ai/storage/logs
+    - /bin/mkdir -p /home/hatchwan/app.hatchers.ai/bootstrap/cache
+    - /bin/chmod -R 775 /home/hatchwan/app.hatchers.ai/storage /home/hatchwan/app.hatchers.ai/bootstrap/cache
+    - /bin/sh -lc 'cd /home/hatchwan/app.hatchers.ai && if [ -x /opt/cpanel/composer/bin/composer ]; then /opt/cpanel/composer/bin/composer install --no-dev --optimize-autoloader; elif [ -x /usr/local/bin/composer ]; then /usr/local/bin/composer install --no-dev --optimize-autoloader; else composer install --no-dev --optimize-autoloader; fi'
+    - /bin/sh -lc 'if [ -f /home/hatchwan/app.hatchers.ai/.env ]; then /usr/local/bin/php /home/hatchwan/app.hatchers.ai/artisan config:clear; else echo ".env not found, skipping artisan config:clear"; fi'
+    - /bin/sh -lc 'if [ -f /home/hatchwan/app.hatchers.ai/.env ]; then /usr/local/bin/php /home/hatchwan/app.hatchers.ai/artisan cache:clear; else echo ".env not found, skipping artisan cache:clear"; fi'
+    - /bin/sh -lc 'if [ -f /home/hatchwan/app.hatchers.ai/.env ]; then /usr/local/bin/php /home/hatchwan/app.hatchers.ai/artisan route:clear; else echo ".env not found, skipping artisan route:clear"; fi'
+    - /bin/sh -lc 'if [ -f /home/hatchwan/app.hatchers.ai/.env ]; then /usr/local/bin/php /home/hatchwan/app.hatchers.ai/artisan view:clear; else echo ".env not found, skipping artisan view:clear"; fi'
+    - /bin/sh -lc 'if [ -f /home/hatchwan/app.hatchers.ai/.env ]; then /usr/local/bin/php /home/hatchwan/app.hatchers.ai/artisan migrate --force; else echo ".env not found, skipping artisan migrate"; fi'
+    - /bin/sh -lc 'if [ -f /home/hatchwan/app.hatchers.ai/.env ]; then /usr/local/bin/php /home/hatchwan/app.hatchers.ai/artisan config:cache; else echo ".env not found, skipping artisan config:cache"; fi'
+    - /bin/sh -lc 'if [ -f /home/hatchwan/app.hatchers.ai/.env ]; then /usr/local/bin/php /home/hatchwan/app.hatchers.ai/artisan route:cache; else echo ".env not found, skipping artisan route:cache"; fi'
