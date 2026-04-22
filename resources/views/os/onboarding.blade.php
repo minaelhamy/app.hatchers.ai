@@ -1,38 +1,18 @@
 @extends('os.layout')
 
 @section('content')
-    <section class="hero">
-        <div class="eyebrow">Founder Signup</div>
-        <h1>Create your founder workspace.</h1>
-        <p class="muted">You’re signing up as a founder on the <strong>{{ $selectedPlan['name'] }}</strong> plan. After signup, you’ll return to login and enter your new workspace from there.</p>
-    </section>
+    <div class="public-shell narrow">
+        <section class="hero">
+            <div class="eyebrow">Founder Signup</div>
+            <h1>Create your founder workspace.</h1>
+            <p class="muted">You’re signing up on the <strong>{{ $selectedPlan['name'] }}</strong> plan. Finish signup, then return to login and enter your founder dashboard.</p>
+        </section>
 
-    <section class="grid-2">
-        <div class="card">
-            <h2>What happens next</h2>
-            <div class="stack" style="margin-top: 14px;">
-                <div class="stack-item"><strong>Step 1</strong><br>Create your founder credentials and company profile</div>
-                <div class="stack-item"><strong>Step 2</strong><br>Choose whether you are building a product, service, or hybrid business</div>
-                <div class="stack-item"><strong>Step 3</strong><br>Capture audience, offer, and brand direction for Atlas</div>
-                <div class="stack-item"><strong>Step 4</strong><br>Finish signup and return to login</div>
-                <div class="stack-item"><strong>Step 5</strong><br>Log in and land directly on your founder dashboard</div>
-            </div>
-        </div>
-
-        <div class="card">
-            <h2>Selected Plan</h2>
-            <div class="stack" style="margin-top: 14px;">
-                <div class="stack-item"><strong>{{ $selectedPlan['name'] }}</strong><br>{{ $selectedPlan['description'] }}</div>
-                @foreach ($selectedPlan['features'] as $feature)
-                    <div class="stack-item">{{ $feature }}</div>
-                @endforeach
-            </div>
-        </div>
-    </section>
-
-    <section class="card" style="margin-top: 22px;">
-        <h2>Founder Signup Form</h2>
-        <form method="POST" action="/onboarding" style="display: grid; gap: 14px; margin-top: 16px;">
+        <section class="card">
+            <div class="pill">{{ $selectedPlan['label'] }}</div>
+            <h2 style="margin-top: 14px;">Founder Signup Form</h2>
+            <p class="muted">{{ $selectedPlan['description'] }}</p>
+            <form method="POST" action="/onboarding" style="display: grid; gap: 14px; margin-top: 16px;">
             @csrf
             <input type="hidden" name="plan_code" value="{{ $selectedPlan['code'] }}">
             <div class="grid-2">
@@ -127,5 +107,6 @@
                 <a class="btn" href="{{ route('plans') }}">Back to plans</a>
             </div>
         </form>
-    </section>
+        </section>
+    </div>
 @endsection

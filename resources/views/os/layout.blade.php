@@ -105,6 +105,16 @@
             padding: 30px 32px 48px;
         }
 
+        .public-shell {
+            max-width: 1180px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .public-shell.narrow {
+            max-width: 860px;
+        }
+
         .hero {
             background: var(--panel);
             border: 1px solid var(--line);
