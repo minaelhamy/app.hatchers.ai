@@ -15,6 +15,7 @@
             <div class="nav-group" style="margin-top: 18px;">
                 <div class="nav-group-title">Control Center</div>
                 <a class="nav-item active" href="/dashboard/admin">Overview</a>
+                <a class="nav-item" href="/admin/control">Founder Operations</a>
                 <a class="nav-item" href="/dashboard">OS Home</a>
             </div>
             <div class="nav-group">
@@ -64,6 +65,19 @@
                                 </div>
                             </div>
                         @endforeach
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>Admin Actions</h2>
+                    <div class="stack" style="margin-top: 14px;">
+                        <div class="stack-item">
+                            <strong>Founder operations</strong><br>
+                            Assign mentors and update subscription state directly from the OS.
+                            <div style="margin-top: 10px;">
+                                <a class="pill" href="/admin/control">Open Admin Control</a>
+                            </div>
+                        </div>
                     </div>
                 </div>
 

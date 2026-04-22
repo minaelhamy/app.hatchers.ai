@@ -10,7 +10,9 @@ use App\Models\FounderActionPlan;
 use App\Models\FounderWeeklyState;
 use App\Models\Subscription;
 use App\Services\AdminDashboardService;
+use App\Services\AdminOperationsService;
 use App\Services\AtlasIntelligenceService;
+use App\Services\FounderModuleSyncService;
 use App\Services\FounderDashboardService;
 use App\Services\IdentitySyncService;
 use App\Services\LmsIdentityBridgeService;
@@ -113,6 +115,118 @@ class OsShellController extends Controller
             'pageTitle' => 'Website Workspace',
             'website' => $websiteWorkspaceService->build($founder),
         ]);
+    }
+
+    public function adminControl(AdminOperationsService $adminOperationsService)
+    {
+        /** @var \App\Models\Founder $user */
+        $user = Auth::user();
+        if (!$user->isAdmin()) {
+            abort(403);
+        }
+
+        return view('os.admin-control', [
+            'pageTitle' => 'Admin Control',
+            'workspace' => $adminOperationsService->build($user),
+        ]);
+    }
+
+    public function adminAssignMentor(Request $request, AdminOperationsService $adminOperationsService): RedirectResponse
+    {
+        /** @var \App\Models\Founder $user */
+        $user = Auth::user();
+        if (!$user->isAdmin()) {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'founder_id' => ['required', 'integer', 'exists:founders,id'],
+            'mentor_id' => ['nullable', 'integer', 'exists:founders,id'],
+        ]);
+
+        $adminOperationsService->assignMentor(
+            (int) $validated['founder_id'],
+            !empty($validated['mentor_id']) ? (int) $validated['mentor_id'] : null
+        );
+
+        return redirect()->route('admin.control')->with('success', 'Mentor assignment updated from Hatchers OS.');
+    }
+
+    public function adminUpdateSubscription(
+        Request $request,
+        AdminOperationsService $adminOperationsService
+    ): RedirectResponse
+    {
+        /** @var \App\Models\Founder $user */
+        $user = Auth::user();
+        if (!$user->isAdmin()) {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'founder_id' => ['required', 'integer', 'exists:founders,id'],
+            'plan_code' => ['required', 'string', 'max:120'],
+            'plan_name' => ['required', 'string', 'max:255'],
+            'billing_status' => ['required', 'string', 'max:50'],
+            'amount' => ['required', 'numeric', 'min:0'],
+        ]);
+
+        $adminOperationsService->updateSubscription((int) $validated['founder_id'], $validated);
+
+        return redirect()->route('admin.control')->with('success', 'Subscription state updated from Hatchers OS.');
+    }
+
+    public function adminUpdateFounder(Request $request, AdminOperationsService $adminOperationsService): RedirectResponse
+    {
+        /** @var \App\Models\Founder $user */
+        $user = Auth::user();
+        if (!$user->isAdmin()) {
+            abort(403);
+        }
+
+        $founderId = (int) $request->input('founder_id');
+        $validated = $request->validate([
+            'founder_id' => ['required', 'integer', 'exists:founders,id'],
+            'full_name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'email', 'max:255', Rule::unique('founders', 'email')->ignore($founderId)],
+            'phone' => ['nullable', 'string', 'max:255'],
+            'country' => ['nullable', 'string', 'max:10'],
+            'status' => ['required', Rule::in(['active', 'paused', 'blocked'])],
+            'company_name' => ['required', 'string', 'max:255'],
+            'company_brief' => ['nullable', 'string', 'max:2000'],
+            'business_model' => ['required', 'in:product,service,hybrid'],
+            'industry' => ['nullable', 'string', 'max:255'],
+            'stage' => ['required', 'in:idea,launching,operating,scaling'],
+            'website_status' => ['required', 'in:not_started,in_progress,live'],
+        ]);
+
+        $adminOperationsService->updateFounderProfile((int) $validated['founder_id'], $validated);
+
+        return redirect()->route('admin.control')->with('success', 'Founder profile updated from Hatchers OS.');
+    }
+
+    public function adminSyncFounder(
+        Request $request,
+        FounderModuleSyncService $founderModuleSyncService
+    ): RedirectResponse {
+        /** @var \App\Models\Founder $user */
+        $user = Auth::user();
+        if (!$user->isAdmin()) {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'founder_id' => ['required', 'integer', 'exists:founders,id'],
+            'target' => ['required', Rule::in(['atlas', 'bazaar', 'servio', 'all'])],
+        ]);
+
+        $founder = Founder::query()->with('company')->findOrFail((int) $validated['founder_id']);
+        $result = $founderModuleSyncService->syncFounder($founder, $validated['target']);
+
+        return redirect()->route('admin.control')->with(
+            empty($result['ok']) ? 'error' : 'success',
+            $result['message'] ?? 'Founder sync completed.'
+        );
     }
 
     public function updateWebsite(

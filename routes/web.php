@@ -23,6 +23,11 @@ Route::middleware('auth')->group(function () {
     Route::get('/dashboard/mentor', [OsShellController::class, 'dashboard'])->name('dashboard.mentor');
     Route::get('/dashboard/admin', [OsShellController::class, 'dashboard'])->name('dashboard.admin');
     Route::get('/workspace/launch/{module}', [OsShellController::class, 'launchWorkspace'])->name('workspace.launch');
+    Route::get('/admin/control', [OsShellController::class, 'adminControl'])->name('admin.control');
+    Route::post('/admin/control/mentor', [OsShellController::class, 'adminAssignMentor'])->name('admin.control.mentor');
+    Route::post('/admin/control/founder', [OsShellController::class, 'adminUpdateFounder'])->name('admin.control.founder');
+    Route::post('/admin/control/subscription', [OsShellController::class, 'adminUpdateSubscription'])->name('admin.control.subscription');
+    Route::post('/admin/control/sync', [OsShellController::class, 'adminSyncFounder'])->name('admin.control.sync');
     Route::get('/website', [OsShellController::class, 'website'])->name('website');
     Route::post('/website/setup', [OsShellController::class, 'updateWebsite'])->name('website.setup');
     Route::post('/website/publish', [OsShellController::class, 'publishWebsite'])->name('website.publish');
