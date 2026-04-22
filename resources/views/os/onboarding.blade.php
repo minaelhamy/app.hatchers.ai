@@ -2,57 +2,57 @@
 
 @section('content')
     <section class="hero">
-        <div class="eyebrow">Founder Onboarding</div>
-        <h1>Tell Hatchers OS about the business once.</h1>
-        <p class="muted">This onboarding replaces fragmented setup across Atlas, LMS, Bazaar, and Servio. It captures the founder context up front so the entire OS can personalize around the company from day one.</p>
+        <div class="eyebrow">Founder Signup</div>
+        <h1>Create your founder workspace.</h1>
+        <p class="muted">You’re signing up as a founder on the <strong>{{ $selectedPlan['name'] }}</strong> plan. After signup, you’ll return to login and enter your new workspace from there.</p>
     </section>
 
     <section class="grid-2">
         <div class="card">
-            <h2>Onboarding Flow</h2>
+            <h2>What happens next</h2>
             <div class="stack" style="margin-top: 14px;">
-                <div class="stack-item"><strong>Step 1</strong><br>Company identity and founder goal</div>
-                <div class="stack-item"><strong>Step 2</strong><br>Business model: product, service, or hybrid</div>
-                <div class="stack-item"><strong>Step 3</strong><br>Audience, offer, and brand direction</div>
-                <div class="stack-item"><strong>Step 4</strong><br>Traction stage and current blockers</div>
-                <div class="stack-item"><strong>Step 5</strong><br>Route the founder into the right weekly plan and website path</div>
+                <div class="stack-item"><strong>Step 1</strong><br>Create your founder credentials and company profile</div>
+                <div class="stack-item"><strong>Step 2</strong><br>Choose whether you are building a product, service, or hybrid business</div>
+                <div class="stack-item"><strong>Step 3</strong><br>Capture audience, offer, and brand direction for Atlas</div>
+                <div class="stack-item"><strong>Step 4</strong><br>Finish signup and return to login</div>
+                <div class="stack-item"><strong>Step 5</strong><br>Log in and land directly on your founder dashboard</div>
             </div>
         </div>
 
         <div class="card">
-            <h2>Sample Intake Fields</h2>
+            <h2>Selected Plan</h2>
             <div class="stack" style="margin-top: 14px;">
-                <div class="stack-item">What is your company called?</div>
-                <div class="stack-item">What are you selling: products, services, or both?</div>
-                <div class="stack-item">Who is your ideal customer?</div>
-                <div class="stack-item">What style should the brand feel like?</div>
-                <div class="stack-item">What is the biggest challenge blocking growth right now?</div>
+                <div class="stack-item"><strong>{{ $selectedPlan['name'] }}</strong><br>{{ $selectedPlan['description'] }}</div>
+                @foreach ($selectedPlan['features'] as $feature)
+                    <div class="stack-item">{{ $feature }}</div>
+                @endforeach
             </div>
         </div>
     </section>
 
     <section class="card" style="margin-top: 22px;">
-        <h2>Prototype Form</h2>
+        <h2>Founder Signup Form</h2>
         <form method="POST" action="/onboarding" style="display: grid; gap: 14px; margin-top: 16px;">
             @csrf
+            <input type="hidden" name="plan_code" value="{{ $selectedPlan['code'] }}">
             <div class="grid-2">
                 <label>
                     <div class="muted" style="margin-bottom: 6px;">Founder Name</div>
-                    <input type="text" name="full_name" value="Mina Elhamy" style="width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); background: #fff;">
+                    <input type="text" name="full_name" value="{{ old('full_name') }}" style="width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); background: #fff;">
                 </label>
                 <label>
                     <div class="muted" style="margin-bottom: 6px;">Email</div>
-                    <input type="email" name="email" value="{{ old('email', 'founder@example.com') }}" style="width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); background: #fff;">
+                    <input type="email" name="email" value="{{ old('email') }}" style="width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); background: #fff;">
                 </label>
             </div>
             <div class="grid-2">
                 <label>
                     <div class="muted" style="margin-bottom: 6px;">Username</div>
-                    <input type="text" name="username" value="{{ old('username', 'founder') }}" style="width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); background: #fff;">
+                    <input type="text" name="username" value="{{ old('username') }}" style="width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); background: #fff;">
                 </label>
                 <label>
                     <div class="muted" style="margin-bottom: 6px;">Company Name</div>
-                    <input type="text" name="company_name" value="{{ old('company_name', 'Brightpath Wellness') }}" style="width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); background: #fff;">
+                    <input type="text" name="company_name" value="{{ old('company_name') }}" style="width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); background: #fff;">
                 </label>
             </div>
             <div class="grid-2">
@@ -86,50 +86,46 @@
             </div>
             <label>
                 <div class="muted" style="margin-bottom: 6px;">Industry</div>
-                <input type="text" name="industry" value="Wellness" style="width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); background: #fff;">
+                <input type="text" name="industry" value="{{ old('industry') }}" style="width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); background: #fff;">
             </label>
             <label>
                 <div class="muted" style="margin-bottom: 6px;">Company Brief</div>
-                <textarea name="company_brief" rows="4" style="width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); background: #fff;">We help busy professionals book premium wellness support with a modern digital experience.</textarea>
+                <textarea name="company_brief" rows="4" style="width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); background: #fff;">{{ old('company_brief') }}</textarea>
             </label>
             <div class="grid-2">
                 <label>
                     <div class="muted" style="margin-bottom: 6px;">Target Audience</div>
-                    <textarea name="target_audience" rows="3" style="width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); background: #fff;">Busy professionals in urban areas looking for convenient premium wellness services.</textarea>
+                    <textarea name="target_audience" rows="3" style="width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); background: #fff;">{{ old('target_audience') }}</textarea>
                 </label>
                 <label>
                     <div class="muted" style="margin-bottom: 6px;">Ideal Customer Profile</div>
-                    <textarea name="ideal_customer_profile" rows="3" style="width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); background: #fff;">A time-constrained, digitally comfortable customer who values trust, convenience, and premium care.</textarea>
+                    <textarea name="ideal_customer_profile" rows="3" style="width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); background: #fff;">{{ old('ideal_customer_profile') }}</textarea>
                 </label>
             </div>
             <div class="grid-2">
                 <label>
                     <div class="muted" style="margin-bottom: 6px;">Brand Voice</div>
-                    <input type="text" name="brand_voice" value="Warm, premium, reassuring, modern" style="width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); background: #fff;">
+                    <input type="text" name="brand_voice" value="{{ old('brand_voice') }}" style="width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); background: #fff;">
                 </label>
                 <label>
                     <div class="muted" style="margin-bottom: 6px;">Core Offer</div>
-                    <input type="text" name="core_offer" value="Book premium wellness services with ease" style="width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); background: #fff;">
+                    <input type="text" name="core_offer" value="{{ old('core_offer') }}" style="width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); background: #fff;">
                 </label>
             </div>
             <div class="grid-2">
                 <label>
                     <div class="muted" style="margin-bottom: 6px;">Primary Growth Goal</div>
-                    <input type="text" name="primary_growth_goal" value="Generate the first 50 recurring customers" style="width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); background: #fff;">
+                    <input type="text" name="primary_growth_goal" value="{{ old('primary_growth_goal') }}" style="width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); background: #fff;">
                 </label>
                 <label>
                     <div class="muted" style="margin-bottom: 6px;">Known Blockers</div>
-                    <input type="text" name="known_blockers" value="No strong website funnel yet and limited content engine" style="width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); background: #fff;">
+                    <input type="text" name="known_blockers" value="{{ old('known_blockers') }}" style="width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); background: #fff;">
                 </label>
             </div>
             <div class="cta-row">
-                <button class="btn primary" type="submit" style="cursor: pointer;">Create founder workspace</button>
+                <button class="btn primary" type="submit" style="cursor: pointer;">Complete founder signup</button>
+                <a class="btn" href="{{ route('plans') }}">Back to plans</a>
             </div>
         </form>
-    </section>
-
-    <section class="card">
-        <h2>Why this matters</h2>
-        <p class="muted">Onboarding should write directly into the central company intelligence layer so Atlas, the dashboard, mentor workflows, and future tools all start from the same business memory.</p>
     </section>
 @endsection

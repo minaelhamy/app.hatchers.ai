@@ -419,7 +419,6 @@
             <a href="/" class="brand">HATCHERS <span>OS</span></a>
             <nav class="top-links">
                 <a class="top-link" href="/plans">Plans</a>
-                <a class="top-link" href="/onboarding">Onboarding</a>
                 @auth
                     <a class="top-link" href="/dashboard">{{ $dashboardLabel }}</a>
                     @if ($authUser->role === 'founder')

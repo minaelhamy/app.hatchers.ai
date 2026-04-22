@@ -1,14 +1,23 @@
 @extends('os.layout')
 
 @section('content')
-    <section class="hero" style="max-width: 680px; margin-inline: auto;">
-        <div class="eyebrow">Unified Login</div>
-        <h1>Return to your Hatchers OS workspace.</h1>
-        <p class="muted">Log in with your email or username to access your founder, mentor, or admin workspace from one operating system.</p>
-    </section>
+    <section class="card" style="max-width: 560px; margin: 24px auto 0; padding: 34px; border-radius: 32px; text-align: center;">
+        <img
+            src="https://lms.hatchers.ai/frontend/default/assets/images/logo.png"
+            alt="Hatchers AI"
+            style="width: 190px; max-width: 70%; height: auto; display: block; margin: 0 auto 18px;"
+        >
+        <div class="eyebrow">Founder Login</div>
+        <h1 style="font-size: clamp(2rem, 4vw, 3rem);">Welcome back to Hatchers AI</h1>
+        <p class="muted" style="margin-bottom: 18px;">Log in to continue building inside your founder operating system.</p>
 
-    <section class="card" style="max-width: 680px; margin-inline: auto;">
-        <form method="POST" action="/login" style="display: grid; gap: 14px;">
+        @if (session('success'))
+            <div style="margin-bottom: 14px; border: 1px solid rgba(44, 122, 87, 0.24); background: rgba(44, 122, 87, 0.08); color: var(--success); border-radius: 16px; padding: 12px 14px; text-align: left;">
+                {{ session('success') }}
+            </div>
+        @endif
+
+        <form method="POST" action="/login" style="display: grid; gap: 14px; text-align: left;">
             @csrf
             <label>
                 <div class="muted" style="margin-bottom: 6px;">Email or Username</div>
@@ -25,9 +34,11 @@
                 @enderror
             </label>
             <div class="cta-row">
-                <button class="btn primary" type="submit" style="cursor: pointer;">Login</button>
-                <a class="btn" href="/onboarding">Create a founder workspace</a>
+                <button class="btn primary" type="submit" style="cursor: pointer; width: 100%;">Login</button>
             </div>
         </form>
+        <p class="muted" style="margin-top: 18px; font-size: 0.96rem;">
+            Don't have an account <a href="/plans" style="color: var(--ink); font-weight: 700; text-decoration: none;">signup here</a>
+        </p>
     </section>
 @endsection

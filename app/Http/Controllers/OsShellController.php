@@ -33,25 +33,30 @@ use Throwable;
 
 class OsShellController extends Controller
 {
-    public function landing()
+    public function landing(): RedirectResponse
     {
-        return view('os.landing', [
-            'pageTitle' => 'Hatchers OS',
-        ]);
+        return redirect()->route('login');
     }
 
     public function plans()
     {
         return view('os.plans', [
             'pageTitle' => 'Choose Your Hatchers OS Plan',
+            'plans' => collect($this->founderSignupPlans())->values()->all(),
         ]);
     }
 
-    public function onboarding()
+    public function onboarding(Request $request)
     {
+        $selectedPlan = $this->resolveFounderSignupPlan((string) $request->query('plan', ''));
+        if ($selectedPlan === null) {
+            return redirect()->route('plans')->with('error', 'Please choose a founder plan before continuing.');
+        }
+
         return view('os.onboarding', [
             'pageTitle' => 'Founder Onboarding',
             'submitted' => session('submitted'),
+            'selectedPlan' => $selectedPlan,
         ]);
     }
 
@@ -354,6 +359,7 @@ class OsShellController extends Controller
     public function storeOnboarding(Request $request, AtlasIntelligenceService $atlas): RedirectResponse
     {
         $validated = $request->validate([
+            'plan_code' => ['required', Rule::in(array_keys($this->founderSignupPlans()))],
             'full_name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', 'unique:founders,email'],
             'username' => ['required', 'string', 'max:255', 'unique:founders,username'],
@@ -371,7 +377,12 @@ class OsShellController extends Controller
             'company_brief' => ['nullable', 'string'],
         ]);
 
-        $founder = DB::transaction(function () use ($validated, $atlas) {
+        $plan = $this->founderSignupPlans()[$validated['plan_code']] ?? null;
+        if ($plan === null) {
+            return redirect()->route('plans')->with('error', 'Please choose a valid founder plan.');
+        }
+
+        DB::transaction(function () use ($validated, $atlas, $plan) {
             $founder = Founder::create(
                 [
                     'username' => $validated['username'],
@@ -381,6 +392,7 @@ class OsShellController extends Controller
                     'status' => 'active',
                     'role' => 'founder',
                     'timezone' => 'Africa/Cairo',
+                    'mentor_entitled_until' => !empty($plan['mentor_months']) ? now()->addMonths((int) $plan['mentor_months']) : null,
                 ]
             );
 
@@ -412,12 +424,17 @@ class OsShellController extends Controller
             Subscription::updateOrCreate(
                 ['founder_id' => $founder->id],
                 [
-                    'plan_code' => 'hatchers-os',
-                    'plan_name' => 'Hatchers OS',
-                    'billing_status' => 'draft',
-                    'amount' => 99,
+                    'plan_code' => $plan['code'],
+                    'plan_name' => $plan['name'],
+                    'billing_status' => $plan['billing_status'],
+                    'amount' => $plan['amount'],
                     'currency' => 'USD',
                     'started_at' => now(),
+                    'mentor_phase_started_at' => !empty($plan['mentor_months']) ? now() : null,
+                    'mentor_phase_ends_at' => !empty($plan['mentor_months']) ? now()->addMonths((int) $plan['mentor_months']) : null,
+                    'transitions_to_plan_code' => $plan['transitions_to_plan_code'] ?? null,
+                    'transitions_on' => !empty($plan['transitions_days']) ? now()->addDays((int) $plan['transitions_days']) : null,
+                    'next_billing_at' => !empty($plan['trial_days']) ? now()->addDays((int) $plan['trial_days']) : now()->addMonth(),
                 ]
             );
 
@@ -467,13 +484,12 @@ class OsShellController extends Controller
             }
 
             $atlas->syncFounderOnboarding($founder, $company, $validated);
-            return $founder;
         });
 
-        Auth::login($founder);
-        $request->session()->regenerate();
-
-        return redirect()->route('dashboard')->with('submitted', true);
+        return redirect()->route('login')->with(
+            'success',
+            'Your founder workspace has been created under the ' . $plan['name'] . ' plan. Please log in to continue.'
+        );
     }
 
     public function authenticate(
@@ -601,5 +617,74 @@ class OsShellController extends Controller
             'actions' => $result['actions'] ?? [],
             'refresh' => false,
         ]);
+    }
+
+    private function founderSignupPlans(): array
+    {
+        return [
+            'hatchers-os-trial' => [
+                'code' => 'hatchers-os-trial',
+                'name' => 'Hatchers OS Free Trial',
+                'label' => 'Free Trial',
+                'amount' => 0,
+                'price_display' => '$0',
+                'period_display' => '/7 days',
+                'description' => 'A 7-day founder trial of Hatchers OS without mentor access so founders can experience the operating system before committing.',
+                'billing_status' => 'trialing',
+                'trial_days' => 7,
+                'transitions_days' => 7,
+                'transitions_to_plan_code' => 'hatchers-os',
+                'cta' => 'Start free trial',
+                'features' => [
+                    'Unified founder dashboard',
+                    'Atlas assistant across the OS',
+                    'Website setup for product or service businesses',
+                    '7-day founder-only trial without mentor access',
+                ],
+            ],
+            'hatchers-os' => [
+                'code' => 'hatchers-os',
+                'name' => 'Hatchers OS',
+                'label' => 'Self-serve',
+                'amount' => 99,
+                'price_display' => '$99',
+                'period_display' => '/month',
+                'description' => 'For founders who want the full OS, unified AI, website tools, content generation, and business workflows without a mentor.',
+                'billing_status' => 'draft',
+                'cta' => 'Choose Hatchers OS',
+                'features' => [
+                    'Unified founder dashboard',
+                    'Atlas assistant across all workflows',
+                    'Website building for product or service businesses',
+                    'Marketing and content studio',
+                ],
+            ],
+            'hatchers-os-mentor' => [
+                'code' => 'hatchers-os-mentor',
+                'name' => 'Hatchers OS + Mentor',
+                'label' => 'Guided growth',
+                'amount' => 600,
+                'price_display' => '$600',
+                'period_display' => '/month',
+                'description' => 'Mentor-guided support for the first 6 months, then transitions to the standard OS subscription at $99/month.',
+                'billing_status' => 'draft',
+                'mentor_months' => 6,
+                'transitions_to_plan_code' => 'hatchers-os',
+                'cta' => 'Choose OS + Mentor',
+                'features' => [
+                    'Everything in Hatchers OS',
+                    'Assigned mentor and weekly execution rhythm',
+                    'Tasks, milestones, and meeting guidance',
+                    'Atlas aware of mentor context and founder progress',
+                ],
+            ],
+        ];
+    }
+
+    private function resolveFounderSignupPlan(string $planCode): ?array
+    {
+        $plans = $this->founderSignupPlans();
+
+        return $plans[$planCode] ?? null;
     }
 }
