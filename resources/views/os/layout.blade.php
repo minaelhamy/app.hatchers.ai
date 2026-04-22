@@ -55,14 +55,35 @@
         }
 
         .brand {
-            font-size: 1.6rem;
-            font-weight: 700;
-            letter-spacing: 0.02em;
             text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 14px;
         }
 
-        .brand span {
-            color: var(--rose);
+        .brand-logo {
+            height: 38px;
+            width: auto;
+            display: block;
+        }
+
+        .brand-copy {
+            display: grid;
+            gap: 2px;
+            line-height: 1.05;
+        }
+
+        .brand-title {
+            font-size: 1.16rem;
+            font-weight: 700;
+            letter-spacing: 0.01em;
+        }
+
+        .brand-subtitle {
+            font-size: 0.78rem;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+            color: var(--muted);
         }
 
         .top-links {
@@ -416,7 +437,13 @@
     @endphp
     <div class="shell">
         <header class="topbar">
-            <a href="/" class="brand">HATCHERS <span>OS</span></a>
+            <a href="/" class="brand">
+                <img class="brand-logo" src="/brand/hatchers-ai-logo.png" alt="Hatchers AI">
+                <span class="brand-copy">
+                    <span class="brand-title">Hatchers Ai Business OS</span>
+                    <span class="brand-subtitle">Founder Operating System</span>
+                </span>
+            </a>
             <nav class="top-links">
                 <a class="top-link" href="/plans">Plans</a>
                 @auth

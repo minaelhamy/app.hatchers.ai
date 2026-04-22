@@ -3,12 +3,12 @@
 @section('content')
     <section class="card" style="max-width: 560px; margin: 24px auto 0; padding: 34px; border-radius: 32px; text-align: center;">
         <img
-            src="https://lms.hatchers.ai/frontend/default/assets/images/logo.png"
+            src="/brand/hatchers-ai-logo.png"
             alt="Hatchers AI"
-            style="width: 190px; max-width: 70%; height: auto; display: block; margin: 0 auto 18px;"
+            style="width: 240px; max-width: 78%; height: auto; display: block; margin: 0 auto 18px;"
         >
         <div class="eyebrow">Founder Login</div>
-        <h1 style="font-size: clamp(2rem, 4vw, 3rem);">Welcome back to Hatchers AI</h1>
+        <h1 style="font-size: clamp(2rem, 4vw, 3rem);">Welcome back to Hatchers Ai Business OS</h1>
         <p class="muted" style="margin-bottom: 18px;">Log in to continue building inside your founder operating system.</p>
 
         @if (session('success'))
