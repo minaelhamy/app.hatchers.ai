@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
 class Founder extends Authenticatable
 {
@@ -63,5 +64,42 @@ class Founder extends Authenticatable
     public function actionPlans(): HasMany
     {
         return $this->hasMany(FounderActionPlan::class);
+    }
+
+    public function mentorAssignments(): HasMany
+    {
+        return $this->hasMany(MentorAssignment::class, 'founder_id');
+    }
+
+    public function assignedFounderLinks(): HasMany
+    {
+        return $this->hasMany(MentorAssignment::class, 'mentor_user_id');
+    }
+
+    public function assignedFounders(): HasManyThrough
+    {
+        return $this->hasManyThrough(
+            self::class,
+            MentorAssignment::class,
+            'mentor_user_id',
+            'id',
+            'id',
+            'founder_id'
+        );
+    }
+
+    public function isFounder(): bool
+    {
+        return $this->role === 'founder';
+    }
+
+    public function isMentor(): bool
+    {
+        return $this->role === 'mentor';
+    }
+
+    public function isAdmin(): bool
+    {
+        return $this->role === 'admin';
     }
 }

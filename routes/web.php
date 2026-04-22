@@ -1,12 +1,14 @@
 <?php
 
 use App\Http\Controllers\OsShellController;
+use App\Http\Controllers\Integration\IdentitySyncController;
 use App\Http\Controllers\Integration\ModuleSnapshotController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [OsShellController::class, 'landing'])->name('landing');
 Route::get('/plans', [OsShellController::class, 'plans'])->name('plans');
 Route::post('/integrations/snapshots/{module}', [ModuleSnapshotController::class, 'store'])->name('integrations.snapshots.store');
+Route::post('/integrations/identities/{role}', [IdentitySyncController::class, 'store'])->name('integrations.identities.store');
 
 Route::middleware('guest')->group(function () {
     Route::get('/login', [OsShellController::class, 'login'])->name('login');
@@ -17,6 +19,10 @@ Route::middleware('guest')->group(function () {
 
 Route::middleware('auth')->group(function () {
     Route::get('/dashboard', [OsShellController::class, 'dashboard'])->name('dashboard');
+    Route::get('/dashboard/founder', [OsShellController::class, 'dashboard'])->name('dashboard.founder');
+    Route::get('/dashboard/mentor', [OsShellController::class, 'dashboard'])->name('dashboard.mentor');
+    Route::get('/dashboard/admin', [OsShellController::class, 'dashboard'])->name('dashboard.admin');
+    Route::get('/workspace/launch/{module}', [OsShellController::class, 'launchWorkspace'])->name('workspace.launch');
     Route::get('/website', [OsShellController::class, 'website'])->name('website');
     Route::post('/website/setup', [OsShellController::class, 'updateWebsite'])->name('website.setup');
     Route::post('/website/publish', [OsShellController::class, 'publishWebsite'])->name('website.publish');

@@ -15,34 +15,27 @@
         $execution = $dashboard['execution'];
         $growth = $dashboard['growth'];
         $atlas = $dashboard['atlas'];
+        $launchCards = $launchCards ?? [];
     @endphp
     <div class="sidebar-layout">
         <aside class="sidebar-card">
             <div class="pill">{{ $subscription?->plan_name ?? 'Hatchers OS' }}</div>
             <div class="nav-group" style="margin-top: 18px;">
                 <div class="nav-group-title">Workspace</div>
-                <a class="nav-item active" href="/dashboard">Home</a>
-                <a class="nav-item" href="#">Weekly Plan</a>
-                <a class="nav-item" href="#">Atlas</a>
+                <a class="nav-item active" href="/dashboard/founder">Home</a>
+                <a class="nav-item" href="/website">Website</a>
+                <a class="nav-item" href="{{ rtrim((string) config('modules.atlas.base_url'), '/') }}" target="_blank" rel="noreferrer">Atlas</a>
             </div>
             <div class="nav-group">
                 <div class="nav-group-title">Business</div>
-                <a class="nav-item" href="/website">Website</a>
-                <a class="nav-item" href="#">Products</a>
-                <a class="nav-item" href="#">Services</a>
-                <a class="nav-item" href="#">Orders & Bookings</a>
+                <a class="nav-item" href="{{ rtrim((string) config('modules.bazaar.base_url'), '/') }}/admin/dashboard" target="_blank" rel="noreferrer">Bazaar</a>
+                <a class="nav-item" href="{{ rtrim((string) config('modules.servio.base_url'), '/') }}/admin/dashboard" target="_blank" rel="noreferrer">Servio</a>
+                <a class="nav-item" href="{{ rtrim((string) config('modules.lms.base_url'), '/') }}" target="_blank" rel="noreferrer">LMS</a>
             </div>
             <div class="nav-group">
                 <div class="nav-group-title">Growth</div>
-                <a class="nav-item" href="#">Marketing</a>
-                <a class="nav-item" href="#">Content Studio</a>
-                <a class="nav-item" href="#">Customers</a>
-                <a class="nav-item" href="#">Analytics</a>
-            </div>
-            <div class="nav-group">
-                <div class="nav-group-title">Support</div>
-                <a class="nav-item" href="#">Mentor</a>
-                <a class="nav-item" href="#">Settings</a>
+                <a class="nav-item" href="{{ rtrim((string) config('modules.atlas.base_url'), '/') }}/dashboard" target="_blank" rel="noreferrer">Campaigns & Content</a>
+                <a class="nav-item" href="{{ rtrim((string) config('modules.atlas.base_url'), '/') }}/all-images" target="_blank" rel="noreferrer">Generated Assets</a>
             </div>
         </aside>
 
@@ -79,6 +72,21 @@
             </section>
 
             <section class="grid-2" style="margin-top: 22px;">
+                <div class="card">
+                    <h2>Open Tools</h2>
+                    <div class="stack" style="margin-top: 14px;">
+                        @foreach ($launchCards as $launch)
+                            <div class="stack-item">
+                                <strong>{{ $launch['label'] }}</strong><br>
+                                {{ $launch['description'] }}
+                                <div style="margin-top: 10px;">
+                                    <a class="pill" href="/workspace/launch/{{ strtolower($launch['module']) }}">Open {{ $launch['label'] }}</a>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+
                 <div class="card">
                     <h2>This Week</h2>
                     <div class="stack" style="margin-top: 14px;">

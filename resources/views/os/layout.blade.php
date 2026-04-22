@@ -403,15 +403,29 @@
     </style>
 </head>
 <body>
+    @php
+        $authUser = auth()->user();
+        $dashboardLabel = 'Dashboard';
+        if ($authUser?->role === 'admin') {
+            $dashboardLabel = 'Admin';
+        } elseif ($authUser?->role === 'mentor') {
+            $dashboardLabel = 'Mentor';
+        } elseif ($authUser?->role === 'founder') {
+            $dashboardLabel = 'Founder';
+        }
+    @endphp
     <div class="shell">
         <header class="topbar">
             <a href="/" class="brand">HATCHERS <span>OS</span></a>
             <nav class="top-links">
                 <a class="top-link" href="/plans">Plans</a>
                 <a class="top-link" href="/onboarding">Onboarding</a>
-                <a class="top-link" href="/dashboard">Dashboard</a>
                 @auth
-                    <a class="top-link" href="/website">Website</a>
+                    <a class="top-link" href="/dashboard">{{ $dashboardLabel }}</a>
+                    @if ($authUser->role === 'founder')
+                        <a class="top-link" href="/website">Website</a>
+                    @endif
+                    <span class="top-link" style="pointer-events: none;">{{ ucfirst($authUser->role) }}</span>
                 @endauth
                 @auth
                     <form method="POST" action="/logout" style="margin: 0;">

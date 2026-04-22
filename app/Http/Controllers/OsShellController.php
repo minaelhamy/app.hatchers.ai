@@ -9,11 +9,16 @@ use App\Models\Founder;
 use App\Models\FounderActionPlan;
 use App\Models\FounderWeeklyState;
 use App\Models\Subscription;
+use App\Services\AdminDashboardService;
 use App\Services\AtlasIntelligenceService;
 use App\Services\FounderDashboardService;
+use App\Services\IdentitySyncService;
+use App\Services\LmsIdentityBridgeService;
+use App\Services\MentorDashboardService;
 use App\Services\OsAssistantActionService;
 use App\Services\WebsiteProvisioningService;
 use App\Services\WebsiteWorkspaceService;
+use App\Services\WorkspaceLaunchService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -49,19 +54,54 @@ class OsShellController extends Controller
     public function login()
     {
         return view('os.login', [
-            'pageTitle' => 'Founder Login',
+            'pageTitle' => 'Hatchers OS Login',
         ]);
     }
 
-    public function dashboard(FounderDashboardService $dashboardService)
+    public function dashboard(
+        FounderDashboardService $founderDashboardService,
+        MentorDashboardService $mentorDashboardService,
+        AdminDashboardService $adminDashboardService,
+        WorkspaceLaunchService $workspaceLaunchService
+    )
     {
-        /** @var \App\Models\Founder $founder */
-        $founder = Auth::user();
+        /** @var \App\Models\Founder $user */
+        $user = Auth::user();
+
+        if ($user->isAdmin()) {
+            return view('os.dashboard-admin', [
+                'pageTitle' => 'Admin Dashboard',
+                'dashboard' => $adminDashboardService->build($user),
+                'launchCards' => $workspaceLaunchService->launchCards($user),
+            ]);
+        }
+
+        if ($user->isMentor()) {
+            return view('os.dashboard-mentor', [
+                'pageTitle' => 'Mentor Dashboard',
+                'dashboard' => $mentorDashboardService->build($user),
+                'launchCards' => $workspaceLaunchService->launchCards($user),
+            ]);
+        }
 
         return view('os.dashboard', [
             'pageTitle' => 'Founder Dashboard',
-            'dashboard' => $dashboardService->build($founder),
+            'dashboard' => $founderDashboardService->build($user),
+            'launchCards' => $workspaceLaunchService->launchCards($user),
         ]);
+    }
+
+    public function launchWorkspace(string $module, WorkspaceLaunchService $workspaceLaunchService): RedirectResponse
+    {
+        /** @var \App\Models\Founder $user */
+        $user = Auth::user();
+
+        $url = $workspaceLaunchService->buildLaunchUrl($user, $module);
+        if ($url === null) {
+            return redirect()->route('dashboard')->with('error', 'Hatchers OS could not prepare that workspace launch yet.');
+        }
+
+        return redirect()->away($url);
     }
 
     public function website(WebsiteWorkspaceService $websiteWorkspaceService)
@@ -320,7 +360,11 @@ class OsShellController extends Controller
         return redirect()->route('dashboard')->with('submitted', true);
     }
 
-    public function authenticate(Request $request): RedirectResponse
+    public function authenticate(
+        Request $request,
+        IdentitySyncService $identitySyncService,
+        LmsIdentityBridgeService $lmsIdentityBridgeService
+    ): RedirectResponse
     {
         $credentials = $request->validate([
             'login' => ['required', 'string'],
@@ -331,13 +375,17 @@ class OsShellController extends Controller
             ->orWhere('username', $credentials['login'])
             ->first();
 
-        if (
-            !$founder ||
-            !Hash::check($credentials['password'], $founder->password)
-        ) {
-            return back()
-                ->withErrors(['login' => 'The provided credentials do not match our records.'])
-                ->onlyInput('login');
+        if (!$founder || !Hash::check($credentials['password'], $founder->password)) {
+            $bridgeResult = $lmsIdentityBridgeService->authenticate($credentials['login'], $credentials['password']);
+            if (empty($bridgeResult['ok'])) {
+                return back()
+                    ->withErrors(['login' => 'The provided credentials do not match our records.'])
+                    ->onlyInput('login');
+            }
+
+            $profile = is_array($bridgeResult['profile'] ?? null) ? $bridgeResult['profile'] : [];
+            $role = trim((string) ($profile['role'] ?? 'founder'));
+            $founder = $identitySyncService->upsert($role, $profile, $credentials['password']);
         }
 
         Auth::login($founder, true);

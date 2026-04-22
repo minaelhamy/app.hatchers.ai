@@ -10,6 +10,7 @@ return [
     ],
     'lms' => [
         'base_url' => env('LMS_BASE_URL', 'https://lms.hatchers.ai'),
+        'shared_secret' => env('WEBSITE_PLATFORM_SHARED_SECRET', ''),
     ],
     'bazaar' => [
         'base_url' => env('BAZAAR_BASE_URL', 'https://bazaar.hatchers.ai'),

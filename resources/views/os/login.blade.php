@@ -2,9 +2,9 @@
 
 @section('content')
     <section class="hero" style="max-width: 680px; margin-inline: auto;">
-        <div class="eyebrow">Founder Login</div>
+        <div class="eyebrow">Unified Login</div>
         <h1>Return to your Hatchers OS workspace.</h1>
-        <p class="muted">Log in with your founder email or username to access your company dashboard, action plan, and Atlas assistant.</p>
+        <p class="muted">Log in with your email or username to access your founder, mentor, or admin workspace from one operating system.</p>
     </section>
 
     <section class="card" style="max-width: 680px; margin-inline: auto;">
