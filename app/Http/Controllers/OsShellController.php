@@ -57,6 +57,8 @@ class OsShellController extends Controller
             'pageTitle' => 'Founder Onboarding',
             'submitted' => session('submitted'),
             'selectedPlan' => $selectedPlan,
+            'industryOptions' => $this->founderIndustryOptions(),
+            'coreOfferOptions' => $this->founderCoreOfferOptions(),
         ]);
     }
 
@@ -366,15 +368,21 @@ class OsShellController extends Controller
             'password' => ['required', 'string', 'min:8', 'confirmed'],
             'company_name' => ['required', 'string', 'max:255'],
             'business_model' => ['required', 'in:product,service,hybrid'],
-            'industry' => ['nullable', 'string', 'max:255'],
+            'industry' => ['required', Rule::in($this->founderIndustryOptions())],
             'stage' => ['required', 'in:idea,launching,operating,scaling'],
-            'target_audience' => ['nullable', 'string'],
-            'ideal_customer_profile' => ['nullable', 'string'],
-            'brand_voice' => ['nullable', 'string'],
-            'core_offer' => ['nullable', 'string'],
-            'primary_growth_goal' => ['nullable', 'string'],
-            'known_blockers' => ['nullable', 'string'],
-            'company_brief' => ['nullable', 'string'],
+            'target_audience' => ['required', 'string', 'max:255'],
+            'ideal_customer_profile' => ['required', 'string', 'max:1000'],
+            'brand_voice' => ['required', 'string', 'max:255'],
+            'core_offer' => ['required', Rule::in($this->founderCoreOfferOptions())],
+            'primary_growth_goal' => ['required', 'string', 'max:255'],
+            'known_blockers' => ['required', 'string', 'max:255'],
+            'company_brief' => ['required', 'string', 'max:2000'],
+        ], [
+            'plan_code.required' => 'Please choose a founder plan before signing up.',
+            'industry.required' => 'Please choose your industry.',
+            'industry.in' => 'Please choose an industry from the list.',
+            'core_offer.required' => 'Please choose the offer type that fits your business.',
+            'core_offer.in' => 'Please choose an offer type from the list.',
         ]);
 
         $plan = $this->founderSignupPlans()[$validated['plan_code']] ?? null;
@@ -382,109 +390,121 @@ class OsShellController extends Controller
             return redirect()->route('plans')->with('error', 'Please choose a valid founder plan.');
         }
 
-        DB::transaction(function () use ($validated, $atlas, $plan) {
-            $founder = Founder::create(
-                [
-                    'username' => $validated['username'],
-                    'email' => $validated['email'],
-                    'full_name' => $validated['full_name'],
-                    'password' => Hash::make($validated['password']),
-                    'status' => 'active',
-                    'role' => 'founder',
-                    'timezone' => 'Africa/Cairo',
-                    'mentor_entitled_until' => !empty($plan['mentor_months']) ? now()->addMonths((int) $plan['mentor_months']) : null,
-                ]
-            );
-
-            $company = Company::updateOrCreate(
-                ['founder_id' => $founder->id],
-                [
-                    'company_name' => $validated['company_name'],
-                    'business_model' => $validated['business_model'],
-                    'industry' => $validated['industry'] ?? null,
-                    'stage' => $validated['stage'],
-                    'website_status' => 'not_started',
-                    'company_brief' => $validated['company_brief'] ?? null,
-                ]
-            );
-
-            CompanyIntelligence::updateOrCreate(
-                ['company_id' => $company->id],
-                [
-                    'target_audience' => $validated['target_audience'] ?? null,
-                    'ideal_customer_profile' => $validated['ideal_customer_profile'] ?? null,
-                    'brand_voice' => $validated['brand_voice'] ?? null,
-                    'core_offer' => $validated['core_offer'] ?? null,
-                    'primary_growth_goal' => $validated['primary_growth_goal'] ?? null,
-                    'known_blockers' => $validated['known_blockers'] ?? null,
-                    'intelligence_updated_at' => now(),
-                ]
-            );
-
-            Subscription::updateOrCreate(
-                ['founder_id' => $founder->id],
-                [
-                    'plan_code' => $plan['code'],
-                    'plan_name' => $plan['name'],
-                    'billing_status' => $plan['billing_status'],
-                    'amount' => $plan['amount'],
-                    'currency' => 'USD',
-                    'started_at' => now(),
-                    'mentor_phase_started_at' => !empty($plan['mentor_months']) ? now() : null,
-                    'mentor_phase_ends_at' => !empty($plan['mentor_months']) ? now()->addMonths((int) $plan['mentor_months']) : null,
-                    'transitions_to_plan_code' => $plan['transitions_to_plan_code'] ?? null,
-                    'transitions_on' => !empty($plan['transitions_days']) ? now()->addDays((int) $plan['transitions_days']) : null,
-                    'next_billing_at' => !empty($plan['trial_days']) ? now()->addDays((int) $plan['trial_days']) : now()->addMonth(),
-                ]
-            );
-
-            CommercialSummary::updateOrCreate(
-                ['founder_id' => $founder->id],
-                [
-                    'business_model' => $validated['business_model'],
-                    'summary_updated_at' => now(),
-                ]
-            );
-
-            FounderWeeklyState::updateOrCreate(
-                ['founder_id' => $founder->id],
-                [
-                    'weekly_focus' => 'Complete onboarding and begin the first business build sprint.',
-                    'state_updated_at' => now(),
-                ]
-            );
-
-            $actions = [
-                [
-                    'title' => 'Complete company intelligence',
-                    'description' => 'Refine your audience, offer, and positioning so Atlas can guide the rest of the OS accurately.',
-                    'platform' => 'atlas',
-                    'priority' => 95,
-                    'cta_label' => 'Open Atlas',
-                    'cta_url' => '/dashboard',
-                ],
-                [
-                    'title' => 'Choose your website path',
-                    'description' => 'Start with the right website engine based on your business model.',
-                    'platform' => $validated['business_model'] === 'service' ? 'servio' : 'bazaar',
-                    'priority' => 88,
-                    'cta_label' => 'Open Website Workspace',
-                    'cta_url' => '/website',
-                ],
-            ];
-
-            foreach ($actions as $action) {
-                FounderActionPlan::firstOrCreate(
+        try {
+            DB::transaction(function () use ($validated, $atlas, $plan) {
+                $founder = Founder::create(
                     [
-                        'founder_id' => $founder->id,
-                        'title' => $action['title'],
-                    ],
-                    $action
+                        'username' => $validated['username'],
+                        'email' => $validated['email'],
+                        'full_name' => $validated['full_name'],
+                        'password' => Hash::make($validated['password']),
+                        'status' => 'active',
+                        'role' => 'founder',
+                        'timezone' => 'Africa/Cairo',
+                        'mentor_entitled_until' => !empty($plan['mentor_months']) ? now()->addMonths((int) $plan['mentor_months']) : null,
+                    ]
                 );
-            }
 
-            $atlas->syncFounderOnboarding($founder, $company, $validated);
-        });
+                $company = Company::updateOrCreate(
+                    ['founder_id' => $founder->id],
+                    [
+                        'company_name' => $validated['company_name'],
+                        'business_model' => $validated['business_model'],
+                        'industry' => $validated['industry'],
+                        'stage' => $validated['stage'],
+                        'website_status' => 'not_started',
+                        'company_brief' => $validated['company_brief'],
+                    ]
+                );
+
+                CompanyIntelligence::updateOrCreate(
+                    ['company_id' => $company->id],
+                    [
+                        'target_audience' => $validated['target_audience'],
+                        'ideal_customer_profile' => $validated['ideal_customer_profile'],
+                        'brand_voice' => $validated['brand_voice'],
+                        'core_offer' => $validated['core_offer'],
+                        'primary_growth_goal' => $validated['primary_growth_goal'],
+                        'known_blockers' => $validated['known_blockers'],
+                        'intelligence_updated_at' => now(),
+                    ]
+                );
+
+                Subscription::updateOrCreate(
+                    ['founder_id' => $founder->id],
+                    [
+                        'plan_code' => $plan['code'],
+                        'plan_name' => $plan['name'],
+                        'billing_status' => $plan['billing_status'],
+                        'amount' => $plan['amount'],
+                        'currency' => 'USD',
+                        'started_at' => now(),
+                        'mentor_phase_started_at' => !empty($plan['mentor_months']) ? now() : null,
+                        'mentor_phase_ends_at' => !empty($plan['mentor_months']) ? now()->addMonths((int) $plan['mentor_months']) : null,
+                        'transitions_to_plan_code' => $plan['transitions_to_plan_code'] ?? null,
+                        'transitions_on' => !empty($plan['transitions_days']) ? now()->addDays((int) $plan['transitions_days']) : null,
+                        'next_billing_at' => !empty($plan['trial_days']) ? now()->addDays((int) $plan['trial_days']) : now()->addMonth(),
+                    ]
+                );
+
+                CommercialSummary::updateOrCreate(
+                    ['founder_id' => $founder->id],
+                    [
+                        'business_model' => $validated['business_model'],
+                        'summary_updated_at' => now(),
+                    ]
+                );
+
+                FounderWeeklyState::updateOrCreate(
+                    ['founder_id' => $founder->id],
+                    [
+                        'weekly_focus' => 'Complete onboarding and begin the first business build sprint.',
+                        'state_updated_at' => now(),
+                    ]
+                );
+
+                $actions = [
+                    [
+                        'title' => 'Complete company intelligence',
+                        'description' => 'Refine your audience, offer, and positioning so Atlas can guide the rest of the OS accurately.',
+                        'platform' => 'atlas',
+                        'priority' => 95,
+                        'cta_label' => 'Open Atlas',
+                        'cta_url' => '/dashboard',
+                    ],
+                    [
+                        'title' => 'Choose your website path',
+                        'description' => 'Start with the right website engine based on your business model.',
+                        'platform' => $validated['business_model'] === 'service' ? 'servio' : 'bazaar',
+                        'priority' => 88,
+                        'cta_label' => 'Open Website Workspace',
+                        'cta_url' => '/website',
+                    ],
+                ];
+
+                foreach ($actions as $action) {
+                    FounderActionPlan::firstOrCreate(
+                        [
+                            'founder_id' => $founder->id,
+                            'title' => $action['title'],
+                        ],
+                        $action
+                    );
+                }
+
+                $atlas->syncFounderOnboarding($founder, $company, $validated);
+            });
+        } catch (Throwable $exception) {
+            Log::error('Founder signup failed unexpectedly.', [
+                'email' => $validated['email'] ?? '',
+                'username' => $validated['username'] ?? '',
+                'message' => $exception->getMessage(),
+            ]);
+
+            return back()
+                ->withInput()
+                ->withErrors(['signup' => 'Hatchers AI could not complete signup right now. Please review the form and try again.']);
+        }
 
         return redirect()->route('login')->with(
             'success',
@@ -678,6 +698,36 @@ class OsShellController extends Controller
                     'Atlas aware of mentor context and founder progress',
                 ],
             ],
+        ];
+    }
+
+    private function founderIndustryOptions(): array
+    {
+        return [
+            'E-commerce and retail',
+            'Professional services',
+            'Coaching and consulting',
+            'Education and training',
+            'Health and wellness',
+            'Beauty and personal care',
+            'Food and hospitality',
+            'Creative and media',
+            'Technology and software',
+            'Real estate and property',
+        ];
+    }
+
+    private function founderCoreOfferOptions(): array
+    {
+        return [
+            'Physical products',
+            'Digital products',
+            '1:1 services',
+            'Group programs',
+            'Membership or subscription',
+            'Courses or workshops',
+            'Agency services',
+            'Hybrid offer',
         ];
     }
 
