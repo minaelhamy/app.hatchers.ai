@@ -4,7 +4,9 @@ namespace App\Services;
 
 use App\Models\Company;
 use App\Models\Founder;
+use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Hash;
+use RuntimeException;
 
 class IdentitySyncService
 {
@@ -22,13 +24,21 @@ class IdentitySyncService
     {
         $user = $this->resolveUser($payload) ?: new Founder();
 
+        $username = $this->normalizeUsername((string) ($payload['username'] ?? $user->username ?? ''));
+        $email = $this->normalizeEmail((string) ($payload['email'] ?? $user->email ?? ''));
+        $fullName = trim((string) ($payload['full_name'] ?? $payload['name'] ?? $user->full_name ?? $username));
+
+        if ($username === '' || $email === '') {
+            throw new RuntimeException('The incoming identity payload is missing a usable username or email.');
+        }
+
         $user->role = $role;
         $user->status = !empty($payload['status']) ? (string) $payload['status'] : 'active';
-        $user->username = trim((string) ($payload['username'] ?? $user->username ?? ''));
-        $user->email = trim((string) ($payload['email'] ?? $user->email ?? ''));
-        $user->full_name = trim((string) ($payload['full_name'] ?? $payload['name'] ?? $user->full_name ?? $user->username));
+        $user->username = $username;
+        $user->email = $email;
+        $user->full_name = $fullName;
         $user->phone = trim((string) ($payload['phone'] ?? $user->phone ?? ''));
-        $user->country = trim((string) ($payload['country'] ?? $user->country ?? '')) ?: null;
+        $user->country = $this->normalizeCountry((string) ($payload['country'] ?? $user->country ?? ''));
         $user->timezone = trim((string) ($payload['timezone'] ?? $user->timezone ?? 'Africa/Cairo')) ?: 'Africa/Cairo';
         $user->last_synced_at = now();
 
@@ -88,5 +98,31 @@ class IdentitySyncService
                 'website_status' => trim((string) ($payload['website_status'] ?? '')) ?: 'not_started',
             ]
         );
+    }
+
+    private function normalizeUsername(string $value): string
+    {
+        $value = trim($value);
+
+        if ($value !== '') {
+            return $value;
+        }
+
+        return '';
+    }
+
+    private function normalizeEmail(string $value): string
+    {
+        return trim($value);
+    }
+
+    private function normalizeCountry(string $value): ?string
+    {
+        $value = strtoupper(trim($value));
+        if ($value === '') {
+            return null;
+        }
+
+        return Str::limit($value, 2, '');
     }
 }

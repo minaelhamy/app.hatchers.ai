@@ -27,7 +27,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
+use Throwable;
 
 class OsShellController extends Controller
 {
@@ -489,17 +491,34 @@ class OsShellController extends Controller
             ->orWhere('username', $credentials['login'])
             ->first();
 
-        if (!$founder || !Hash::check($credentials['password'], $founder->password)) {
-            $bridgeResult = $lmsIdentityBridgeService->authenticate($credentials['login'], $credentials['password']);
-            if (empty($bridgeResult['ok'])) {
-                return back()
-                    ->withErrors(['login' => 'The provided credentials do not match our records.'])
-                    ->onlyInput('login');
+        try {
+            if (!$founder || !Hash::check($credentials['password'], $founder->password)) {
+                $bridgeResult = $lmsIdentityBridgeService->authenticate($credentials['login'], $credentials['password']);
+                if (empty($bridgeResult['ok'])) {
+                    return back()
+                        ->withErrors(['login' => 'The provided credentials do not match our records.'])
+                        ->onlyInput('login');
+                }
+
+                $profile = is_array($bridgeResult['profile'] ?? null) ? $bridgeResult['profile'] : [];
+                $role = trim((string) ($profile['role'] ?? 'founder'));
+                $founder = $identitySyncService->upsert($role, $profile, $credentials['password']);
             }
 
-            $profile = is_array($bridgeResult['profile'] ?? null) ? $bridgeResult['profile'] : [];
-            $role = trim((string) ($profile['role'] ?? 'founder'));
-            $founder = $identitySyncService->upsert($role, $profile, $credentials['password']);
+            if (!in_array((string) $founder->status, ['active', 'trialing'], true)) {
+                return back()
+                    ->withErrors(['login' => 'This account is currently ' . $founder->status . '.'])
+                    ->onlyInput('login');
+            }
+        } catch (Throwable $exception) {
+            Log::error('OS login failed unexpectedly.', [
+                'login' => $credentials['login'],
+                'message' => $exception->getMessage(),
+            ]);
+
+            return back()
+                ->withErrors(['login' => 'Hatchers OS could not complete login right now. Please try again in a moment.'])
+                ->onlyInput('login');
         }
 
         Auth::login($founder, true);
