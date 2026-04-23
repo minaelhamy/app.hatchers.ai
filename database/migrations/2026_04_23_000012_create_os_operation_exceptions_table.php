@@ -10,11 +10,11 @@ return new class extends Migration
     {
         Schema::create('os_operation_exceptions', function (Blueprint $table) {
             $table->id();
-            $table->string('module');
-            $table->string('operation');
+            $table->string('module', 64);
+            $table->string('operation', 120);
             $table->foreignId('founder_id')->nullable()->constrained('founders')->nullOnDelete();
             $table->text('message');
-            $table->string('status')->default('open');
+            $table->string('status', 32)->default('open');
             $table->json('payload_json')->nullable();
             $table->timestamp('resolved_at')->nullable();
             $table->timestamps();
