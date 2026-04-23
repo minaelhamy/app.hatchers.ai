@@ -1,318 +1,841 @@
 @extends('os.layout')
 
+@section('hide_topbar', '1')
+@section('page_class', 'founder-home-page')
+
+@section('head')
+    <style>
+        .page.founder-home-page {
+            padding: 0;
+        }
+
+        .founder-home {
+            min-height: 100vh;
+            display: grid;
+            grid-template-columns: 220px minmax(0, 1fr) 220px;
+            background: #f8f5ee;
+        }
+
+        .founder-sidebar,
+        .founder-rightbar {
+            background: rgba(255, 252, 247, 0.8);
+            border-color: var(--line);
+            border-style: solid;
+            border-width: 0 1px 0 0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .founder-rightbar {
+            border-width: 0 0 0 1px;
+            background: rgba(255, 251, 246, 0.9);
+        }
+
+        .founder-sidebar-inner,
+        .founder-rightbar-inner {
+            padding: 22px 18px;
+        }
+
+        .founder-brand {
+            display: inline-block;
+            margin-bottom: 24px;
+        }
+
+        .founder-brand img {
+            width: 168px;
+            height: auto;
+            display: block;
+        }
+
+        .founder-nav {
+            display: grid;
+            gap: 6px;
+        }
+
+        .founder-nav-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 14px;
+            border-radius: 14px;
+            text-decoration: none;
+            color: var(--ink);
+            font-size: 0.98rem;
+        }
+
+        .founder-nav-item.active {
+            background: #ece6db;
+        }
+
+        .founder-nav-icon {
+            width: 18px;
+            text-align: center;
+            color: var(--muted);
+        }
+
+        .founder-sidebar-footer {
+            margin-top: auto;
+            padding: 18px;
+            border-top: 1px solid var(--line);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .founder-user {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 0;
+        }
+
+        .founder-avatar {
+            width: 30px;
+            height: 30px;
+            border-radius: 999px;
+            background: #b0a999;
+            color: #fff;
+            display: grid;
+            place-items: center;
+            font-weight: 700;
+            font-size: 0.92rem;
+            flex-shrink: 0;
+        }
+
+        .founder-user-name {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .founder-main {
+            padding: 26px 28px 24px;
+        }
+
+        .founder-main-inner {
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        .founder-welcome h1 {
+            font-size: clamp(2rem, 3vw, 3.1rem);
+            letter-spacing: -0.02em;
+            margin-bottom: 4px;
+        }
+
+        .founder-welcome p {
+            color: var(--muted);
+            font-size: 1.02rem;
+            margin-bottom: 28px;
+        }
+
+        .founder-section {
+            margin-bottom: 20px;
+        }
+
+        .founder-section h2 {
+            font-size: 1.15rem;
+            margin-bottom: 12px;
+        }
+
+        .founder-block {
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid rgba(220, 207, 191, 0.65);
+            border-radius: 18px;
+            padding: 18px 20px;
+            box-shadow: 0 10px 28px rgba(52, 41, 26, 0.04);
+        }
+
+        .founder-block + .founder-block {
+            margin-top: 10px;
+        }
+
+        .founder-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+        }
+
+        .founder-meta {
+            font-size: 0.84rem;
+            color: #2fac5a;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 6px;
+        }
+
+        .founder-subtle {
+            color: var(--muted);
+            font-size: 0.98rem;
+        }
+
+        .founder-badge {
+            padding: 8px 14px;
+            border-radius: 10px;
+            background: #f0ece4;
+            color: #7a7267;
+            font-size: 0.95rem;
+            white-space: nowrap;
+        }
+
+        .founder-badge.success {
+            background: linear-gradient(135deg, #2fba5a, #93e0a5);
+            color: white;
+        }
+
+        .founder-badge.info {
+            background: linear-gradient(135deg, #4c91ec, #68b4ff);
+            color: white;
+        }
+
+        .founder-task-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 8px;
+        }
+
+        .founder-task-label {
+            font-size: 0.83rem;
+            color: var(--rose);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .founder-task-cta {
+            border: 0;
+            border-radius: 10px;
+            padding: 10px 16px;
+            background: linear-gradient(90deg, #8e1c74, #ff2c35);
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .founder-task-card.completed .founder-task-title {
+            text-decoration: line-through;
+            opacity: 0.75;
+        }
+
+        .founder-task-card {
+            cursor: pointer;
+        }
+
+        .founder-learning-card,
+        .founder-mentor-card {
+            cursor: pointer;
+        }
+
+        .founder-assistant-bar {
+            margin-top: 26px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: white;
+            border: 1px solid rgba(220, 207, 191, 0.8);
+            border-radius: 16px;
+            padding: 14px 16px;
+            box-shadow: 0 12px 24px rgba(52, 41, 26, 0.05);
+        }
+
+        .founder-assistant-icon,
+        .founder-assistant-send {
+            width: 34px;
+            height: 34px;
+            border-radius: 10px;
+            border: 1px solid rgba(220, 207, 191, 0.8);
+            display: grid;
+            place-items: center;
+            background: #fffdf9;
+            color: var(--ink);
+            flex-shrink: 0;
+        }
+
+        .founder-assistant-input {
+            flex: 1;
+            color: #8a8378;
+        }
+
+        .founder-rightbar h3 {
+            font-size: 0.83rem;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: var(--muted);
+            margin-bottom: 12px;
+        }
+
+        .notification-badge {
+            width: 20px;
+            height: 20px;
+            border-radius: 999px;
+            background: var(--rose);
+            color: white;
+            font-size: 0.76rem;
+            display: grid;
+            place-items: center;
+        }
+
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 8px;
+            font-size: 0.84rem;
+            color: var(--muted);
+        }
+
+        .calendar-head {
+            text-align: center;
+            font-size: 0.74rem;
+            text-transform: uppercase;
+        }
+
+        .calendar-day {
+            width: 28px;
+            height: 28px;
+            margin: 0 auto;
+            border-radius: 999px;
+            display: grid;
+            place-items: center;
+            color: var(--ink);
+        }
+
+        .calendar-day.dim {
+            color: #b9b1a5;
+        }
+
+        .calendar-day.today {
+            background: #6d675f;
+            color: white;
+        }
+
+        .notification-list,
+        .tool-list {
+            display: grid;
+            gap: 10px;
+            margin-top: 14px;
+        }
+
+        .notification-item,
+        .tool-item {
+            background: rgba(255, 255, 255, 0.92);
+            border: 1px solid rgba(220, 207, 191, 0.65);
+            border-radius: 14px;
+            padding: 12px 14px;
+        }
+
+        .notification-item {
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+        }
+
+        .notification-icon {
+            width: 22px;
+            height: 22px;
+            border-radius: 999px;
+            background: linear-gradient(135deg, #8e1c74, #ff2c35);
+            color: white;
+            display: grid;
+            place-items: center;
+            font-size: 0.75rem;
+            flex-shrink: 0;
+        }
+
+        .tool-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-weight: 600;
+        }
+
+        .tool-icon {
+            width: 28px;
+            height: 28px;
+            border-radius: 8px;
+            border: 1px solid rgba(222, 60, 109, 0.24);
+            color: #e02961;
+            display: grid;
+            place-items: center;
+            font-size: 0.82rem;
+        }
+
+        .founder-drawer {
+            position: fixed;
+            top: 0;
+            right: 0;
+            width: min(480px, 100%);
+            height: 100vh;
+            background: #fffdf8;
+            border-left: 1px solid rgba(220, 207, 191, 0.8);
+            box-shadow: -10px 0 30px rgba(52, 41, 26, 0.08);
+            transform: translateX(100%);
+            transition: transform 0.25s ease;
+            z-index: 40;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .founder-drawer.open {
+            transform: translateX(0);
+        }
+
+        .founder-drawer-header {
+            padding: 20px 24px 12px;
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 14px;
+        }
+
+        .founder-drawer-body {
+            padding: 0 24px 24px;
+            overflow-y: auto;
+        }
+
+        .founder-drawer-close {
+            border: 0;
+            background: transparent;
+            font-size: 1.6rem;
+            color: var(--muted);
+            cursor: pointer;
+            line-height: 1;
+        }
+
+        .drawer-eyebrow {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #4c91ec;
+            margin-bottom: 10px;
+        }
+
+        .drawer-eyebrow.task {
+            color: var(--rose);
+        }
+
+        .drawer-grid {
+            display: grid;
+            grid-template-columns: 100px 1fr;
+            gap: 14px 10px;
+            margin: 24px 0;
+        }
+
+        .drawer-label {
+            color: var(--muted);
+        }
+
+        .drawer-comments {
+            margin-top: 18px;
+        }
+
+        .drawer-comment {
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+            background: white;
+            border: 1px solid rgba(220, 207, 191, 0.65);
+            border-radius: 14px;
+            padding: 14px;
+            margin-top: 12px;
+        }
+
+        .drawer-comment-box {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 16px;
+            border: 1px solid rgba(220, 207, 191, 0.8);
+            border-radius: 14px;
+            padding: 12px 14px;
+            color: #8a8378;
+            background: #f4efe6;
+        }
+
+        @media (max-width: 1240px) {
+            .founder-home {
+                grid-template-columns: 220px 1fr;
+            }
+
+            .founder-rightbar {
+                display: none;
+            }
+        }
+
+        @media (max-width: 900px) {
+            .founder-home {
+                grid-template-columns: 1fr;
+            }
+
+            .founder-sidebar {
+                min-height: auto;
+                border-right: 0;
+                border-bottom: 1px solid var(--line);
+            }
+
+            .founder-sidebar-footer {
+                display: none;
+            }
+
+            .founder-main {
+                padding: 20px 16px 24px;
+            }
+
+            .founder-main-inner {
+                max-width: none;
+            }
+        }
+    </style>
+@endsection
+
 @section('content')
     @php
         $founder = $dashboard['founder'];
-        $company = $dashboard['company'];
-        $intelligence = $dashboard['intelligence'];
-        $subscription = $dashboard['subscription'];
-        $weeklyState = $dashboard['weekly_state'];
-        $commercial = $dashboard['commercial_summary'];
-        $actions = $dashboard['actions'];
-        $metrics = $dashboard['metrics'];
-        $moduleCards = $dashboard['module_cards'];
-        $activityFeed = $dashboard['activity_feed'];
-        $execution = $dashboard['execution'];
-        $growth = $dashboard['growth'];
-        $atlas = $dashboard['atlas'];
-        $launchCards = $launchCards ?? [];
+        $workspace = $dashboard['workspace'];
+        $mentor = $workspace['mentor_session'];
+        $learning = $workspace['learning_item'];
+        $tasks = $workspace['task_cards'];
+        $notifications = $workspace['notifications'];
+        $unreadNotificationCount = $workspace['unread_notification_count'];
+        $calendar = $workspace['calendar'];
+        $aiTools = $workspace['ai_tools'];
+        $syncStatus = $dashboard['sync_status'];
+        $nextBestActions = $workspace['next_best_actions'];
     @endphp
-    <div class="sidebar-layout">
-        <aside class="sidebar-card">
-            <div class="pill">{{ $subscription?->plan_name ?? 'Hatchers OS' }}</div>
-            <div class="nav-group" style="margin-top: 18px;">
-                <div class="nav-group-title">Workspace</div>
-                <a class="nav-item active" href="/dashboard/founder">Home</a>
-                <a class="nav-item" href="/website">Website</a>
-                <a class="nav-item" href="{{ rtrim((string) config('modules.atlas.base_url'), '/') }}" target="_blank" rel="noreferrer">Atlas</a>
+
+    <div class="founder-home">
+        <aside class="founder-sidebar">
+            <div class="founder-sidebar-inner">
+                <a class="founder-brand" href="/dashboard/founder">
+                    <img src="/brand/hatchers-ai-logo.png" alt="Hatchers AI">
+                </a>
+
+                <nav class="founder-nav">
+                    <a class="founder-nav-item active" href="/dashboard/founder">
+                        <span class="founder-nav-icon">⌂</span>
+                        <span>Home</span>
+                    </a>
+                    <a class="founder-nav-item" href="{{ route('founder.activity') }}">
+                        <span class="founder-nav-icon">◫</span>
+                        <span>Activity</span>
+                    </a>
+                    <a class="founder-nav-item" href="{{ route('founder.commerce') }}">
+                        <span class="founder-nav-icon">⌁</span>
+                        <span>Launch Plan</span>
+                    </a>
+                    <a class="founder-nav-item" href="{{ route('founder.ai-tools') }}">
+                        <span class="founder-nav-icon">✦</span>
+                        <span>AI Tools</span>
+                    </a>
+                    <a class="founder-nav-item" href="{{ route('founder.learning-plan') }}">
+                        <span class="founder-nav-icon">▣</span>
+                        <span>Learning Plan</span>
+                    </a>
+                    <a class="founder-nav-item" href="{{ route('founder.tasks') }}">
+                        <span class="founder-nav-icon">◌</span>
+                        <span>Tasks</span>
+                    </a>
+                    <a class="founder-nav-item" href="{{ route('founder.settings') }}">
+                        <span class="founder-nav-icon">⚙</span>
+                        <span>Settings</span>
+                    </a>
+                </nav>
             </div>
-            <div class="nav-group">
-                <div class="nav-group-title">Business</div>
-                <a class="nav-item" href="{{ rtrim((string) config('modules.bazaar.base_url'), '/') }}/admin/dashboard" target="_blank" rel="noreferrer">Bazaar</a>
-                <a class="nav-item" href="{{ rtrim((string) config('modules.servio.base_url'), '/') }}/admin/dashboard" target="_blank" rel="noreferrer">Servio</a>
-                <a class="nav-item" href="{{ rtrim((string) config('modules.lms.base_url'), '/') }}" target="_blank" rel="noreferrer">LMS</a>
-            </div>
-            <div class="nav-group">
-                <div class="nav-group-title">Growth</div>
-                <a class="nav-item" href="{{ rtrim((string) config('modules.atlas.base_url'), '/') }}/dashboard" target="_blank" rel="noreferrer">Campaigns & Content</a>
-                <a class="nav-item" href="{{ rtrim((string) config('modules.atlas.base_url'), '/') }}/all-images" target="_blank" rel="noreferrer">Generated Assets</a>
+
+            <div class="founder-sidebar-footer">
+                <div class="founder-user">
+                    <div class="founder-avatar">{{ strtoupper(substr($founder->full_name, 0, 1)) }}</div>
+                    <div class="founder-user-name">{{ $founder->full_name }}</div>
+                </div>
+                <form method="POST" action="/logout" style="margin: 0;">
+                    @csrf
+                    <button class="founder-nav-icon" type="submit" style="border: 0; background: transparent; cursor: pointer;">↘</button>
+                </form>
             </div>
         </aside>
 
-        <div>
-            <section class="hero">
-                <div class="eyebrow">Founder Dashboard</div>
-                <h1>{{ $company?->company_name ?? $founder->full_name }} runs from one operating system.</h1>
-                <p class="muted">Welcome back, {{ $founder->full_name }}. This dashboard combines execution, company intelligence, website readiness, revenue signals, and growth momentum into one founder view.</p>
-                <div class="cta-row">
-                    <a class="btn primary" href="/website">Open Website Workspace</a>
-                    <span class="pill">Business model: {{ ucfirst($company?->business_model ?? 'hybrid') }}</span>
-                    <span class="pill">Stage: {{ ucfirst($company?->stage ?? 'launching') }}</span>
-                    <span class="pill">Plan: {{ $subscription?->plan_name ?? 'Hatchers OS' }}</span>
-                </div>
-            </section>
+        <main class="founder-main">
+            <div class="founder-main-inner">
+                <section class="founder-welcome">
+                    <h1>Welcome back {{ $workspace['first_name'] }},</h1>
+                    <p>Here’s what’s on for you for this week:</p>
+                </section>
 
-            <section class="metrics">
-                <div class="card metric">
-                    <div class="muted">Weekly Progress</div>
-                    <strong>{{ $metrics['weekly_progress_percent'] }}%</strong>
-                </div>
-                <div class="card metric">
-                    <div class="muted">Open Tasks</div>
-                    <strong>{{ $metrics['open_tasks'] }}</strong>
-                </div>
-                <div class="card metric">
-                    <div class="muted">Orders / Bookings</div>
-                    <strong>{{ $metrics['orders_bookings'] }}</strong>
-                </div>
-                <div class="card metric">
-                    <div class="muted">Revenue</div>
-                    <strong>{{ $metrics['currency'] }} {{ number_format($metrics['gross_revenue'], 0) }}</strong>
-                </div>
-            </section>
+                <section class="founder-section">
+                    <h2>Mentoring</h2>
+                    <article class="founder-block founder-mentor-card"
+                        data-open-drawer="task"
+                        data-drawer-title="{{ e($mentor['title']) }}"
+                        data-drawer-due="{{ e($mentor['date_label']) }}"
+                        data-drawer-owner="{{ e($mentor['subtitle']) }}"
+                        data-drawer-description="Join your mentor session from Hatchers Ai OS and keep your weekly execution aligned."
+                        data-drawer-badge="{{ e($mentor['badge']) }}"
+                        data-drawer-comments='@json($notifications)'>
+                        <div class="founder-row">
+                            <div>
+                                <div class="founder-meta">{{ $mentor['date_label'] }}</div>
+                                <div style="font-size: 1.1rem; font-weight: 600;">{{ $mentor['title'] }}</div>
+                                <div class="founder-subtle" style="margin-top: 4px;">{{ $mentor['subtitle'] }}</div>
+                            </div>
+                            <div class="founder-badge {{ $mentor['badge_tone'] === 'success' ? 'success' : '' }}">{{ $mentor['badge'] }}</div>
+                        </div>
+                    </article>
+                </section>
 
-            <section class="grid-2" style="margin-top: 22px;">
-                <div class="card">
-                    <h2>Open Tools</h2>
-                    <div class="stack" style="margin-top: 14px;">
-                        @foreach ($launchCards as $launch)
-                            <div class="stack-item">
-                                <strong>{{ $launch['label'] }}</strong><br>
-                                {{ $launch['description'] }}
-                                <div style="margin-top: 10px;">
-                                    <a class="pill" href="/workspace/launch/{{ strtolower($launch['module']) }}">Open {{ $launch['label'] }}</a>
+                <section class="founder-section">
+                    <h2>Learning</h2>
+                    <article class="founder-block founder-learning-card"
+                        data-open-drawer="lesson"
+                        data-drawer-title="{{ e($learning['detail_heading']) }}"
+                        data-drawer-due="{{ e($learning['detail_due']) }}"
+                        data-drawer-owner="{{ e($learning['detail_owner']) }}"
+                        data-drawer-description="{{ e($learning['detail_description']) }}"
+                        data-drawer-badge="{{ e($learning['badge']) }}"
+                        data-drawer-comments='@json($learning["comments"])'>
+                        <div class="founder-row">
+                            <div>
+                                <div class="founder-meta" style="color: #4c91ec;">THURSDAY, DEC 25 · 1:00PM</div>
+                                <div style="font-size: 1.1rem; font-weight: 600;">{{ $learning['title'] }}</div>
+                                <div class="founder-subtle" style="margin-top: 4px;">{{ $learning['subtitle'] }}</div>
+                            </div>
+                            <div class="founder-badge">{{ $learning['badge'] }}</div>
+                        </div>
+                    </article>
+                </section>
+
+                <section class="founder-section">
+                    <h2>Next Best Actions</h2>
+                    @foreach ($nextBestActions as $action)
+                        <article class="founder-block">
+                            <div class="founder-row" style="align-items:flex-start;">
+                                <div>
+                                    <div style="font-size: 1.04rem; font-weight: 600;">{{ $action['title'] }}</div>
+                                    <div class="founder-subtle" style="margin-top: 4px;">{{ $action['description'] }}</div>
                                 </div>
+                                <a class="founder-badge" href="{{ $action['href'] }}" style="text-decoration:none;">{{ $action['label'] }}</a>
                             </div>
-                        @endforeach
-                    </div>
+                        </article>
+                    @endforeach
+                </section>
+
+                <section class="founder-section">
+                    <h2>Tasks</h2>
+                    @foreach ($tasks as $task)
+                        <article class="founder-block founder-task-card {{ $task['completed'] ? 'completed' : '' }}"
+                            data-open-drawer="task"
+                            data-drawer-title="{{ e($task['detail_heading']) }}"
+                            data-drawer-due="{{ e($task['detail_due']) }}"
+                            data-drawer-owner="{{ e($task['detail_owner']) }}"
+                            data-drawer-description="{{ e($task['detail_description']) }}"
+                            data-drawer-badge="{{ e($task['cta'] ?: 'View task') }}"
+                            data-drawer-comments='@json($task["comments"])'>
+                            <div class="founder-task-top">
+                                <div class="founder-task-label">{{ strtoupper($task['label']) }} · {{ strtoupper($task['due']) }}</div>
+                                @if (!$task['completed'] && $task['cta'] !== '')
+                                    <button class="founder-task-cta" type="button">{{ $task['cta'] }}</button>
+                                @endif
+                            </div>
+                            <div class="founder-task-title" style="font-size: 1.08rem; font-weight: 600;">{{ $task['title'] }}</div>
+                            <div class="founder-subtle" style="margin-top: 4px;">{{ $task['description'] }}</div>
+                        </article>
+                    @endforeach
+                </section>
+
+                <div id="assistant-bar" class="founder-assistant-bar">
+                    <div class="founder-assistant-icon">◔</div>
+                    <div class="founder-assistant-input">{{ $workspace['quick_prompt'] ?: 'Ask AI anything about your project...' }}</div>
+                    <div class="founder-assistant-send">↵</div>
+                </div>
+            </div>
+        </main>
+
+        <aside class="founder-rightbar">
+            <div class="founder-rightbar-inner">
+                <div class="founder-row" style="margin-bottom: 18px;">
+                    <a href="{{ route('founder.inbox') }}" style="text-decoration: none;"><h3 style="margin: 0;">Notifications</h3></a>
+                    <a href="{{ route('founder.inbox') }}" class="notification-badge" style="text-decoration: none;">{{ $unreadNotificationCount }}</a>
                 </div>
 
-                <div class="card">
-                    <h2>This Week</h2>
-                    <div class="stack" style="margin-top: 14px;">
-                        @forelse ($actions as $action)
-                            <div class="stack-item">
-                                <strong>{{ $action->title }}</strong><br>
-                                {{ $action->description }}
-                            </div>
-                        @empty
-                            <div class="stack-item"><strong>Complete company intelligence</strong><br>Atlas will recommend the next sprint once your company context is more complete.</div>
-                        @endforelse
-                    </div>
+                <div style="margin-bottom: 14px; color: var(--muted); font-size: 0.86rem;">{{ $calendar['month_label'] }}</div>
+                <div class="calendar-grid" style="margin-bottom: 10px;">
+                    @foreach (['S','M','T','W','T','F','S'] as $dayLabel)
+                        <div class="calendar-head">{{ $dayLabel }}</div>
+                    @endforeach
+                    @foreach ($calendar['days'] as $day)
+                        <div class="calendar-day {{ !$day['in_month'] ? 'dim' : '' }} {{ $day['is_today'] ? 'today' : '' }}">{{ $day['day'] }}</div>
+                    @endforeach
                 </div>
 
-                <div class="card">
-                    <h2>Module Status</h2>
-                    <div class="stack" style="margin-top: 14px;">
-                        @foreach ($moduleCards as $moduleCard)
-                            <div class="stack-item">
-                                <strong>{{ $moduleCard['module'] }} · readiness {{ $moduleCard['readiness_score'] }}%</strong><br>
-                                {{ $moduleCard['description'] }}
-                                @if (!empty($moduleCard['highlights']))
-                                    <div class="muted" style="margin-top: 8px;">{{ implode(' · ', $moduleCard['highlights']) }}</div>
-                                @endif
-                                @if (!empty($moduleCard['updated_at']))
-                                    <div class="muted" style="margin-top: 6px;">Updated {{ $moduleCard['updated_at'] }}</div>
-                                @endif
+                <div class="notification-list">
+                    @forelse ($notifications as $notification)
+                        <div class="notification-item">
+                            <div class="notification-icon">{{ strtoupper(substr($notification['kind'], 0, 1)) }}</div>
+                            <div>
+                                <div style="font-weight: 600;">{{ $notification['title'] }}</div>
+                                <div class="founder-subtle" style="margin-top: 4px;">{{ $notification['meta'] }}</div>
                             </div>
-                        @endforeach
-                    </div>
-                </div>
-            </section>
-
-            <section class="grid-2" style="margin-top: 22px;">
-                <div class="card">
-                    <h2>Execution Pulse</h2>
-                    <div class="stack" style="margin-top: 14px;">
-                        <div class="stack-item">
-                            <strong>Weekly focus</strong><br>
-                            {{ $execution['weekly_focus'] ?: 'Atlas and LMS will surface the next sprint once more mentoring data is synced.' }}
                         </div>
-                        <div class="stack-item">
-                            <strong>Mentor</strong><br>
-                            {{ $execution['mentor_name'] ?: 'No mentor assigned yet' }}
+                    @empty
+                        <div class="notification-item">
+                            <div class="notification-icon">i</div>
+                            <div>
+                                <div style="font-weight: 600;">No notifications yet</div>
+                                <div class="founder-subtle" style="margin-top: 4px;">New founder updates will appear here.</div>
+                            </div>
                         </div>
-                        <div class="stack-item">
-                            <strong>Tasks</strong><br>
-                            {{ $execution['completed_tasks'] }} completed · {{ $execution['open_tasks'] }} open
-                        </div>
-                        <div class="stack-item">
-                            <strong>Milestones</strong><br>
-                            {{ $execution['completed_milestones'] }} completed · {{ $execution['open_milestones'] }} open
-                        </div>
-                        <div class="stack-item">
-                            <strong>Next meeting</strong><br>
-                            {{ $execution['next_meeting_at'] ?: 'No meeting synced yet' }}
-                        </div>
-                    </div>
+                    @endforelse
                 </div>
 
-                <div class="card">
-                    <h2>Growth Pulse</h2>
-                    <div class="stack" style="margin-top: 14px;">
-                        <div class="stack-item">
-                            <strong>Business model</strong><br>
-                            {{ ucfirst($growth['business_model']) }}
+                <h3 style="margin-top: 22px;"><a href="{{ route('founder.activity') }}" style="text-decoration:none;color:inherit;">Activity Center</a></h3>
+                <div class="tool-list">
+                    @foreach (array_slice($dashboard['activity_feed'], 0, 3) as $item)
+                        <div class="tool-item" style="display:block;">
+                            <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
+                                <div>{{ $item['module'] }}</div>
+                                <span class="founder-subtle">{{ $item['updated_at'] ?: 'Recently' }}</span>
+                            </div>
+                            <div class="founder-subtle" style="margin-top:4px;">{{ $item['message'] }}</div>
                         </div>
-                        <div class="stack-item">
-                            <strong>Commerce</strong><br>
-                            {{ $growth['product_count'] }} products · {{ $growth['order_count'] }} orders
-                        </div>
-                        <div class="stack-item">
-                            <strong>Services</strong><br>
-                            {{ $growth['service_count'] }} services · {{ $growth['booking_count'] }} bookings
-                        </div>
-                        <div class="stack-item">
-                            <strong>Customers</strong><br>
-                            {{ $growth['customer_count'] }}
-                        </div>
-                        <div class="stack-item">
-                            <strong>Revenue</strong><br>
-                            {{ $growth['gross_revenue_formatted'] }}
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <section class="grid-2" style="margin-top: 22px;">
-                <div class="card">
-                    <h2>Atlas Intelligence</h2>
-                    <div class="stack" style="margin-top: 14px;">
-                        <div class="stack-item">
-                            <strong>Company</strong><br>
-                            {{ $atlas['company_name'] ?: ($company?->company_name ?? 'Company profile still being formed') }}
-                        </div>
-                        <div class="stack-item">
-                            <strong>Primary growth goal</strong><br>
-                            {{ $atlas['primary_growth_goal'] ?: 'No explicit growth goal synced yet' }}
-                        </div>
-                        <div class="stack-item">
-                            <strong>Brand voice</strong><br>
-                            {{ $atlas['brand_voice'] ?: 'Brand voice not defined yet' }}
-                        </div>
-                        <div class="stack-item">
-                            <strong>Generated assets</strong><br>
-                            {{ $atlas['generated_posts_count'] }} posts · {{ $atlas['generated_campaigns_count'] }} campaigns · {{ $atlas['generated_images_count'] }} images
-                        </div>
-                        <div class="stack-item">
-                            <strong>Recommended actions</strong><br>
-                            {{ $atlas['recommended_actions_count'] }}
-                        </div>
-                    </div>
+                    @endforeach
                 </div>
 
-                <div class="card">
-                    <h2>Atlas Campaigns</h2>
-                    <div class="stack" style="margin-top: 14px;">
-                        @forelse ($atlas['recent_campaigns'] as $campaign)
-                            <div class="stack-item">
-                                <strong>{{ $campaign['title'] ?? 'Campaign brief' }}</strong><br>
-                                {{ $campaign['description'] ?? 'Saved in Atlas.' }}
-                                @if (!empty($campaign['generated_posts_count']) || !empty($campaign['last_generated_at']))
-                                    <div class="muted" style="margin-top: 6px;">
-                                        {{ (int) ($campaign['generated_posts_count'] ?? 0) }} linked posts
-                                        @if (!empty($campaign['last_generated_at']))
-                                            · Last generated {{ $campaign['last_generated_at'] }}
-                                        @endif
-                                    </div>
-                                @endif
-                                @if (!empty($campaign['updated_at']))
-                                    <div class="muted" style="margin-top: 6px;">{{ $campaign['updated_at'] }}</div>
-                                @endif
-                                @if (!empty($campaign['url']))
-                                    <div style="margin-top: 10px;">
-                                        <a class="pill" href="{{ $campaign['url'] }}" target="_blank" rel="noreferrer">Open In Atlas</a>
-                                    </div>
-                                @endif
+                <h3 style="margin-top: 22px;">Module Sync</h3>
+                <div class="tool-list">
+                    @foreach ($syncStatus['modules'] as $status)
+                        <div class="tool-item" style="display:block;">
+                            <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
+                                <div>{{ $status['module'] }}</div>
+                                <span class="notification-badge" style="
+                                    background:
+                                    @if ($status['tone'] === 'success') rgba(44,122,87,0.12)
+                                    @elseif ($status['tone'] === 'warning') rgba(154,107,27,0.12)
+                                    @else rgba(179,34,83,0.10)
+                                    @endif
+                                    ; color:
+                                    @if ($status['tone'] === 'success') #21643a
+                                    @elseif ($status['tone'] === 'warning') #9a6b1b
+                                    @else #b32253
+                                    @endif
+                                    ;">
+                                    {{ $status['status'] }}
+                                </span>
                             </div>
-                        @empty
-                            <div class="stack-item">
-                                <strong>No saved campaigns yet</strong><br>
-                                Active Atlas campaigns will appear here as founders create and refine them.
-                            </div>
-                        @endforelse
-                    </div>
+                            <div class="founder-subtle" style="margin-top:4px;">{{ $status['reason'] }}</div>
+                            <div class="founder-subtle" style="margin-top:4px;">{{ $status['updated_at'] ?: 'Not synced yet' }}</div>
+                        </div>
+                    @endforeach
                 </div>
 
-                <div class="card">
-                    <h2>Archived Atlas Campaigns</h2>
-                    <div class="stack" style="margin-top: 14px;">
-                        @forelse ($atlas['archived_campaigns'] as $campaign)
-                            <div class="stack-item">
-                                <strong>{{ $campaign['title'] ?? 'Archived campaign' }}</strong><br>
-                                {{ $campaign['description'] ?? 'Archived in Atlas.' }}
-                                @if (!empty($campaign['generated_posts_count']) || !empty($campaign['last_generated_at']))
-                                    <div class="muted" style="margin-top: 6px;">
-                                        {{ (int) ($campaign['generated_posts_count'] ?? 0) }} linked posts
-                                        @if (!empty($campaign['last_generated_at']))
-                                            · Last generated {{ $campaign['last_generated_at'] }}
-                                        @endif
-                                    </div>
-                                @endif
-                                @if (!empty($campaign['updated_at']))
-                                    <div class="muted" style="margin-top: 6px;">{{ $campaign['updated_at'] }}</div>
-                                @endif
-                                @if (!empty($campaign['url']))
-                                    <div style="margin-top: 10px;">
-                                        <a class="pill" href="{{ $campaign['url'] }}" target="_blank" rel="noreferrer">Open In Atlas</a>
-                                    </div>
-                                @endif
-                            </div>
-                        @empty
-                            <div class="stack-item">
-                                <strong>No archived campaigns</strong><br>
-                                Archived Atlas campaigns will appear here without cluttering the active OS view.
-                            </div>
-                        @endforelse
-                    </div>
+                <h3 style="margin-top: 22px;">AI Tools</h3>
+                <div class="tool-list">
+                    @foreach ($aiTools as $tool)
+                        <div class="tool-item">
+                            <div class="tool-icon">□</div>
+                            <div>{{ $tool['title'] }}</div>
+                        </div>
+                    @endforeach
                 </div>
-
-                <div class="card">
-                    <h2>Live Activity</h2>
-                    <div class="stack" style="margin-top: 14px;">
-                        @forelse ($activityFeed as $event)
-                            <div class="stack-item">
-                                <strong>{{ $event['module'] }}</strong><br>
-                                {{ $event['message'] }}
-                                @if (!empty($event['updated_at']))
-                                    <div class="muted" style="margin-top: 6px;">{{ $event['updated_at'] }}</div>
-                                @endif
-                            </div>
-                        @empty
-                            <div class="stack-item">
-                                <strong>No activity yet</strong><br>
-                                Once LMS, Atlas, Bazaar, and Servio sync activity, the OS will show a live founder timeline here.
-                            </div>
-                        @endforelse
-                    </div>
-                </div>
-            </section>
-        </div>
+            </div>
+        </aside>
     </div>
+
+    <aside class="founder-drawer" data-founder-drawer>
+        <div class="founder-drawer-header">
+            <div>
+                <div class="drawer-eyebrow" data-drawer-eyebrow>Lesson</div>
+                <h2 data-drawer-title style="font-size: 1.7rem; margin: 0;">Item title</h2>
+            </div>
+            <button class="founder-drawer-close" type="button" data-close-drawer>&times;</button>
+        </div>
+        <div class="founder-drawer-body">
+            <div class="founder-badge" data-drawer-badge>Open</div>
+            <div class="drawer-grid">
+                <div class="drawer-label">Due date</div>
+                <div data-drawer-due></div>
+                <div class="drawer-label">Owner</div>
+                <div data-drawer-owner></div>
+                <div class="drawer-label">Description</div>
+                <div data-drawer-description></div>
+            </div>
+
+            <div class="drawer-comments">
+                <div class="drawer-label" style="margin-bottom: 10px;">Comments</div>
+                <div data-drawer-comments></div>
+                <div class="drawer-comment-box">
+                    <div class="founder-avatar">{{ strtoupper(substr($founder->full_name, 0, 1)) }}</div>
+                    <div style="flex: 1;">Add comment...</div>
+                    <div>🔗</div>
+                    <div>↑</div>
+                </div>
+            </div>
+        </div>
+    </aside>
 @endsection
 
-@section('assistant')
-    <div class="assistant" data-os-assistant>
-        <div class="assistant-header">
-            <div>
-                <h3 style="margin: 0 0 6px;">Atlas</h3>
-                <p>I know {{ $company?->company_name ?? 'your company' }}, your plan, your weekly priorities, and your latest OS state.</p>
-            </div>
-            <button class="assistant-toggle" type="button" data-assistant-toggle>+</button>
-        </div>
-        <div class="assistant-body">
-            <div class="assistant-feed" data-assistant-feed>
-                <div class="assistant-bubble atlas">
-                    Ask Atlas what to do next, where to focus this week, or how to use Bazaar, Servio, LMS, and Atlas together.
-                </div>
-            </div>
-            <form class="assistant-form" data-assistant-form>
-                <textarea class="assistant-textarea" data-assistant-input placeholder="Ask Atlas anything about your business, execution plan, website, sales, or content..."></textarea>
-                <div class="assistant-row">
-                    <div class="assistant-status" data-assistant-status>Atlas is synced with your OS context.</div>
-                    <button class="assistant-send" data-assistant-send type="submit">Send</button>
-                </div>
-            </form>
-        </div>
-    </div>
+@section('scripts')
+    <script>
+        (() => {
+            const drawer = document.querySelector('[data-founder-drawer]');
+            if (!drawer) return;
+
+            const closeButton = drawer.querySelector('[data-close-drawer]');
+            const title = drawer.querySelector('[data-drawer-title]');
+            const eyebrow = drawer.querySelector('[data-drawer-eyebrow]');
+            const due = drawer.querySelector('[data-drawer-due]');
+            const owner = drawer.querySelector('[data-drawer-owner]');
+            const description = drawer.querySelector('[data-drawer-description]');
+            const badge = drawer.querySelector('[data-drawer-badge]');
+            const comments = drawer.querySelector('[data-drawer-comments]');
+
+            const openDrawer = (trigger) => {
+                const type = trigger.getAttribute('data-open-drawer') || 'lesson';
+                title.textContent = trigger.getAttribute('data-drawer-title') || 'Details';
+                eyebrow.textContent = type === 'task' ? 'Task' : 'Lesson';
+                eyebrow.classList.toggle('task', type === 'task');
+                due.textContent = trigger.getAttribute('data-drawer-due') || 'This week';
+                owner.textContent = trigger.getAttribute('data-drawer-owner') || 'Hatchers Ai OS';
+                description.textContent = trigger.getAttribute('data-drawer-description') || 'No description yet.';
+                badge.textContent = trigger.getAttribute('data-drawer-badge') || 'Open';
+
+                const rawComments = trigger.getAttribute('data-drawer-comments') || '[]';
+                let parsedComments = [];
+                try {
+                    parsedComments = JSON.parse(rawComments);
+                } catch (error) {
+                    parsedComments = [];
+                }
+
+                comments.innerHTML = '';
+                parsedComments.forEach((comment) => {
+                    const node = document.createElement('div');
+                    node.className = 'drawer-comment';
+                    node.innerHTML = `
+                        <div class="founder-avatar">${(comment.author || 'U').slice(0, 1).toUpperCase()}</div>
+                        <div>
+                            <div style="font-weight: 600; margin-bottom: 4px;">${comment.author || 'Founder'}</div>
+                            <div>${comment.message || ''}</div>
+                        </div>
+                    `;
+                    comments.appendChild(node);
+                });
+
+                drawer.classList.add('open');
+            };
+
+            document.querySelectorAll('[data-open-drawer]').forEach((trigger) => {
+                trigger.addEventListener('click', (event) => {
+                    if (event.target.closest('button') && !event.target.matches('[data-open-drawer]')) {
+                        event.preventDefault();
+                    }
+                    event.preventDefault();
+                    openDrawer(trigger);
+                });
+            });
+
+            closeButton?.addEventListener('click', () => drawer.classList.remove('open'));
+        })();
+    </script>
 @endsection

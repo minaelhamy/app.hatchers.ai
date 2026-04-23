@@ -65,6 +65,7 @@ class WebsiteProvisioningService
             'website_title' => trim((string) ($input['website_title'] ?? '')),
             'theme_template' => trim((string) ($input['theme_template'] ?? '')),
             'website_mode' => trim((string) ($input['website_mode'] ?? '')),
+            'website_path' => trim((string) ($input['website_path'] ?? '')),
         ];
 
         $response = $this->postToEngine($engine, $payload);

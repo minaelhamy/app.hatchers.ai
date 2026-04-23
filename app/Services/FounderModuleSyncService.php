@@ -10,7 +10,7 @@ class FounderModuleSyncService
 {
     public function syncFounder(Founder $founder, string $target): array
     {
-        $targets = $target === 'all' ? ['atlas', 'bazaar', 'servio'] : [$target];
+        $targets = $this->syncTargets($target);
         $results = [];
 
         foreach ($targets as $module) {
@@ -28,6 +28,54 @@ class FounderModuleSyncService
                     fn (string $module) => strtoupper($module) . ': ' . ($results[$module]['error'] ?? 'sync failed'),
                     array_keys($errors)
                 )),
+        ];
+    }
+
+    public function retryModuleAcrossFounders(string $target): array
+    {
+        $targets = $this->syncTargets($target);
+        $founders = Founder::query()
+            ->where('role', 'founder')
+            ->with('company')
+            ->get();
+
+        $summary = [];
+        $overallFailures = [];
+
+        foreach ($targets as $module) {
+            $successCount = 0;
+            $failureCount = 0;
+            $lastError = null;
+
+            foreach ($founders as $founder) {
+                $result = $this->syncToModule($founder, $module);
+                if (!empty($result['ok'])) {
+                    $successCount++;
+                    continue;
+                }
+
+                $failureCount++;
+                $lastError = $result['error'] ?? 'sync failed';
+            }
+
+            $summary[$module] = [
+                'success_count' => $successCount,
+                'failure_count' => $failureCount,
+                'last_error' => $lastError,
+            ];
+
+            if ($failureCount > 0) {
+                $overallFailures[] = strtoupper($module) . ': ' . $failureCount . ' failed'
+                    . ($lastError ? ' (' . $lastError . ')' : '');
+            }
+        }
+
+        return [
+            'ok' => empty($overallFailures),
+            'summary' => $summary,
+            'message' => empty($overallFailures)
+                ? 'Module retry completed successfully for ' . implode(', ', array_map('strtoupper', array_keys($summary))) . '.'
+                : 'Retry finished with issues: ' . implode(' | ', $overallFailures),
         ];
     }
 
@@ -103,5 +151,10 @@ class FounderModuleSyncService
             'servio' => rtrim((string) config('modules.servio.base_url'), '/') . '/api/hatchers/founder-sync',
             default => null,
         };
+    }
+
+    private function syncTargets(string $target): array
+    {
+        return $target === 'all' ? ['atlas', 'bazaar', 'servio'] : [$target];
     }
 }

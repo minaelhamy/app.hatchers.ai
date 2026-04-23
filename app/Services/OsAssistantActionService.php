@@ -97,6 +97,139 @@ class OsAssistantActionService
         ];
     }
 
+    public function createCampaignFromOs(Founder $founder, string $title, string $description, string $actorRole = 'founder'): array
+    {
+        $title = trim($title);
+        $description = trim($description);
+
+        if ($title === '' || $description === '') {
+            return [
+                'success' => false,
+                'reply' => 'Campaign title and description are both required.',
+            ];
+        }
+
+        $creation = $this->createPlatformRecord($founder, [
+            'platform' => 'atlas',
+            'category' => 'campaign',
+            'title' => $title,
+            'description' => $description,
+            'actor_role' => $actorRole,
+        ]);
+
+        if (!($creation['success'] ?? false)) {
+            return $creation;
+        }
+
+        $this->recordActionPlan(
+            $founder,
+            $title,
+            'Atlas created a real campaign record in ATLAS from Hatchers OS.',
+            'atlas',
+            $creation['edit_url'] ?? '/marketing',
+            $this->ctaLabelForPlatform('atlas'),
+            'created'
+        );
+
+        return [
+            'success' => true,
+            'title' => (string) ($creation['title'] ?? $title),
+            'description' => $description,
+            'edit_url' => (string) ($creation['edit_url'] ?? ''),
+            'reply' => $creation['reply'] ?? 'Done. I created that campaign in Atlas and linked it back into Hatchers OS.',
+            'action_type' => 'platform_record_create',
+            'sync_summary' => 'Atlas created a real "campaign" record in atlas from Hatchers OS.',
+        ];
+    }
+
+    public function archiveCampaignFromOs(Founder $founder, string $title, string $actorRole = 'founder'): array
+    {
+        return $this->handleCampaignStateAction($founder, $title, 'archive', $actorRole);
+    }
+
+    public function restoreCampaignFromOs(Founder $founder, string $title, string $actorRole = 'founder'): array
+    {
+        return $this->handleCampaignStateAction($founder, $title, 'restore', $actorRole);
+    }
+
+    public function updateTaskStatusFromOs(Founder $founder, string $title, string $status, string $actorRole = 'founder'): array
+    {
+        $normalizedStatus = in_array(trim(strtolower($status)), ['complete', 'completed', 'done'], true) ? 'completed' : 'open';
+
+        $result = $this->updatePlatformRecord($founder, [
+            'platform' => 'lms',
+            'category' => 'task',
+            'field' => 'status',
+            'value' => $normalizedStatus,
+            'target_name' => trim($title),
+            'actor_role' => $actorRole,
+        ]);
+
+        if (!($result['success'] ?? false)) {
+            return $result;
+        }
+
+        return [
+            'success' => true,
+            'reply' => $normalizedStatus === 'completed'
+                ? 'Done. I marked that LMS task as completed from Hatchers OS.'
+                : 'Done. I reopened that LMS task from Hatchers OS.',
+            'action_type' => 'platform_record_update',
+            'sync_summary' => $normalizedStatus === 'completed'
+                ? 'Hatchers OS marked an LMS task as completed.'
+                : 'Hatchers OS reopened an LMS task.',
+        ];
+    }
+
+    public function updateMilestoneStatusFromOs(Founder $founder, string $title, string $status, string $actorRole = 'founder'): array
+    {
+        $normalizedStatus = in_array(trim(strtolower($status)), ['complete', 'completed', 'done'], true) ? 'completed' : 'open';
+
+        $result = $this->updatePlatformRecord($founder, [
+            'platform' => 'lms',
+            'category' => 'milestone',
+            'field' => 'status',
+            'value' => $normalizedStatus,
+            'target_name' => trim($title),
+            'actor_role' => $actorRole,
+        ]);
+
+        if (!($result['success'] ?? false)) {
+            return $result;
+        }
+
+        return [
+            'success' => true,
+            'reply' => $normalizedStatus === 'completed'
+                ? 'Done. I marked that LMS milestone as completed from Hatchers OS.'
+                : 'Done. I reopened that LMS milestone from Hatchers OS.',
+            'action_type' => 'platform_record_update',
+            'sync_summary' => $normalizedStatus === 'completed'
+                ? 'Hatchers OS marked an LMS milestone as completed.'
+                : 'Hatchers OS reopened an LMS milestone.',
+        ];
+    }
+
+    public function updateProductFieldFromOs(
+        Founder $founder,
+        string $title,
+        string $field,
+        string $value,
+        string $actorRole = 'founder'
+    ): array {
+        return $this->updateCommerceFieldFromOs($founder, 'bazaar', 'product', $title, $field, $value, $actorRole);
+    }
+
+    public function updateServiceFieldFromOs(
+        Founder $founder,
+        string $title,
+        string $field,
+        string $value,
+        string $actorRole = 'founder'
+    ): array {
+        return $this->updateCommerceFieldFromOs($founder, 'servio', 'service', $title, $field, $value, $actorRole);
+    }
+
     private function executeWriteAction(Founder $founder, array $action): array
     {
         $type = trim((string) ($action['type'] ?? ''));
@@ -1123,6 +1256,36 @@ class OsAssistantActionService
         ];
     }
 
+    private function updateCommerceFieldFromOs(
+        Founder $founder,
+        string $platform,
+        string $category,
+        string $title,
+        string $field,
+        string $value,
+        string $actorRole
+    ): array {
+        $result = $this->updatePlatformRecord($founder, [
+            'platform' => $platform,
+            'category' => $category,
+            'field' => $field,
+            'value' => $value,
+            'target_name' => trim($title),
+            'actor_role' => $actorRole,
+        ]);
+
+        if (!($result['success'] ?? false)) {
+            return $result;
+        }
+
+        return [
+            'success' => true,
+            'reply' => 'Done. I updated that ' . $category . ' ' . $field . ' in ' . ucfirst($platform) . ' from Hatchers OS.',
+            'action_type' => 'platform_record_update',
+            'sync_summary' => 'Hatchers OS updated a ' . $category . ' field in ' . ucfirst($platform) . '.',
+        ];
+    }
+
     private function updatePlatformRecord(Founder $founder, array $action): array
     {
         $platform = trim((string) ($action['platform'] ?? ''));
@@ -1331,6 +1494,49 @@ class OsAssistantActionService
         return [
             'reply' => $intro . "\n" . implode("\n", $lines),
             'actions' => $actions,
+        ];
+    }
+
+    private function handleCampaignStateAction(Founder $founder, string $title, string $operation, string $actorRole): array
+    {
+        $title = trim($title);
+        if ($title === '') {
+            return [
+                'success' => false,
+                'reply' => 'Please choose a campaign before trying to ' . $operation . ' it.',
+            ];
+        }
+
+        $result = $this->actOnPlatformRecord($founder, [
+            'platform' => 'atlas',
+            'category' => 'campaign',
+            'operation' => $operation,
+            'target_name' => $title,
+            'actor_role' => $actorRole,
+        ]);
+
+        if (!($result['success'] ?? false)) {
+            return $result;
+        }
+
+        $actionLabel = $operation === 'archive' ? 'Archived' : 'Restored';
+        $this->recordActionPlan(
+            $founder,
+            $actionLabel . ' campaign',
+            'Atlas ' . strtolower($actionLabel) . ' campaign "' . $title . '" from Hatchers OS.',
+            'atlas',
+            $result['edit_url'] ?? $this->ctaUrlForPlatform('atlas'),
+            $this->ctaLabelForPlatform('atlas'),
+            $operation === 'archive' ? 'archived' : 'updated'
+        );
+
+        return [
+            'success' => true,
+            'title' => $title,
+            'edit_url' => (string) ($result['edit_url'] ?? ''),
+            'reply' => $result['reply'] ?? ('Done. I ' . $this->operationPastTense($operation) . ' that campaign in Atlas and linked it back into Hatchers OS.'),
+            'action_type' => 'platform_record_action',
+            'sync_summary' => 'Atlas ' . $this->operationPastTense($operation) . ' "' . $title . '" in atlas from Hatchers OS.',
         ];
     }
 

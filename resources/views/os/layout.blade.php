@@ -432,10 +432,12 @@
             }
         }
     </style>
+    @yield('head')
 </head>
 <body>
     @php
         $authUser = auth()->user();
+        $hideTopbar = trim($__env->yieldContent('hide_topbar')) === '1';
         $dashboardLabel = 'Dashboard';
         if ($authUser?->role === 'admin') {
             $dashboardLabel = 'Admin';
@@ -446,35 +448,37 @@
         }
     @endphp
     <div class="shell">
-        <header class="topbar">
-            <a href="/" class="brand">
-                <img class="brand-logo" src="/brand/hatchers-ai-logo.png" alt="Hatchers AI">
-                <span class="brand-copy">
-                    <span class="brand-title">Hatchers Ai Business OS</span>
-                    <span class="brand-subtitle">Founder Operating System</span>
-                </span>
-            </a>
-            <nav class="top-links">
-                <a class="top-link" href="/plans">Plans</a>
-                @auth
-                    <a class="top-link" href="/dashboard">{{ $dashboardLabel }}</a>
-                    @if ($authUser->role === 'founder')
-                        <a class="top-link" href="/website">Website</a>
-                    @endif
-                    <span class="top-link" style="pointer-events: none;">{{ ucfirst($authUser->role) }}</span>
-                @endauth
-                @auth
-                    <form method="POST" action="/logout" style="margin: 0;">
-                        @csrf
-                        <button class="top-link" type="submit" style="cursor: pointer;">Logout</button>
-                    </form>
-                @else
-                    <a class="top-link" href="/login">Login</a>
-                @endauth
-            </nav>
-        </header>
+        @unless($hideTopbar)
+            <header class="topbar">
+                <a href="/" class="brand">
+                    <img class="brand-logo" src="/brand/hatchers-ai-logo.png" alt="Hatchers AI">
+                    <span class="brand-copy">
+                        <span class="brand-title">Hatchers Ai Business OS</span>
+                        <span class="brand-subtitle">Founder Operating System</span>
+                    </span>
+                </a>
+                <nav class="top-links">
+                    <a class="top-link" href="/plans">Plans</a>
+                    @auth
+                        <a class="top-link" href="/dashboard">{{ $dashboardLabel }}</a>
+                        @if ($authUser->role === 'founder')
+                            <a class="top-link" href="/website">Website</a>
+                        @endif
+                        <span class="top-link" style="pointer-events: none;">{{ ucfirst($authUser->role) }}</span>
+                    @endauth
+                    @auth
+                        <form method="POST" action="/logout" style="margin: 0;">
+                            @csrf
+                            <button class="top-link" type="submit" style="cursor: pointer;">Logout</button>
+                        </form>
+                    @else
+                        <a class="top-link" href="/login">Login</a>
+                    @endauth
+                </nav>
+            </header>
+        @endunless
 
-        <main class="page">
+        <main class="page @yield('page_class')">
             @yield('content')
         </main>
     </div>
@@ -572,5 +576,6 @@
             setOpen(false);
         })();
     </script>
+    @yield('scripts')
 </body>
 </html>

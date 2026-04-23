@@ -8,6 +8,7 @@
         $recommendedEngine = $website['recommended_engine'];
         $currentWebsiteUrl = $website['current_website_url'];
         $recommendedSubdomain = $website['recommended_subdomain'];
+        $websitePath = $website['website_path'];
         $customDomainExample = $website['custom_domain_example'];
         $customDomain = $website['custom_domain'];
         $customDomainStatus = $website['custom_domain_status'];
@@ -109,6 +110,16 @@
                                 placeholder="Enter the public website title">
                         </div>
                         <div class="stack-item">
+                            <strong>Website path</strong><br>
+                            <input
+                                type="text"
+                                name="website_path"
+                                value="{{ old('website_path', $websitePath) }}"
+                                style="margin-top: 10px; width: 100%; padding: 12px; border-radius: 14px; border: 1px solid var(--line); background: #fff;"
+                                placeholder="home, store, services, launch">
+                            <div class="muted" style="margin-top: 10px;">This path becomes part of the public URL the founder shares from Hatchers Ai Business OS.</div>
+                        </div>
+                        <div class="stack-item">
                             <strong>Theme</strong><br>
                             <select name="theme_template" data-theme-select style="margin-top: 10px; width: 100%; padding: 12px; border-radius: 14px; border: 1px solid var(--line); background: #fff;">
                                 @foreach ($initialThemeOptions as $theme)
@@ -136,6 +147,10 @@
                         <div class="stack-item">
                             <strong>Recommended public site</strong><br>
                             {{ preg_replace('#^https?://#', '', $recommendedSubdomain) }}
+                        </div>
+                        <div class="stack-item">
+                            <strong>Current website path</strong><br>
+                            /{{ $websitePath }}
                         </div>
                         <div class="stack-item">
                             <strong>Current website status</strong><br>
@@ -209,6 +224,10 @@
                         <div class="stack-item">
                             <strong>Custom domain</strong><br>
                             <input type="text" name="custom_domain" value="{{ old('custom_domain', $customDomain ?: $customDomainExample) }}" style="margin-top: 10px; width: 100%; padding: 12px; border-radius: 14px; border: 1px solid var(--line); background: #fff;" placeholder="www.yourbrand.com">
+                        </div>
+                        <div class="stack-item">
+                            <strong>Live preview after DNS</strong><br>
+                            {{ preg_replace('#^https?://#', '', 'https://' . ($customDomain ?: $customDomainExample) . '/' . ltrim($websitePath, '/')) }}
                         </div>
                         <div class="stack-item">
                             <strong>DNS target</strong><br>
@@ -336,6 +355,10 @@
                         <div class="stack-item">
                             <strong>Shared intelligence</strong><br>
                             Bazaar and Servio already push snapshots into Hatchers OS, so the founder dashboard can summarize website readiness, revenue, products, services, orders, and bookings.
+                        </div>
+                        <div class="stack-item">
+                            <strong>OS-native path and domain control</strong><br>
+                            Founders can now manage website title, website path, custom domain, and publish flow from the same OS website workspace.
                         </div>
                         <div class="stack-item">
                             <strong>Cross-platform actions</strong><br>

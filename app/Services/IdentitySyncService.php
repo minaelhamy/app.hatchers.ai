@@ -34,6 +34,7 @@ class IdentitySyncService
 
         $user->role = $role;
         $user->status = !empty($payload['status']) ? (string) $payload['status'] : 'active';
+        $user->auth_source = trim((string) ($payload['auth_source'] ?? '')) ?: 'integration_sync';
         $user->username = $username;
         $user->email = $email;
         $user->full_name = $fullName;

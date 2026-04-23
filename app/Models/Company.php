@@ -19,6 +19,7 @@ class Company extends Model
         'stage',
         'website_status',
         'website_engine',
+        'website_path',
         'website_url',
         'custom_domain',
         'custom_domain_status',

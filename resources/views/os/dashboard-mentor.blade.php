@@ -59,7 +59,7 @@
                                 <strong>{{ $launch['label'] }}</strong><br>
                                 {{ $launch['description'] }}
                                 <div style="margin-top: 10px;">
-                                    <a class="pill" href="/workspace/launch/{{ strtolower($launch['module']) }}">Open {{ $launch['label'] }}</a>
+                                    <a class="pill" href="{{ route('mentor.legacy-tools') }}">Legacy access</a>
                                 </div>
                             </div>
                         @endforeach
@@ -99,6 +99,11 @@
                                 <div class="muted" style="margin-top: 6px;">Growth goal: {{ $founder['primary_growth_goal'] }}</div>
                             @endif
                             <div class="muted" style="margin-top: 6px;">Next meeting: {{ $founder['next_meeting_at'] ?: 'Not synced yet' }}</div>
+                            @if (!empty($founder['id']))
+                                <div style="margin-top: 10px;">
+                                    <a class="pill" href="{{ route('mentor.founders.show', $founder['id']) }}">Open founder review</a>
+                                </div>
+                            @endif
                         </div>
                     @empty
                         <div class="stack-item">

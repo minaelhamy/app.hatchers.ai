@@ -9,6 +9,8 @@
         $planOptions = $workspace['plan_options'];
         $statusOptions = $workspace['status_options'];
         $unassignedFounderCount = $workspace['unassigned_founder_count'];
+        $recentAudits = $workspace['recent_audits'];
+        $exceptions = $workspace['exceptions'];
     @endphp
     <div class="sidebar-layout">
         <aside class="sidebar-card">
@@ -17,6 +19,11 @@
                 <div class="nav-group-title">Control Center</div>
                 <a class="nav-item" href="/dashboard/admin">Overview</a>
                 <a class="nav-item active" href="/admin/control">Founder Operations</a>
+                <a class="nav-item" href="{{ route('admin.subscribers') }}">Subscribers</a>
+                <a class="nav-item" href="{{ route('admin.system-access') }}">System Access</a>
+                <a class="nav-item" href="{{ route('admin.identity') }}">Identity</a>
+                <a class="nav-item" href="{{ route('admin.modules') }}">Module Monitoring</a>
+                <a class="nav-item" href="{{ route('admin.support') }}">Support Center</a>
             </div>
         </aside>
 
@@ -238,6 +245,62 @@
                             As LMS mentor identities sync into Hatchers OS, you’ll be able to manage portfolio balance from this workspace.
                         </div>
                     @endforelse
+                </div>
+            </section>
+
+            <section class="grid-2" style="margin-top: 22px;">
+                <div class="card">
+                    <h2>Admin Audit Log</h2>
+                    <p class="muted">Every meaningful admin operation in the OS should leave a trace here.</p>
+                    <div class="stack" style="margin-top: 14px;">
+                        @forelse ($recentAudits as $audit)
+                            <div class="stack-item">
+                                <strong>{{ $audit['summary'] }}</strong><br>
+                                <span class="muted">{{ $audit['actor_name'] }} · {{ $audit['actor_role'] }} · {{ $audit['created_at'] }}</span>
+                            </div>
+                        @empty
+                            <div class="stack-item">
+                                <strong>No audit entries yet</strong><br>
+                                As admins make changes from Hatchers Ai Business OS, those actions will be tracked here.
+                            </div>
+                        @endforelse
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>Exception Queue</h2>
+                    <p class="muted">Failed sync and operational issues should surface here instead of getting lost in server logs.</p>
+                    <div class="stack" style="margin-top: 14px;">
+                        @forelse ($exceptions as $exception)
+                            <div class="stack-item">
+                                <div style="display:flex;justify-content:space-between;gap:12px;align-items:start;flex-wrap:wrap;">
+                                    <div>
+                                        <strong>{{ $exception['module'] }} · {{ $exception['operation'] }}</strong><br>
+                                        <span class="muted">{{ $exception['created_at'] }} @if($exception['founder_name']) · {{ $exception['founder_name'] }} @endif</span>
+                                    </div>
+                                    <div class="pill" style="background: {{ $exception['status'] === 'resolved' ? 'rgba(44, 122, 87, 0.12)' : 'rgba(179, 34, 83, 0.08)' }};">
+                                        {{ ucfirst($exception['status']) }}
+                                    </div>
+                                </div>
+                                <div class="muted" style="margin-top:8px;">{{ $exception['message'] }}</div>
+                                @if ($exception['status'] !== 'resolved')
+                                    <div class="cta-row">
+                                        <form method="POST" action="{{ route('admin.control.exceptions.resolve', $exception['id']) }}">
+                                            @csrf
+                                            <button class="btn primary" type="submit" style="cursor:pointer;">Resolve</button>
+                                        </form>
+                                    </div>
+                                @elseif ($exception['resolved_at'])
+                                    <div class="muted" style="margin-top:8px;">Resolved {{ $exception['resolved_at'] }}</div>
+                                @endif
+                            </div>
+                        @empty
+                            <div class="stack-item">
+                                <strong>No open exceptions</strong><br>
+                                OS sync and admin operations are currently not reporting tracked failures.
+                            </div>
+                        @endforelse
+                    </div>
                 </div>
             </section>
         </div>

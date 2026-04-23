@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Founder;
 use App\Models\ModuleSnapshot;
+use Illuminate\Support\Carbon;
 
 class FounderDashboardService
 {
@@ -24,6 +25,8 @@ class FounderDashboardService
         $execution = $this->buildExecutionSummary($weeklyState, $snapshots);
         $growth = $this->buildGrowthSummary($commercialSummary, $snapshots);
         $atlas = $this->buildAtlasSummary($snapshots);
+        $syncStatus = $this->buildSyncStatus($moduleCards);
+        $workspace = $this->buildWorkspace($founder, $company, $weeklyState, $actions, $activityFeed, $execution, $atlas, $growth, $syncStatus);
 
         return [
             'founder' => $founder,
@@ -35,10 +38,12 @@ class FounderDashboardService
             'snapshots' => $snapshots,
             'module_cards' => $moduleCards,
             'activity_feed' => $activityFeed,
+            'sync_status' => $syncStatus,
             'execution' => $execution,
             'growth' => $growth,
             'atlas' => $atlas,
             'actions' => $actions,
+            'workspace' => $workspace,
             'metrics' => [
                 'weekly_progress_percent' => (int) ($weeklyState->weekly_progress_percent ?? 0),
                 'open_tasks' => (int) ($weeklyState->open_tasks ?? 0),
@@ -47,6 +52,246 @@ class FounderDashboardService
                 'currency' => strtoupper((string) ($commercialSummary->currency ?? 'USD')),
             ],
         ];
+    }
+
+    private function buildWorkspace(
+        Founder $founder,
+        $company,
+        $weeklyState,
+        $actions,
+        array $activityFeed,
+        array $execution,
+        array $atlas,
+        array $growth,
+        array $syncStatus
+    ): array {
+        $today = now();
+        $firstName = trim((string) preg_replace('/\s+.*/', '', (string) $founder->full_name));
+        $mentorName = $execution['mentor_name'] ?: 'your Hatchers mentor';
+        $mentorLinked = trim((string) $execution['mentor_name']) !== '';
+        $mentorSession = [
+            'date_label' => strtoupper($today->format('l, M j')) . ' · 1:00PM',
+            'title' => '1 on 1 session (30 mins)',
+            'subtitle' => 'with ' . $mentorName,
+            'badge' => $execution['next_meeting_at'] ? 'Join Session' : 'Session in 1d',
+            'badge_tone' => $execution['next_meeting_at'] ? 'success' : 'neutral',
+        ];
+
+        $learningTitle = $actions->first()?->title ?: ($execution['weekly_focus'] ?: 'This week\'s founder sprint');
+        $learningDescription = $company?->company_brief ?: 'Keep moving through your weekly build plan inside Hatchers Ai OS.';
+        $primaryAction = $actions->first();
+        $primaryLessonCompleted = $primaryAction && ($primaryAction->completed_at !== null || in_array((string) $primaryAction->status, ['completed', 'complete', 'done'], true));
+        $learningItem = [
+            'id' => $primaryAction?->id,
+            'title' => $learningTitle,
+            'subtitle' => mb_strimwidth((string) $learningDescription, 0, 72, '...'),
+            'badge' => $primaryLessonCompleted ? 'Completed' : ($execution['open_milestones'] > 0 ? 'Lesson in 3d 2h' : 'Open lesson'),
+            'completed' => $primaryLessonCompleted,
+            'status_label' => $primaryLessonCompleted ? 'Reopen lesson' : 'Complete lesson',
+            'detail_type' => 'lesson',
+            'detail_heading' => $learningTitle,
+            'detail_due' => $primaryLessonCompleted ? 'Completed' : ($execution['next_meeting_at'] ?: 'This week'),
+            'detail_owner' => $mentorLinked ? ('Mentor · ' . $mentorName) : 'Hatchers Ai OS',
+            'detail_description' => $learningDescription,
+            'mentor_name' => $mentorLinked ? $mentorName : '',
+            'comments' => $this->buildDrawerComments($founder, $activityFeed, 'lesson'),
+        ];
+
+        $taskCards = [];
+        foreach ($actions->take(3) as $index => $action) {
+            $isCompleted = $action->completed_at !== null || in_array((string) $action->status, ['completed', 'complete', 'done'], true);
+            $taskCards[] = [
+                'id' => $action->id,
+                'label' => 'Milestone name',
+                'due' => $isCompleted ? 'Completed' : ($index === 0 ? 'Due in 3 days' : ($index === 1 ? 'Due in 5 days' : 'Queued this week')),
+                'title' => $action->title,
+                'description' => $action->description,
+                'cta' => $isCompleted ? '' : ($index === 0 ? 'Build with AI' : 'Write with AI'),
+                'completed' => $isCompleted,
+                'mentor_name' => $mentorLinked ? $mentorName : '',
+                'mentor_context' => $mentorLinked
+                    ? 'Aligned with your current mentor execution rhythm.'
+                    : 'OS-guided task from your current weekly founder plan.',
+                'status_label' => $isCompleted ? 'Reopen task' : 'Complete task',
+                'detail_type' => 'task',
+                'detail_heading' => $action->title,
+                'detail_due' => $isCompleted ? 'Completed' : ($index === 0 ? strtoupper($today->copy()->addDays(3)->format('D, M j')) . ' - 1:00 PM' : strtoupper($today->copy()->addDays(5)->format('D, M j'))),
+                'detail_owner' => $mentorLinked ? ('Mentor linked · ' . $mentorName) : 'Milestone name',
+                'detail_description' => $action->description,
+                'comments' => $this->buildDrawerComments($founder, $activityFeed, 'task'),
+            ];
+        }
+
+        if (count($taskCards) < 3) {
+            $taskCards[] = [
+                'id' => null,
+                'label' => 'Milestone name',
+                'due' => 'Completed',
+                'title' => 'List your first 10 potential customers',
+                'description' => 'Identify specific people you can reach out to for customer discovery conversations.',
+                'cta' => '',
+                'completed' => true,
+                'mentor_name' => $mentorLinked ? $mentorName : '',
+                'mentor_context' => $mentorLinked
+                    ? 'Previously completed during mentor-guided execution.'
+                    : 'Previously completed in your weekly founder workflow.',
+                'status_label' => '',
+                'detail_type' => 'task',
+                'detail_heading' => 'List your first 10 potential customers',
+                'detail_due' => 'Completed',
+                'detail_owner' => $mentorLinked ? ('Mentor linked · ' . $mentorName) : 'Milestone name',
+                'detail_description' => 'This task has already been completed and kept here as part of your weekly momentum.',
+                'comments' => $this->buildDrawerComments($founder, $activityFeed, 'task'),
+            ];
+        }
+
+        $notifications = $this->buildNotifications($founder, $activityFeed, $execution);
+
+        return [
+            'first_name' => $firstName !== '' ? $firstName : 'Founder',
+            'mentor_session' => $mentorSession,
+            'learning_item' => $learningItem,
+            'learning_plan_entries' => $this->buildLearningPlanEntries($learningItem, $actions, $founder, $activityFeed),
+            'task_cards' => array_slice($taskCards, 0, 3),
+            'task_center_entries' => $taskCards,
+            'notifications' => $notifications,
+            'notification_groups' => $this->groupNotifications($notifications),
+            'unread_notification_count' => count($notifications),
+            'calendar' => $this->buildCalendar($today),
+            'ai_tools' => [
+                ['title' => 'Landing Pages'],
+                ['title' => 'Forms'],
+                ['title' => 'Social Media'],
+                ['title' => 'CRM'],
+                ['title' => 'Payments & Bookings'],
+                ['title' => 'SEO'],
+                ['title' => 'Messaging Automation'],
+            ],
+            'quick_prompt' => $atlas['primary_growth_goal'] ?: 'Ask AI anything about your project...',
+            'next_best_actions' => $this->buildNextBestActions(
+                $company,
+                $execution,
+                $growth,
+                $atlas,
+                $syncStatus,
+                $actions
+            ),
+            'activity_feed_groups' => $this->buildActivityFeedGroups($activityFeed),
+        ];
+    }
+
+    private function buildLearningPlanEntries(array $learningItem, $actions, Founder $founder, array $activityFeed): array
+    {
+        $entries = [$learningItem];
+
+        foreach ($actions->slice(1, 2)->values() as $index => $action) {
+            $isCompleted = $action->completed_at !== null || in_array((string) $action->status, ['completed', 'complete', 'done'], true);
+            $entries[] = [
+                'id' => $action->id,
+                'title' => $action->title,
+                'subtitle' => mb_strimwidth((string) $action->description, 0, 72, '...'),
+                'badge' => $isCompleted ? 'Completed' : ($index === 0 ? 'Lesson in 5d 1h' : 'Queued this week'),
+                'completed' => $isCompleted,
+                'status_label' => $isCompleted ? 'Reopen lesson' : 'Complete lesson',
+                'detail_type' => 'lesson',
+                'detail_heading' => $action->title,
+                'detail_due' => $isCompleted ? 'Completed' : ($index === 0 ? 'Later this week' : 'Next up'),
+                'detail_owner' => !empty($learningItem['mentor_name']) ? ('Mentor · ' . $learningItem['mentor_name']) : 'Hatchers Ai OS',
+                'detail_description' => $action->description,
+                'mentor_name' => $learningItem['mentor_name'] ?? '',
+                'comments' => $this->buildDrawerComments($founder, $activityFeed, 'lesson'),
+            ];
+        }
+
+        return $entries;
+    }
+
+    private function buildNotifications(Founder $founder, array $activityFeed, array $execution): array
+    {
+        $notifications = [];
+
+        if ($execution['next_meeting_at']) {
+            $notifications[] = [
+                'title' => 'You have an upcoming mentoring session.',
+                'meta' => $execution['next_meeting_at'],
+                'kind' => 'mentor',
+                'age_label' => '21h',
+                'is_new' => true,
+            ];
+        }
+
+        if ($execution['open_tasks'] > 0) {
+            $notifications[] = [
+                'title' => 'There are ' . $execution['open_tasks'] . ' open tasks for this week.',
+                'meta' => 'Needs attention',
+                'kind' => 'task',
+                'age_label' => '1 day',
+                'is_new' => false,
+            ];
+        }
+
+        foreach (array_slice($activityFeed, 0, 4) as $index => $item) {
+            $notifications[] = [
+                'title' => $item['message'],
+                'meta' => $item['updated_at'] ?: 'Recently',
+                'kind' => strtolower((string) ($item['module'] ?? 'update')),
+                'age_label' => $index === 0 ? '1 day' : ($index === 1 ? '2 days' : 'Earlier'),
+                'is_new' => false,
+            ];
+        }
+
+        return array_slice($notifications, 0, 4);
+    }
+
+    private function groupNotifications(array $notifications): array
+    {
+        $new = array_values(array_filter($notifications, fn (array $item) => !empty($item['is_new'])));
+        $earlier = array_values(array_filter($notifications, fn (array $item) => empty($item['is_new'])));
+
+        return [
+            'new' => $new,
+            'earlier' => $earlier,
+        ];
+    }
+
+    private function buildCalendar($today): array
+    {
+        $start = $today->copy()->startOfMonth()->startOfWeek();
+        $end = $today->copy()->endOfMonth()->endOfWeek();
+        $days = [];
+
+        while ($start <= $end) {
+            $days[] = [
+                'day' => (int) $start->format('j'),
+                'in_month' => $start->month === $today->month,
+                'is_today' => $start->isSameDay($today),
+            ];
+            $start->addDay();
+        }
+
+        return [
+            'month_label' => strtoupper($today->format('F Y')),
+            'days' => $days,
+        ];
+    }
+
+    private function buildDrawerComments(Founder $founder, array $activityFeed, string $type): array
+    {
+        $messages = array_values(array_filter(array_map(
+            fn (array $item) => trim((string) ($item['message'] ?? '')),
+            array_slice($activityFeed, 0, 2)
+        )));
+
+        if (empty($messages)) {
+            $messages = $type === 'lesson'
+                ? ['Use this lesson to align your next business move with your weekly focus.']
+                : ['Track progress here and use AI when you need help moving faster.'];
+        }
+
+        return array_map(fn (string $message) => [
+            'author' => $founder->full_name,
+            'message' => $message,
+        ], $messages);
     }
 
     private function buildModuleCards($snapshots): array
@@ -142,6 +387,56 @@ class FounderDashboardService
         return $cards;
     }
 
+    private function buildSyncStatus(array $moduleCards): array
+    {
+        $statuses = [];
+        $issues = [];
+
+        foreach ($moduleCards as $card) {
+            $updatedAt = !empty($card['updated_at']) ? Carbon::parse($card['updated_at']) : null;
+            $hoursSince = $updatedAt?->diffInHours(now());
+
+            if ($updatedAt === null) {
+                $label = 'Offline';
+                $tone = 'danger';
+                $reason = 'No sync has reached Hatchers Ai OS yet.';
+            } elseif ($hoursSince !== null && $hoursSince <= 24) {
+                $label = 'Healthy';
+                $tone = 'success';
+                $reason = 'Recently synced into the OS.';
+            } elseif ($hoursSince !== null && $hoursSince <= 72) {
+                $label = 'Stale';
+                $tone = 'warning';
+                $reason = 'Synced before, but needs refresh attention.';
+            } else {
+                $label = 'Offline';
+                $tone = 'danger';
+                $reason = 'This module is too old to trust operationally.';
+            }
+
+            $statuses[] = [
+                'module' => $card['module'],
+                'status' => $label,
+                'tone' => $tone,
+                'reason' => $reason,
+                'updated_at' => $card['updated_at'],
+            ];
+
+            if ($label !== 'Healthy') {
+                $issues[] = [
+                    'module' => $card['module'],
+                    'message' => $reason,
+                ];
+            }
+        }
+
+        return [
+            'modules' => $statuses,
+            'issues' => $issues,
+            'healthy_count' => collect($statuses)->where('status', 'Healthy')->count(),
+        ];
+    }
+
     private function buildActivityFeed($snapshots): array
     {
         $feed = [];
@@ -166,6 +461,96 @@ class FounderDashboardService
         usort($feed, fn ($a, $b) => $b['timestamp'] <=> $a['timestamp']);
 
         return array_slice($feed, 0, 8);
+    }
+
+    private function buildActivityFeedGroups(array $activityFeed): array
+    {
+        $grouped = collect($activityFeed)
+            ->groupBy('module')
+            ->map(fn ($items, $module): array => [
+                'module' => $module,
+                'items' => collect($items)
+                    ->map(fn (array $item): array => [
+                        'message' => $item['message'],
+                        'updated_at' => $item['updated_at'] ?: 'Recently',
+                    ])
+                    ->values()
+                    ->all(),
+            ])
+            ->values()
+            ->all();
+
+        return $grouped;
+    }
+
+    private function buildNextBestActions(
+        $company,
+        array $execution,
+        array $growth,
+        array $atlas,
+        array $syncStatus,
+        $actions
+    ): array {
+        $items = [];
+
+        if (!empty($syncStatus['issues'])) {
+            $items[] = [
+                'title' => 'Review module trust before acting',
+                'description' => 'One or more backend engines are stale or offline. Check the OS activity center before you rely on those records.',
+                'label' => 'Open Activity',
+                'href' => route('founder.activity') . '#sync-issues',
+            ];
+        }
+
+        if ((int) ($execution['open_tasks'] ?? 0) > 0) {
+            $primaryTask = $actions->first();
+            $items[] = [
+                'title' => 'Complete your highest-priority founder task',
+                'description' => $primaryTask?->title ?: 'Keep momentum moving by completing the next execution task in your queue.',
+                'label' => 'Open Tasks',
+                'href' => route('founder.tasks'),
+            ];
+        }
+
+        if ((int) ($atlas['generated_campaigns_count'] ?? 0) === 0) {
+            $items[] = [
+                'title' => 'Start your next campaign from the OS',
+                'description' => $atlas['primary_growth_goal']
+                    ? 'Use your growth goal to launch a campaign without leaving Hatchers Ai OS.'
+                    : 'Create your first campaign and begin building a visible pipeline from the OS.',
+                'label' => 'Open Marketing',
+                'href' => route('founder.marketing'),
+            ];
+        }
+
+        if (((int) ($growth['product_count'] ?? 0) + (int) ($growth['service_count'] ?? 0)) === 0) {
+            $items[] = [
+                'title' => 'Publish your first offer',
+                'description' => 'Set up a starter product or service so your storefront has something real to sell or book.',
+                'label' => 'Open Launch Plan',
+                'href' => route('founder.commerce'),
+            ];
+        }
+
+        if (trim((string) ($company?->company_brief ?? '')) === '') {
+            $items[] = [
+                'title' => 'Tighten your company profile',
+                'description' => 'Your brand brief is still thin. Adding it will improve Atlas outputs and mentor context.',
+                'label' => 'Open Settings',
+                'href' => route('founder.settings'),
+            ];
+        }
+
+        if (empty($items)) {
+            $items[] = [
+                'title' => 'Review your cross-tool momentum',
+                'description' => 'Your dashboard is in a healthy state. Use the activity center to review what changed across LMS, Atlas, Bazaar, and Servio.',
+                'label' => 'Open Activity',
+                'href' => route('founder.activity'),
+            ];
+        }
+
+        return array_slice($items, 0, 4);
     }
 
     private function buildExecutionSummary($weeklyState, $snapshots): array

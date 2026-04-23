@@ -33,6 +33,7 @@ class IdentitySyncController extends Controller
             'timezone' => ['nullable', 'string', 'max:255'],
             'status' => ['nullable', 'string', 'max:50'],
             'password' => ['nullable', 'string', 'max:255'],
+            'auth_source' => ['nullable', 'string', 'max:50'],
             'company_name' => ['nullable', 'string', 'max:255'],
             'company_brief' => ['nullable', 'string'],
             'business_model' => ['nullable', 'string', 'max:50'],

@@ -1,0 +1,140 @@
+@extends('os.layout')
+
+@section('content')
+    @php
+        $admin = $workspace['admin'];
+        $metrics = $workspace['metrics'];
+        $urgentSubscribers = $workspace['urgent_subscribers'];
+        $staleModules = $workspace['stale_modules'];
+        $exceptions = $workspace['exceptions'];
+        $recentAudits = $workspace['recent_audits'];
+    @endphp
+
+    <div class="sidebar-layout">
+        <aside class="sidebar-card">
+            <div class="pill">System Admin</div>
+            <div class="nav-group" style="margin-top: 18px;">
+                <div class="nav-group-title">Control Center</div>
+                <a class="nav-item" href="/dashboard/admin">Overview</a>
+                <a class="nav-item" href="{{ route('admin.subscribers') }}">Subscribers</a>
+                <a class="nav-item" href="/admin/control">Founder Operations</a>
+                <a class="nav-item" href="{{ route('admin.system-access') }}">System Access</a>
+                <a class="nav-item" href="{{ route('admin.identity') }}">Identity</a>
+                <a class="nav-item" href="{{ route('admin.modules') }}">Module Monitoring</a>
+                <a class="nav-item active" href="{{ route('admin.support') }}">Support Center</a>
+                <a class="nav-item" href="/dashboard">OS Home</a>
+            </div>
+        </aside>
+
+        <div>
+            <section class="hero">
+                <div class="eyebrow">Support Center</div>
+                <h1>Run support operations from the OS.</h1>
+                <p class="muted">Welcome back, {{ $admin->full_name }}. This workspace pulls founder risk, stale module trust, and open exception handling into one operational surface.</p>
+            </section>
+
+            <section class="metrics" style="margin-bottom: 22px;">
+                <div class="card metric"><div class="muted">Urgent founders</div><strong>{{ $metrics['urgent_founders'] }}</strong></div>
+                <div class="card metric"><div class="muted">Open exceptions</div><strong>{{ $metrics['open_exceptions'] }}</strong></div>
+                <div class="card metric"><div class="muted">Stale modules</div><strong>{{ $metrics['stale_modules'] }}</strong></div>
+                <div class="card metric"><div class="muted">Watchlist founders</div><strong>{{ $metrics['watchlist_founders'] }}</strong></div>
+            </section>
+
+            <section class="grid-2">
+                <div class="card">
+                    <h2>Founder Watchlist</h2>
+                    <p class="muted">These founders need support attention because they are blocked, off-track, or billing-risky.</p>
+                    <div class="stack" style="margin-top: 14px;">
+                        @forelse ($urgentSubscribers as $subscriber)
+                            <div class="stack-item">
+                                <strong>{{ $subscriber['company_name'] }}</strong><br>
+                                {{ $subscriber['name'] }} · {{ ucfirst($subscriber['status']) }} · {{ ucfirst($subscriber['billing_status']) }}
+                                <div class="muted" style="margin-top: 6px;">
+                                    {{ $subscriber['weekly_progress_percent'] }}% weekly progress · {{ $subscriber['mentor_name'] }} · USD {{ number_format($subscriber['gross_revenue'], 0) }}
+                                </div>
+                                <div class="cta-row" style="margin-top: 10px;">
+                                    <a class="btn" href="{{ route('admin.control') }}">Open founder operations</a>
+                                    <a class="btn" href="{{ route('admin.subscribers', ['search' => $subscriber['email']]) }}">Open subscriber record</a>
+                                </div>
+                            </div>
+                        @empty
+                            <div class="stack-item">
+                                <strong>No urgent founder issues right now</strong><br>
+                                The OS is not currently flagging a founder support watchlist.
+                            </div>
+                        @endforelse
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>Reliability Queue</h2>
+                    <p class="muted">Use this queue to work stale trust issues and unresolved cross-tool failures without leaving the OS.</p>
+                    <div class="stack" style="margin-top: 14px;">
+                        @forelse ($staleModules as $module)
+                            <div class="stack-item">
+                                <strong>{{ $module['module'] }} · {{ $module['status'] }}</strong><br>
+                                {{ $module['status_reason'] }}
+                                <div class="muted" style="margin-top: 6px;">
+                                    {{ $module['coverage_percent'] }}% coverage · {{ $module['synced_founders'] }} synced · {{ $module['missing_founders'] }} missing
+                                </div>
+                                <div class="cta-row" style="margin-top: 10px;">
+                                    <a class="btn" href="{{ route('admin.modules') }}">Open module monitoring</a>
+                                </div>
+                            </div>
+                        @empty
+                            <div class="stack-item">
+                                <strong>All modules look healthy</strong><br>
+                                No stale or offline module trust signals are currently blocking support work.
+                            </div>
+                        @endforelse
+                    </div>
+                </div>
+            </section>
+
+            <section class="grid-2" style="margin-top: 22px;">
+                <div class="card">
+                    <h2>Open Exception Queue</h2>
+                    <div class="stack" style="margin-top: 14px;">
+                        @forelse ($exceptions as $exception)
+                            <div class="stack-item">
+                                <strong>{{ $exception['module'] }} · {{ $exception['operation'] }}</strong><br>
+                                {{ $exception['message'] }}
+                                <div class="muted" style="margin-top: 6px;">
+                                    {{ $exception['created_at'] }}@if($exception['founder_name']) · {{ $exception['founder_name'] }}@endif
+                                </div>
+                                <div class="cta-row" style="margin-top: 10px;">
+                                    <form method="POST" action="{{ route('admin.control.exceptions.resolve', $exception['id']) }}">
+                                        @csrf
+                                        <button class="btn primary" type="submit">Resolve exception</button>
+                                    </form>
+                                </div>
+                            </div>
+                        @empty
+                            <div class="stack-item">
+                                <strong>No unresolved exceptions</strong><br>
+                                Support does not currently have any open OS exception items to clear.
+                            </div>
+                        @endforelse
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>Recent Support Actions</h2>
+                    <div class="stack" style="margin-top: 14px;">
+                        @forelse ($recentAudits as $audit)
+                            <div class="stack-item">
+                                <strong>{{ $audit['summary'] }}</strong><br>
+                                <span class="muted">{{ $audit['actor_name'] }} · {{ $audit['created_at'] }}</span>
+                            </div>
+                        @empty
+                            <div class="stack-item">
+                                <strong>No recent support actions</strong><br>
+                                Once support and recovery work happens in the OS, it will appear here.
+                            </div>
+                        @endforelse
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+@endsection

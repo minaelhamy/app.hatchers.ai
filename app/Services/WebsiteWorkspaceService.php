@@ -22,10 +22,19 @@ class WebsiteWorkspaceService
         $servio = $snapshots->get('servio');
 
         $recommendedEngine = (string) ($company?->website_engine ?: $this->determineRecommendedEngine($businessModel));
-        $recommendedSubdomain = $this->buildRecommendedSubdomain($slug, $recommendedEngine);
+        $websitePath = $this->normalizeWebsitePath((string) ($company?->website_path ?? ''));
+        if ($websitePath === '') {
+            $websitePath = $slug;
+        }
+        $recommendedSubdomain = $this->buildRecommendedSubdomain($slug, $recommendedEngine, $websitePath);
         $currentWebsiteUrl = (string) ($company?->website_url ?? '');
         if ($currentWebsiteUrl === '') {
-            $currentWebsiteUrl = $recommendedSubdomain;
+            $currentWebsiteUrl = $this->buildPublicWebsiteUrl(
+                $recommendedEngine,
+                $slug,
+                $websitePath,
+                (string) ($company?->custom_domain ?? '')
+            );
         }
 
         return [
@@ -33,6 +42,7 @@ class WebsiteWorkspaceService
             'business_model' => $businessModel,
             'website_status' => (string) ($company?->website_status ?? 'not_started'),
             'recommended_engine' => $recommendedEngine,
+            'website_path' => $websitePath,
             'current_website_url' => $currentWebsiteUrl,
             'recommended_subdomain' => $recommendedSubdomain,
             'custom_domain_example' => 'www.' . $slug . '.com',
@@ -77,7 +87,7 @@ class WebsiteWorkspaceService
         $summary = $payload['summary'] ?? [];
         $keyCounts = $payload['key_counts'] ?? [];
         $engineLabel = strtoupper($engine);
-        $defaultUrl = $this->buildRecommendedSubdomain($slug, $engine);
+        $defaultUrl = $this->buildRecommendedSubdomain($slug, $engine, $slug);
 
         if ($engine === 'bazaar') {
             $title = (string) ($summary['website_title'] ?? 'Product storefront');
@@ -165,13 +175,9 @@ class WebsiteWorkspaceService
         };
     }
 
-    private function buildRecommendedSubdomain(string $slug, string $engine): string
+    private function buildRecommendedSubdomain(string $slug, string $engine, string $path = ''): string
     {
-        return match ($engine) {
-            'servio' => 'https://' . $slug . '.hatchers.site',
-            'bazaar' => 'https://' . $slug . '.hatchers.site',
-            default => 'https://' . $slug . '.hatchers.site',
-        };
+        return $this->buildPublicWebsiteUrl($engine, $slug, $path, '');
     }
 
     private function slugify(string $value): string
@@ -199,5 +205,33 @@ class WebsiteWorkspaceService
         $host = parse_url($baseUrl, PHP_URL_HOST);
 
         return is_string($host) && $host !== '' ? $host : $baseUrl;
+    }
+
+    private function buildPublicWebsiteUrl(string $engine, string $slug, string $path, string $customDomain): string
+    {
+        $host = trim($customDomain) !== ''
+            ? $this->normalizeDomainHost($customDomain)
+            : $slug . '.hatchers.site';
+        $normalizedPath = $this->normalizeWebsitePath($path);
+
+        return 'https://' . $host . ($normalizedPath !== '' ? '/' . $normalizedPath : '');
+    }
+
+    private function normalizeWebsitePath(string $path): string
+    {
+        $path = strtolower(trim($path));
+        $path = preg_replace('/[^a-z0-9\-\/]+/', '-', $path) ?? '';
+        $path = preg_replace('/\/+/', '/', $path) ?? '';
+        $path = trim($path, '/-');
+
+        return $path;
+    }
+
+    private function normalizeDomainHost(string $domain): string
+    {
+        $domain = strtolower(trim($domain));
+        $domain = preg_replace('#^https?://#', '', $domain) ?? '';
+
+        return trim($domain, '/');
     }
 }
