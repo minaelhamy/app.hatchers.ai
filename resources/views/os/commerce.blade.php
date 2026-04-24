@@ -6,9 +6,9 @@
 @section('head')
     <style>
         .page.founder-home-page { padding: 0; }
-        .commerce-shell { min-height: 100vh; display:grid; grid-template-columns:220px minmax(0,1fr) 220px; background:#f8f5ee; }
-        .commerce-sidebar, .commerce-rightbar { background: rgba(255,252,247,0.8); border-color: var(--line); border-style: solid; border-width:0 1px 0 0; min-height:100vh; display:flex; flex-direction:column; }
-        .commerce-rightbar { border-width:0 0 0 1px; background: rgba(255,251,246,0.9); }
+        .commerce-shell { min-height:100vh; display:grid; grid-template-columns:220px minmax(0,1fr) 220px; background:#f8f5ee; }
+        .commerce-sidebar, .commerce-rightbar { background:rgba(255,252,247,0.8); border-color:var(--line); border-style:solid; border-width:0 1px 0 0; min-height:100vh; display:flex; flex-direction:column; }
+        .commerce-rightbar { border-width:0 0 0 1px; background:rgba(255,251,246,0.9); }
         .commerce-sidebar-inner, .commerce-rightbar-inner { padding:22px 18px; }
         .commerce-brand { display:inline-block; margin-bottom:24px; }
         .commerce-brand img { width:168px; height:auto; display:block; }
@@ -20,19 +20,19 @@
         .commerce-user { display:flex; align-items:center; gap:10px; }
         .commerce-avatar { width:30px; height:30px; border-radius:999px; background:#b0a999; color:#fff; display:grid; place-items:center; font-weight:700; font-size:0.92rem; flex-shrink:0; }
         .commerce-main { padding:26px 28px 24px; }
-        .commerce-main-inner { max-width:780px; margin:0 auto; }
+        .commerce-main-inner { max-width:820px; margin:0 auto; }
         .commerce-main h1 { font-size: clamp(2rem, 3vw, 3rem); letter-spacing:-0.02em; margin-bottom:6px; }
         .commerce-main p { color:var(--muted); margin-bottom:24px; }
-        .commerce-banner { border-radius:16px; padding:14px 16px; border:1px solid rgba(220,207,191,0.8); background: rgba(255,255,255,0.9); margin-bottom:14px; }
-        .commerce-banner.success { border-color: rgba(44,122,87,0.26); background: rgba(226,245,236,0.9); }
-        .commerce-banner.error { border-color: rgba(179,34,83,0.22); background: rgba(255,241,246,0.92); }
-        .commerce-metrics { display:grid; grid-template-columns:repeat(5, minmax(0,1fr)); gap:12px; margin-bottom:22px; }
-        .commerce-metric { background: rgba(255,255,255,0.92); border:1px solid rgba(220,207,191,0.65); border-radius:18px; padding:16px 18px; box-shadow:0 10px 28px rgba(52,41,26,0.04); }
+        .commerce-banner { border-radius:16px; padding:14px 16px; border:1px solid rgba(220,207,191,0.8); background:rgba(255,255,255,0.9); margin-bottom:14px; }
+        .commerce-banner.success { border-color:rgba(44,122,87,0.26); background:rgba(226,245,236,0.9); }
+        .commerce-banner.error { border-color:rgba(179,34,83,0.22); background:rgba(255,241,246,0.92); }
+        .commerce-metrics { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:12px; margin-bottom:22px; }
+        .commerce-metric { background:rgba(255,255,255,0.92); border:1px solid rgba(220,207,191,0.65); border-radius:18px; padding:16px 18px; box-shadow:0 10px 28px rgba(52,41,26,0.04); }
         .commerce-metric strong { display:block; font-size:1.55rem; margin-top:6px; }
         .commerce-section { margin-bottom:22px; }
         .commerce-section h2 { font-size:1.08rem; margin-bottom:12px; }
         .commerce-grid { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:12px; }
-        .commerce-card { background: rgba(255,255,255,0.92); border:1px solid rgba(220,207,191,0.65); border-radius:18px; padding:18px 18px 16px; box-shadow:0 10px 28px rgba(52,41,26,0.04); }
+        .commerce-card, .rail-item, .mini-note { background:rgba(255,255,255,0.92); border:1px solid rgba(220,207,191,0.65); border-radius:18px; padding:18px 18px 16px; box-shadow:0 10px 28px rgba(52,41,26,0.04); }
         .commerce-card-title { font-size:1rem; font-weight:700; margin-bottom:6px; }
         .commerce-card-copy { color:var(--muted); font-size:0.95rem; line-height:1.45; }
         .commerce-card-meta { font-size:0.82rem; text-transform:uppercase; letter-spacing:0.06em; color:var(--rose); margin-bottom:8px; }
@@ -47,7 +47,6 @@
         .commerce-actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:14px; }
         .commerce-rightbar h3 { font-size:0.83rem; letter-spacing:0.06em; text-transform:uppercase; color:var(--muted); margin-bottom:12px; }
         .rail-list { display:grid; gap:10px; margin-top:14px; }
-        .rail-item, .mini-note { background: rgba(255,255,255,0.92); border:1px solid rgba(220,207,191,0.65); border-radius:14px; padding:12px 14px; }
         @media (max-width:1240px) { .commerce-shell { grid-template-columns:220px 1fr; } .commerce-rightbar { display:none; } }
         @media (max-width:900px) { .commerce-shell { grid-template-columns:1fr; } .commerce-sidebar { min-height:auto; border-right:0; border-bottom:1px solid var(--line); } .commerce-sidebar-footer { display:none; } .commerce-main { padding:20px 16px 24px; } .commerce-grid, .commerce-metrics { grid-template-columns:1fr; } }
     </style>
@@ -59,10 +58,16 @@
         $growth = $dashboard['growth'];
         $businessModel = $website['business_model'];
         $engines = collect($website['engines']);
-        $bazaar = $engines->firstWhere('key', 'bazaar');
-        $servio = $engines->firstWhere('key', 'servio');
-        $nextSteps = $website['next_steps'];
         $catalogOffers = $catalogOffers ?? [];
+        $commerceConfigs = $commerceConfigs ?? ['coupon' => [], 'shipping' => [], 'booking_policy' => []];
+        $supportsProducts = in_array($businessModel, ['product', 'hybrid'], true);
+        $supportsServices = in_array($businessModel, ['service', 'hybrid'], true);
+        $automationSummary = $dashboard['automation_summary'] ?? ['active_count' => 0, 'items' => [], 'has_unpaid_order_rule' => false, 'has_unscheduled_booking_rule' => false, 'has_provider_assignment_rule' => false];
+        $commerceHeading = match ($businessModel) {
+            'service' => 'Manage your services, booking rules, and delivery flow from one OS workspace powered by Servio behind the scenes.',
+            'product' => 'Manage your products, discounts, shipping plans, and orders from one OS workspace powered by Bazaar behind the scenes.',
+            default => 'Manage your products, services, storefront readiness, orders, and bookings from one OS workspace powered by Bazaar and Servio behind the scenes.',
+        };
     @endphp
 
     <div class="commerce-shell">
@@ -72,8 +77,8 @@
                 <nav class="commerce-nav">
                     <a class="commerce-nav-item" href="/dashboard/founder"><span class="commerce-nav-icon">⌂</span><span>Home</span></a>
                     <a class="commerce-nav-item active" href="{{ route('founder.commerce') }}"><span class="commerce-nav-icon">⌁</span><span>Commerce</span></a>
+                    <a class="commerce-nav-item" href="{{ route('website') }}"><span class="commerce-nav-icon">◫</span><span>Website</span></a>
                     <a class="commerce-nav-item" href="{{ route('founder.ai-tools') }}"><span class="commerce-nav-icon">✦</span><span>AI Tools</span></a>
-                    <a class="commerce-nav-item" href="{{ route('founder.learning-plan') }}"><span class="commerce-nav-icon">▣</span><span>Learning Plan</span></a>
                     <a class="commerce-nav-item" href="{{ route('founder.tasks') }}"><span class="commerce-nav-icon">◌</span><span>Tasks</span></a>
                     <a class="commerce-nav-item" href="{{ route('founder.settings') }}"><span class="commerce-nav-icon">⚙</span><span>Settings</span></a>
                 </nav>
@@ -90,7 +95,7 @@
         <main class="commerce-main">
             <div class="commerce-main-inner">
                 <h1>Commerce</h1>
-                <p>Manage your products, services, storefront readiness, orders, and bookings from one OS workspace powered by Bazaar and Servio behind the scenes.</p>
+                <p>{{ $commerceHeading }}</p>
 
                 @if (session('success'))
                     <div class="commerce-banner success">{{ session('success') }}</div>
@@ -100,54 +105,20 @@
                 @endif
 
                 <section class="commerce-metrics">
-                    <div class="commerce-metric">
-                        <div class="commerce-card-copy">Products</div>
-                        <strong>{{ $growth['product_count'] }}</strong>
-                    </div>
-                    <div class="commerce-metric">
-                        <div class="commerce-card-copy">Services</div>
-                        <strong>{{ $growth['service_count'] }}</strong>
-                    </div>
-                    <div class="commerce-metric">
-                        <div class="commerce-card-copy">Orders</div>
-                        <strong>{{ $growth['order_count'] }}</strong>
-                    </div>
-                    <div class="commerce-metric">
-                        <div class="commerce-card-copy">Bookings</div>
-                        <strong>{{ $growth['booking_count'] }}</strong>
-                    </div>
-                    <div class="commerce-metric">
-                        <div class="commerce-card-copy">Revenue</div>
-                        <strong>{{ $growth['gross_revenue_formatted'] }}</strong>
-                    </div>
+                    @if ($supportsProducts)
+                        <div class="commerce-metric"><div class="commerce-card-copy">Products</div><strong>{{ $growth['product_count'] }}</strong></div>
+                        <div class="commerce-metric"><div class="commerce-card-copy">Orders</div><strong>{{ $growth['order_count'] }}</strong></div>
+                    @endif
+                    @if ($supportsServices)
+                        <div class="commerce-metric"><div class="commerce-card-copy">Services</div><strong>{{ $growth['service_count'] }}</strong></div>
+                        <div class="commerce-metric"><div class="commerce-card-copy">Bookings</div><strong>{{ $growth['booking_count'] }}</strong></div>
+                    @endif
+                    <div class="commerce-metric"><div class="commerce-card-copy">Customers</div><strong>{{ $growth['customer_count'] }}</strong></div>
+                    <div class="commerce-metric"><div class="commerce-card-copy">Revenue</div><strong>{{ $growth['gross_revenue_formatted'] }}</strong></div>
                 </section>
 
                 <section class="commerce-section">
-                    <h2>Storefront Performance</h2>
-                    <div class="commerce-grid">
-                        <div class="commerce-card">
-                            <div class="commerce-card-meta">Commercial Health</div>
-                            <div class="commerce-card-title">How your storefront is performing</div>
-                            <div class="commerce-card-copy">
-                                <div style="margin-bottom:10px;"><strong>Customers tracked</strong><br>{{ $growth['customer_count'] }} customers across product and service workflows.</div>
-                                <div style="margin-bottom:10px;"><strong>Revenue tracked</strong><br>{{ $growth['gross_revenue_formatted'] }}</div>
-                                <div><strong>Conversion flow</strong><br>{{ $growth['order_count'] }} orders and {{ $growth['booking_count'] }} bookings are already visible from the OS.</div>
-                            </div>
-                        </div>
-                        <div class="commerce-card">
-                            <div class="commerce-card-meta">Storefront Coverage</div>
-                            <div class="commerce-card-title">Where the business is live</div>
-                            <div class="commerce-card-copy">
-                                <div style="margin-bottom:10px;"><strong>Bazaar storefront</strong><br>{{ $growth['bazaar_title'] ?: 'Not named yet' }}</div>
-                                <div style="margin-bottom:10px;"><strong>Servio storefront</strong><br>{{ $growth['servio_title'] ?: 'Not named yet' }}</div>
-                                <div><strong>Offer mix</strong><br>{{ $growth['product_count'] }} products and {{ $growth['service_count'] }} services currently tracked.</div>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-
-                <section class="commerce-section">
-                    <h2>Storefront Engines</h2>
+                    <h2>Connected Engine{{ $engines->count() > 1 ? 's' : '' }}</h2>
                     <div class="commerce-grid">
                         @foreach ($engines as $engine)
                             <div class="commerce-card">
@@ -157,8 +128,13 @@
                                 <div class="commerce-chip">Theme: {{ $engine['theme'] }}</div>
                                 <div class="commerce-chip">Readiness: {{ $engine['readiness_score'] }}%</div>
                                 <div class="commerce-actions">
-                                    <a class="commerce-cta" href="{{ $engine['website_url'] }}" target="_blank" rel="noreferrer">Preview site</a>
-                                    <a class="commerce-secondary" href="{{ route('website') }}">Website Workspace</a>
+                                    <a class="commerce-cta" href="{{ route('website') }}">Open website workspace</a>
+                                    @if ($engine['key'] === 'bazaar' && $supportsProducts)
+                                        <a class="commerce-secondary" href="{{ route('founder.commerce.orders') }}">Orders</a>
+                                    @endif
+                                    @if ($engine['key'] === 'servio' && $supportsServices)
+                                        <a class="commerce-secondary" href="{{ route('founder.commerce.bookings') }}">Bookings</a>
+                                    @endif
                                 </div>
                             </div>
                         @endforeach
@@ -168,82 +144,122 @@
                 <section class="commerce-section">
                     <h2>OS-Native Offer Setup</h2>
                     <div class="commerce-grid">
-                        <div class="commerce-card">
-                            <div class="commerce-card-meta">Product Manager</div>
-                            <div class="commerce-card-title">Add a product from the OS</div>
-                            <div class="commerce-card-copy">This creates the first product record in Bazaar without pushing the founder into Bazaar first.</div>
-                            <form method="POST" action="/website/starter" class="commerce-field">
-                                @csrf
-                                <input type="hidden" name="website_engine" value="bazaar">
-                                <input type="hidden" name="starter_mode" value="product">
-                                <div class="commerce-field">
+                        @if ($supportsProducts)
+                            <div class="commerce-card">
+                                <div class="commerce-card-meta">Product Manager</div>
+                                <div class="commerce-card-title">Add a product from the OS</div>
+                                <div class="commerce-card-copy">This creates the product in Bazaar without pushing the founder into Bazaar first.</div>
+                                <form method="POST" action="/website/starter" class="commerce-field">
+                                    @csrf
+                                    <input type="hidden" name="website_engine" value="bazaar">
+                                    <input type="hidden" name="starter_mode" value="product">
                                     <label for="product-title">Product title</label>
                                     <input id="product-title" name="starter_title" type="text" placeholder="Core product name" required>
-                                </div>
-                                <div class="commerce-field">
                                     <label for="product-description">Product description</label>
                                     <textarea id="product-description" name="starter_description" placeholder="What does the product do and who is it for?"></textarea>
-                                </div>
-                                <div class="commerce-field">
                                     <label for="product-price">Price</label>
                                     <input id="product-price" name="starter_price" type="number" step="0.01" min="0" placeholder="99">
-                                </div>
-                                <div class="commerce-actions">
-                                    <button class="commerce-cta" type="submit">Create product</button>
-                                </div>
-                            </form>
-                        </div>
+                                    <div class="commerce-actions"><button class="commerce-cta" type="submit">Create product</button></div>
+                                </form>
+                            </div>
+                        @endif
 
-                        <div class="commerce-card">
-                            <div class="commerce-card-meta">Services Manager</div>
-                            <div class="commerce-card-title">Add a service from the OS</div>
-                            <div class="commerce-card-copy">This creates the first service record in Servio so the founder can keep building from the OS.</div>
-                            <form method="POST" action="/website/starter" class="commerce-field">
-                                @csrf
-                                <input type="hidden" name="website_engine" value="servio">
-                                <input type="hidden" name="starter_mode" value="service">
-                                <div class="commerce-field">
+                        @if ($supportsServices)
+                            <div class="commerce-card">
+                                <div class="commerce-card-meta">Services Manager</div>
+                                <div class="commerce-card-title">Add a service from the OS</div>
+                                <div class="commerce-card-copy">This creates the service in Servio so the founder can keep building from the OS.</div>
+                                <form method="POST" action="/website/starter" class="commerce-field">
+                                    @csrf
+                                    <input type="hidden" name="website_engine" value="servio">
+                                    <input type="hidden" name="starter_mode" value="service">
                                     <label for="service-title">Service title</label>
                                     <input id="service-title" name="starter_title" type="text" placeholder="Core service name" required>
-                                </div>
-                                <div class="commerce-field">
                                     <label for="service-description">Service description</label>
                                     <textarea id="service-description" name="starter_description" placeholder="What outcome does this service deliver?"></textarea>
-                                </div>
-                                <div class="commerce-field">
                                     <label for="service-price">Price</label>
                                     <input id="service-price" name="starter_price" type="number" step="0.01" min="0" placeholder="250">
-                                </div>
-                                <div class="commerce-actions">
-                                    <button class="commerce-cta" type="submit">Create service</button>
-                                </div>
-                            </form>
-                        </div>
+                                    <div class="commerce-actions"><button class="commerce-cta" type="submit">Create service</button></div>
+                                </form>
+                            </div>
+                        @endif
                     </div>
                 </section>
 
                 <section class="commerce-section">
                     <h2>Offer Manager</h2>
                     <div class="commerce-grid">
-                        @forelse ($catalogOffers as $offer)
+                        @php
+                            $visibleOffers = collect($catalogOffers)->filter(function ($offer) use ($supportsProducts, $supportsServices) {
+                                return ($supportsProducts && $offer['engine'] === 'bazaar') || ($supportsServices && $offer['engine'] === 'servio');
+                            })->values();
+                        @endphp
+                        @forelse ($visibleOffers as $offer)
                             <div class="commerce-card">
                                 <div class="commerce-card-meta">{{ strtoupper($offer['type']) }} · {{ strtoupper($offer['engine']) }}</div>
                                 <div class="commerce-card-title">{{ $offer['title'] }}</div>
                                 <div class="commerce-card-copy">Last updated {{ $offer['updated_at'] ?? 'recently' }}.</div>
                                 <form method="POST" action="{{ route('founder.commerce.offer.update', $offer['id']) }}" class="commerce-field" style="margin-top:14px;">
                                     @csrf
-                                    <div class="commerce-field">
-                                        <label for="offer-title-{{ $offer['id'] }}">Title</label>
-                                        <input id="offer-title-{{ $offer['id'] }}" name="title" type="text" value="{{ $offer['title'] }}" required>
-                                    </div>
-                                    <div class="commerce-field">
-                                        <label for="offer-description-{{ $offer['id'] }}">Description</label>
-                                        <textarea id="offer-description-{{ $offer['id'] }}" name="description">{{ $offer['description'] }}</textarea>
-                                    </div>
-                                    <div class="commerce-field">
-                                        <label for="offer-price-{{ $offer['id'] }}">Price</label>
-                                        <input id="offer-price-{{ $offer['id'] }}" name="price" type="number" step="0.01" min="0" value="{{ $offer['price'] }}">
-                                    </div>
+                                    <label for="offer-title-{{ $offer['id'] }}">Title</label>
+                                    <input id="offer-title-{{ $offer['id'] }}" name="title" type="text" value="{{ $offer['title'] }}" required>
+                                    <label for="offer-description-{{ $offer['id'] }}">Description</label>
+                                    <textarea id="offer-description-{{ $offer['id'] }}" name="description">{{ $offer['description'] }}</textarea>
+                                    <label for="offer-price-{{ $offer['id'] }}">Price</label>
+                                    <input id="offer-price-{{ $offer['id'] }}" name="price" type="number" step="0.01" min="0" value="{{ $offer['price'] }}">
+                                    @if ($offer['engine'] === 'bazaar')
+                                        <label for="offer-sku-{{ $offer['id'] }}">SKU</label>
+                                        <input id="offer-sku-{{ $offer['id'] }}" name="sku" type="text" value="{{ $offer['sku'] }}">
+                                        <label for="offer-stock-{{ $offer['id'] }}">Stock quantity</label>
+                                        <input id="offer-stock-{{ $offer['id'] }}" name="stock" type="number" min="0" step="1" value="{{ $offer['stock'] }}">
+                                        <label for="offer-low-stock-{{ $offer['id'] }}">Low stock alert</label>
+                                        <input id="offer-low-stock-{{ $offer['id'] }}" name="low_stock" type="number" min="0" step="1" value="{{ $offer['low_stock'] }}">
+                                        <label for="offer-adjustment-mode-{{ $offer['id'] }}">Quick stock movement</label>
+                                        <select id="offer-adjustment-mode-{{ $offer['id'] }}" name="adjustment_mode">
+                                            <option value="">No stock movement</option>
+                                            <option value="increase">Increase stock</option>
+                                            <option value="decrease">Decrease stock</option>
+                                            <option value="set">Set stock to exact quantity</option>
+                                        </select>
+                                        <label for="offer-adjustment-amount-{{ $offer['id'] }}">Adjustment quantity</label>
+                                        <input id="offer-adjustment-amount-{{ $offer['id'] }}" name="adjustment_amount" type="number" min="1" step="1" placeholder="10">
+                                    @else
+                                        <label for="offer-duration-{{ $offer['id'] }}">Duration</label>
+                                        <input id="offer-duration-{{ $offer['id'] }}" name="duration" type="number" min="1" step="1" value="{{ $offer['duration'] }}">
+                                        <label for="offer-duration-unit-{{ $offer['id'] }}">Duration unit</label>
+                                        <select id="offer-duration-unit-{{ $offer['id'] }}" name="duration_unit">
+                                            <option value="minutes" @selected(($offer['duration_unit'] ?? 'minutes') === 'minutes')>Minutes</option>
+                                            <option value="hours" @selected(($offer['duration_unit'] ?? 'minutes') === 'hours')>Hours</option>
+                                        </select>
+                                        <label for="offer-capacity-{{ $offer['id'] }}">Bookings per slot</label>
+                                        <input id="offer-capacity-{{ $offer['id'] }}" name="capacity" type="number" min="1" step="1" value="{{ $offer['capacity'] }}">
+                                        <label for="offer-staff-mode-{{ $offer['id'] }}">Staff assignment</label>
+                                        <select id="offer-staff-mode-{{ $offer['id'] }}" name="staff_mode">
+                                            <option value="auto" @selected(($offer['staff_mode'] ?? 'auto') === 'auto')>Any available staff</option>
+                                            <option value="specific" @selected(($offer['staff_mode'] ?? 'auto') === 'specific')>Specific staff member</option>
+                                        </select>
+                                        <label for="offer-staff-id-{{ $offer['id'] }}">Staff member id</label>
+                                        <input id="offer-staff-id-{{ $offer['id'] }}" name="staff_id" type="text" value="{{ $offer['staff_id'] }}" placeholder="Optional specific staff id">
+                                        <label><span>Available days</span>
+                                            <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;">
+                                                @foreach (['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] as $day)
+                                                    <label style="display:inline-flex;align-items:center;gap:6px;font-weight:500;">
+                                                        <input type="checkbox" name="availability_days[]" value="{{ $day }}" @checked(in_array($day, $offer['availability_days'] ?? [], true))>
+                                                        <span>{{ substr($day, 0, 3) }}</span>
+                                                    </label>
+                                                @endforeach
+                                            </div>
+                                        </label>
+                                        <label for="offer-open-time-{{ $offer['id'] }}">Open time</label>
+                                        <input id="offer-open-time-{{ $offer['id'] }}" name="open_time" type="time" value="{{ $offer['open_time'] ?? '09:00' }}">
+                                        <label for="offer-close-time-{{ $offer['id'] }}">Close time</label>
+                                        <input id="offer-close-time-{{ $offer['id'] }}" name="close_time" type="time" value="{{ $offer['close_time'] ?? '17:00' }}">
+                                    @endif
+                                    <label for="offer-status-{{ $offer['id'] }}">Availability</label>
+                                    <select id="offer-status-{{ $offer['id'] }}" name="availability">
+                                        <option value="active" @selected(($offer['status'] ?? 'active') === 'active')>Active</option>
+                                        <option value="inactive" @selected(($offer['status'] ?? 'active') === 'inactive')>Inactive</option>
+                                    </select>
                                     <div class="commerce-actions">
                                         <button class="commerce-cta" type="submit">Save in OS</button>
                                         <a class="commerce-secondary" href="{{ route('website') }}">Website Workspace</a>
@@ -254,61 +270,224 @@
                             <div class="commerce-card">
                                 <div class="commerce-card-meta">Offer Manager</div>
                                 <div class="commerce-card-title">No offers in the OS yet</div>
-                                <div class="commerce-card-copy">Create your first product or service above and it will stay visible here for ongoing editing from Hatchers Ai Business OS.</div>
+                                <div class="commerce-card-copy">Create your first relevant product or service above and it will stay visible here for ongoing editing from Hatchers Ai Business OS.</div>
                             </div>
                         @endforelse
                     </div>
                 </section>
 
-                <section class="commerce-section">
-                    <h2>Orders And Bookings</h2>
-                    <div class="commerce-grid">
-                        <div class="commerce-card">
-                            <div class="commerce-card-meta">Orders</div>
-                            <div class="commerce-card-title">{{ $growth['order_count'] }} orders tracked</div>
-                            <div class="commerce-card-copy">Bazaar snapshots feed the OS with store health, order volume, and storefront readiness so the founder sees commerce state from one place.</div>
-                            <div class="commerce-actions">
-                                <a class="commerce-cta" href="{{ route('founder.commerce.orders') }}">Open orders view</a>
-                                <a class="commerce-secondary" href="{{ route('founder.commerce.orders') }}">Orders</a>
+                @if ($supportsProducts)
+                    <section class="commerce-section">
+                        <h2>Discounts And Shipping</h2>
+                        <div class="commerce-grid">
+                            <div class="commerce-card">
+                                <div class="commerce-card-meta">Coupons</div>
+                                <div class="commerce-card-title">Add coupon codes from the OS</div>
+                                <div class="commerce-card-copy">Coupons belong here in the OS. Saving from this workspace now syncs the discount rule directly into Bazaar too.</div>
+                                <form method="POST" action="{{ route('founder.commerce.settings.store') }}" class="commerce-field">
+                                    @csrf
+                                    <input type="hidden" name="setting_type" value="coupon">
+                                    <input type="hidden" name="setting_platform" value="bazaar">
+                                    <label for="coupon-title">Coupon name</label>
+                                    <input id="coupon-title" name="title" type="text" placeholder="Spring launch offer" required>
+                                    <label for="coupon-code">Coupon code</label>
+                                    <input id="coupon-code" name="field_one" type="text" placeholder="SPRING20">
+                                    <label for="coupon-type">Discount type</label>
+                                    <select id="coupon-type" name="field_two">
+                                        <option value="percent">Percentage discount</option>
+                                        <option value="fixed">Fixed amount discount</option>
+                                    </select>
+                                    <label for="coupon-value">Discount value</label>
+                                    <input id="coupon-value" name="field_three" type="text" placeholder="20">
+                                    <label for="coupon-applies-to">Applies to</label>
+                                    <input id="coupon-applies-to" name="field_four" type="text" placeholder="All products or selected collection">
+                                    <div class="commerce-actions"><button class="commerce-cta" type="submit">Save coupon rule</button></div>
+                                </form>
+                                @foreach (collect($commerceConfigs['coupon'])->where('engine', 'bazaar') as $config)
+                                    <div style="margin-top:10px;">
+                                        <div class="commerce-chip">{{ $config['title'] }} · {{ $config['field_one'] }} · {{ $config['field_two'] }} {{ $config['field_three'] }} · {{ $config['status'] === 'paused' ? 'Inactive' : 'Active' }}</div>
+                                        <form method="POST" action="{{ route('founder.commerce.settings.toggle') }}" style="margin-top:8px;">
+                                            @csrf
+                                            <input type="hidden" name="platform" value="bazaar">
+                                            <input type="hidden" name="config_type" value="coupon">
+                                            <input type="hidden" name="title" value="{{ $config['title'] }}">
+                                            <input type="hidden" name="status" value="{{ $config['status'] === 'paused' ? 'active' : 'inactive' }}">
+                                            <button class="commerce-secondary" type="submit">{{ $config['status'] === 'paused' ? 'Activate' : 'Deactivate' }}</button>
+                                        </form>
+                                        <form method="POST" action="{{ route('founder.commerce.config.update', $config['id']) }}" class="commerce-field" style="margin-top:8px;">
+                                            @csrf
+                                            <label>Coupon name<input name="title" type="text" value="{{ $config['title'] }}"></label>
+                                            <label>Coupon code<input name="field_one" type="text" value="{{ $config['field_one'] }}"></label>
+                                            <label>Discount type
+                                                <select name="field_two">
+                                                    <option value="percent" @selected(($config['field_two'] ?? '') === 'percent')>Percentage discount</option>
+                                                    <option value="fixed" @selected(($config['field_two'] ?? '') === 'fixed')>Fixed amount discount</option>
+                                                </select>
+                                            </label>
+                                            <label>Discount value<input name="field_three" type="text" value="{{ $config['field_three'] }}"></label>
+                                            <label>Coupon note<input name="field_four" type="text" value="{{ $config['field_four'] }}"></label>
+                                            <button class="commerce-secondary" type="submit">Update coupon</button>
+                                        </form>
+                                    </div>
+                                @endforeach
                             </div>
-                        </div>
-                        <div class="commerce-card">
-                            <div class="commerce-card-meta">Bookings</div>
-                            <div class="commerce-card-title">{{ $growth['booking_count'] }} bookings tracked</div>
-                            <div class="commerce-card-copy">Servio snapshots feed the OS with booking and service delivery signals while the OS becomes the founder-facing workspace.</div>
-                            <div class="commerce-actions">
-                                <a class="commerce-cta" href="{{ route('founder.commerce.bookings') }}">Open bookings view</a>
-                                <a class="commerce-secondary" href="{{ route('founder.commerce.bookings') }}">Bookings</a>
-                            </div>
-                        </div>
-                    </div>
-                </section>
 
-                <section class="commerce-section">
-                    <h2>Website And Domain Control</h2>
-                    <div class="commerce-grid">
-                        <div class="commerce-card">
-                            <div class="commerce-card-meta">Website Workspace</div>
-                            <div class="commerce-card-title">Configure your public site from the OS</div>
-                            <div class="commerce-card-copy">Theme selection, publishing, and domain connection already route through Hatchers Ai Business OS.</div>
-                            <div class="commerce-actions">
-                                <a class="commerce-cta" href="{{ route('website') }}">Open website workspace</a>
-                            </div>
-                        </div>
-                        <div class="commerce-card">
-                            <div class="commerce-card-meta">Next Steps</div>
-                            <div class="commerce-card-title">What to finish next</div>
-                            <div class="commerce-card-copy">
-                                @foreach ($nextSteps as $step)
-                                    <div style="margin-bottom:10px;">
-                                        <strong>{{ $step['title'] }}</strong><br>
-                                        {{ $step['description'] }}
+                            <div class="commerce-card">
+                                <div class="commerce-card-meta">Shipping</div>
+                                <div class="commerce-card-title">Set shipping plans from the OS</div>
+                                <div class="commerce-card-copy">Shipping plans should be configured here, not in a separate storefront admin. Saving from this workspace now syncs the shipping area into Bazaar too.</div>
+                                <form method="POST" action="{{ route('founder.commerce.settings.store') }}" class="commerce-field">
+                                    @csrf
+                                    <input type="hidden" name="setting_type" value="shipping">
+                                    <input type="hidden" name="setting_platform" value="bazaar">
+                                    <label for="shipping-title">Shipping plan name</label>
+                                    <input id="shipping-title" name="title" type="text" placeholder="Standard shipping" required>
+                                    <label for="shipping-region">Region</label>
+                                    <input id="shipping-region" name="field_one" type="text" placeholder="Egypt, GCC, Worldwide">
+                                    <label for="shipping-fee">Fee</label>
+                                    <input id="shipping-fee" name="field_two" type="text" placeholder="30 USD or free over 100 USD">
+                                    <label for="shipping-window">Delivery window</label>
+                                    <input id="shipping-window" name="field_three" type="text" placeholder="2-4 business days">
+                                    <label for="shipping-note">Fulfillment note</label>
+                                    <input id="shipping-note" name="field_four" type="text" placeholder="Courier, pickup, same-day">
+                                    <div class="commerce-actions"><button class="commerce-cta" type="submit">Save shipping plan</button></div>
+                                </form>
+                                @foreach (collect($commerceConfigs['shipping'])->where('engine', 'bazaar') as $config)
+                                    <div style="margin-top:10px;">
+                                        <div class="commerce-chip">{{ $config['title'] }} · {{ $config['field_one'] }} · {{ $config['field_two'] }} · {{ $config['status'] === 'paused' ? 'Inactive' : 'Active' }}</div>
+                                        <form method="POST" action="{{ route('founder.commerce.settings.toggle') }}" style="margin-top:8px;">
+                                            @csrf
+                                            <input type="hidden" name="platform" value="bazaar">
+                                            <input type="hidden" name="config_type" value="shipping">
+                                            <input type="hidden" name="title" value="{{ $config['title'] }}">
+                                            <input type="hidden" name="status" value="{{ $config['status'] === 'paused' ? 'active' : 'inactive' }}">
+                                            <button class="commerce-secondary" type="submit">{{ $config['status'] === 'paused' ? 'Activate' : 'Deactivate' }}</button>
+                                        </form>
+                                        <form method="POST" action="{{ route('founder.commerce.config.update', $config['id']) }}" class="commerce-field" style="margin-top:8px;">
+                                            @csrf
+                                            <label>Plan name<input name="title" type="text" value="{{ $config['title'] }}"></label>
+                                            <label>Region<input name="field_one" type="text" value="{{ $config['field_one'] }}"></label>
+                                            <label>Fee<input name="field_two" type="text" value="{{ $config['field_two'] }}"></label>
+                                            <label>Delivery window<input name="field_three" type="text" value="{{ $config['field_three'] }}"></label>
+                                            <label>Fulfillment note<input name="field_four" type="text" value="{{ $config['field_four'] }}"></label>
+                                            <button class="commerce-secondary" type="submit">Update shipping plan</button>
+                                        </form>
                                     </div>
                                 @endforeach
                             </div>
                         </div>
-                    </div>
-                </section>
+                    </section>
+                @endif
+
+                @if ($supportsServices)
+                    <section class="commerce-section">
+                        <h2>Booking Policies</h2>
+                        <div class="commerce-grid">
+                            <div class="commerce-card">
+                                <div class="commerce-card-meta">Coupons</div>
+                                <div class="commerce-card-title">Add service coupons from the OS</div>
+                                <div class="commerce-card-copy">Service discounts should be managed in the OS too. Saving here now syncs the coupon directly into Servio.</div>
+                                <form method="POST" action="{{ route('founder.commerce.settings.store') }}" class="commerce-field" style="margin-top:14px;">
+                                    @csrf
+                                    <input type="hidden" name="setting_type" value="coupon">
+                                    <input type="hidden" name="setting_platform" value="servio">
+                                    <label for="service-coupon-title">Coupon name</label>
+                                    <input id="service-coupon-title" name="title" type="text" placeholder="New client booking offer" required>
+                                    <label for="service-coupon-code">Coupon code</label>
+                                    <input id="service-coupon-code" name="field_one" type="text" placeholder="BOOK15">
+                                    <label for="service-coupon-type">Discount type</label>
+                                    <select id="service-coupon-type" name="field_two">
+                                        <option value="percent">Percentage discount</option>
+                                        <option value="fixed">Fixed amount discount</option>
+                                    </select>
+                                    <label for="service-coupon-value">Discount value</label>
+                                    <input id="service-coupon-value" name="field_three" type="text" placeholder="15">
+                                    <label for="service-coupon-note">Coupon note</label>
+                                    <input id="service-coupon-note" name="field_four" type="text" placeholder="Applies to first booking only">
+                                    <div class="commerce-actions"><button class="commerce-cta" type="submit">Save service coupon</button></div>
+                                </form>
+                                @foreach (collect($commerceConfigs['coupon'])->where('engine', 'servio') as $config)
+                                    <div style="margin-top:10px;">
+                                        <div class="commerce-chip">{{ $config['title'] }} · {{ $config['field_one'] }} · {{ $config['field_two'] }} {{ $config['field_three'] }} · {{ $config['status'] === 'paused' ? 'Inactive' : 'Active' }}</div>
+                                        <form method="POST" action="{{ route('founder.commerce.settings.toggle') }}" style="margin-top:8px;">
+                                            @csrf
+                                            <input type="hidden" name="platform" value="servio">
+                                            <input type="hidden" name="config_type" value="coupon">
+                                            <input type="hidden" name="title" value="{{ $config['title'] }}">
+                                            <input type="hidden" name="status" value="{{ $config['status'] === 'paused' ? 'active' : 'inactive' }}">
+                                            <button class="commerce-secondary" type="submit">{{ $config['status'] === 'paused' ? 'Activate' : 'Deactivate' }}</button>
+                                        </form>
+                                        <form method="POST" action="{{ route('founder.commerce.config.update', $config['id']) }}" class="commerce-field" style="margin-top:8px;">
+                                            @csrf
+                                            <label>Coupon name<input name="title" type="text" value="{{ $config['title'] }}"></label>
+                                            <label>Coupon code<input name="field_one" type="text" value="{{ $config['field_one'] }}"></label>
+                                            <label>Discount type
+                                                <select name="field_two">
+                                                    <option value="percent" @selected(($config['field_two'] ?? '') === 'percent')>Percentage discount</option>
+                                                    <option value="fixed" @selected(($config['field_two'] ?? '') === 'fixed')>Fixed amount discount</option>
+                                                </select>
+                                            </label>
+                                            <label>Discount value<input name="field_three" type="text" value="{{ $config['field_three'] }}"></label>
+                                            <label>Coupon note<input name="field_four" type="text" value="{{ $config['field_four'] }}"></label>
+                                            <button class="commerce-secondary" type="submit">Update service coupon</button>
+                                        </form>
+                                    </div>
+                                @endforeach
+                            </div>
+
+                            <div class="commerce-card">
+                                <div class="commerce-card-meta">Servio Operations</div>
+                                <div class="commerce-card-title">Configure booking rules from the OS</div>
+                                <div class="commerce-card-copy">Availability, session length, buffer time, and cancellation policy should all be managed from Hatchers Ai Business OS for a service business.</div>
+                                <form method="POST" action="{{ route('founder.commerce.settings.store') }}" class="commerce-field">
+                                    @csrf
+                                    <input type="hidden" name="setting_type" value="booking_policy">
+                                    <input type="hidden" name="setting_platform" value="servio">
+                                    <label for="booking-title">Policy name</label>
+                                    <input id="booking-title" name="title" type="text" placeholder="Standard sessions" required>
+                                    <label for="booking-length">Session length</label>
+                                    <input id="booking-length" name="field_one" type="text" placeholder="60 minutes">
+                                    <label for="booking-buffer">Buffer time</label>
+                                    <input id="booking-buffer" name="field_two" type="text" placeholder="15 minutes">
+                                    <label for="booking-lead">Minimum lead time</label>
+                                    <input id="booking-lead" name="field_three" type="text" placeholder="12 hours">
+                                    <label for="booking-cancel">Cancellation window</label>
+                                    <input id="booking-cancel" name="field_four" type="text" placeholder="24 hours before start">
+                                    <div class="commerce-actions"><button class="commerce-cta" type="submit">Save booking policy</button></div>
+                                </form>
+                                @foreach (collect($commerceConfigs['booking_policy'])->where('engine', 'servio') as $config)
+                                    <div class="commerce-chip">{{ $config['title'] }} · {{ $config['field_one'] }} · {{ $config['field_two'] }}</div>
+                                @endforeach
+                            </div>
+                            <div class="commerce-card">
+                                <div class="commerce-card-meta">Bookings</div>
+                                <div class="commerce-card-title">{{ $growth['booking_count'] }} bookings tracked</div>
+                                <div class="commerce-card-copy">Servio snapshots feed the OS with booking and service delivery signals while the OS stays the founder-facing workspace.</div>
+                                <div class="commerce-actions"><a class="commerce-cta" href="{{ route('founder.commerce.bookings') }}">Open bookings view</a></div>
+                            </div>
+                        </div>
+                    </section>
+                @endif
+
+                @if ($supportsProducts)
+                    <section class="commerce-section">
+                        <h2>Orders</h2>
+                        <div class="commerce-grid">
+                            <div class="commerce-card">
+                                <div class="commerce-card-meta">Orders</div>
+                                <div class="commerce-card-title">{{ $growth['order_count'] }} orders tracked</div>
+                                <div class="commerce-card-copy">Bazaar snapshots feed the OS with store health, order volume, and storefront readiness so the founder sees commerce state from one place.</div>
+                                <div class="commerce-actions"><a class="commerce-cta" href="{{ route('founder.commerce.orders') }}">Open orders view</a></div>
+                            </div>
+                            <div class="commerce-card">
+                                <div class="commerce-card-meta">Website</div>
+                                <div class="commerce-card-title">Public storefront and checkout</div>
+                                <div class="commerce-card-copy">The live public experience should route through Hatchers Ai Business OS URLs while Bazaar handles the storefront backend.</div>
+                                <div class="commerce-actions"><a class="commerce-cta" href="{{ route('website') }}">Open website workspace</a></div>
+                            </div>
+                        </div>
+                    </section>
+                @endif
             </div>
         </main>
 
@@ -328,14 +507,59 @@
                     @endforeach
                 </div>
 
-                <h3 style="margin-top:22px;">Connected Tools</h3>
+                <h3 style="margin-top:22px;">Where To Manage Things</h3>
                 <div class="rail-list">
-                    @foreach ($launchCards as $launch)
-                        <div class="rail-item">
-                            <div style="font-weight:600;">{{ $launch['label'] }}</div>
-                            <div style="margin-top:4px;color:var(--muted);">{{ $launch['description'] }}</div>
-                        </div>
-                    @endforeach
+                    @if ($supportsProducts)
+                        <div class="rail-item"><strong>Coupons</strong><br><span class="muted">Commerce → Discounts And Shipping</span></div>
+                        <div class="rail-item"><strong>Shipping plans</strong><br><span class="muted">Commerce → Discounts And Shipping</span></div>
+                        <div class="rail-item"><strong>Orders</strong><br><span class="muted">Commerce → Orders</span></div>
+                    @endif
+                    @if ($supportsServices)
+                        <div class="rail-item"><strong>Booking rules</strong><br><span class="muted">Commerce → Booking Policies</span></div>
+                        <div class="rail-item"><strong>Bookings</strong><br><span class="muted">Commerce → Bookings</span></div>
+                    @endif
+                    <div class="rail-item"><strong>Theme + public URL</strong><br><span class="muted">Website workspace</span></div>
+                </div>
+
+                <h3 style="margin-top:22px;">Reminder Rules</h3>
+                <div class="rail-list">
+                    @if ($supportsProducts)
+                        <a class="rail-item" href="{{ $automationSummary['has_unpaid_order_rule'] ? route('founder.commerce.orders', ['status' => 'all', 'queue' => 'unpaid']) : route('founder.automations') }}" style="text-decoration:none;color:inherit;display:block;">
+                            <strong>Unpaid orders</strong><br>
+                            <span class="muted">
+                                @if ($automationSummary['has_unpaid_order_rule'])
+                                    Active in OS automations
+                                @else
+                                    Save the unpaid order reminder template in Automations
+                                @endif
+                            </span>
+                        </a>
+                    @endif
+                    @if ($supportsServices)
+                        <a class="rail-item" href="{{ $automationSummary['has_unscheduled_booking_rule'] ? route('founder.commerce.bookings', ['status' => 'all', 'queue' => 'unscheduled']) : route('founder.automations') }}" style="text-decoration:none;color:inherit;display:block;">
+                            <strong>Unscheduled bookings</strong><br>
+                            <span class="muted">
+                                @if ($automationSummary['has_unscheduled_booking_rule'])
+                                    Active in OS automations
+                                @else
+                                    Save the unscheduled booking reminder template in Automations
+                                @endif
+                            </span>
+                        </a>
+                        <a class="rail-item" href="{{ $automationSummary['has_provider_assignment_rule'] ? route('founder.commerce.bookings', ['status' => 'all', 'queue' => 'needs_staff']) : route('founder.automations') }}" style="text-decoration:none;color:inherit;display:block;">
+                            <strong>Provider assignment</strong><br>
+                            <span class="muted">
+                                @if ($automationSummary['has_provider_assignment_rule'])
+                                    Active in OS automations
+                                @else
+                                    Save the provider assignment template in Automations
+                                @endif
+                            </span>
+                        </a>
+                    @endif
+                    <div class="rail-item">
+                        <a class="commerce-secondary" href="{{ route('founder.automations') }}" style="text-decoration:none;">Open automations</a>
+                    </div>
                 </div>
             </div>
         </aside>

@@ -27,6 +27,27 @@
         @endif
 
         <section class="grid-2">
+            <div class="card">
+                <h2>Recommended Reminder Sequences</h2>
+                <p class="muted">These presets turn the new order and booking follow-up flows into reusable OS rules instead of one-off manual actions.</p>
+                <div class="stack" style="margin-top:14px;">
+                    @foreach ($recommendedTemplates as $key => $template)
+                        <div class="stack-item">
+                            <div class="pill">{{ $scopeOptions[$template['module_scope']] ?? ucfirst($template['module_scope']) }}</div>
+                            <strong style="display:block;margin-top:10px;">{{ $template['name'] }}</strong>
+                            <div class="muted" style="margin-top:6px;">{{ $triggerOptions[$template['trigger_type']] ?? $template['trigger_type'] }}</div>
+                            <div class="muted" style="margin-top:6px;">If {{ $template['condition_summary'] }}</div>
+                            <div class="muted" style="margin-top:6px;">Then {{ $template['action_summary'] }}</div>
+                            <form method="POST" action="{{ route('founder.automations.templates.store') }}" style="margin-top:12px;">
+                                @csrf
+                                <input type="hidden" name="template_key" value="{{ $key }}">
+                                <button class="btn" type="submit">Save Template Rule</button>
+                            </form>
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+
             <form method="POST" action="{{ route('founder.automations.store') }}" class="card">
                 @csrf
                 <h2>Create Automation</h2>

@@ -230,6 +230,91 @@ class OsAssistantActionService
         return $this->updateCommerceFieldFromOs($founder, 'servio', 'service', $title, $field, $value, $actorRole);
     }
 
+    public function saveCommerceConfigFromOs(
+        Founder $founder,
+        string $platform,
+        string $category,
+        string $title,
+        array $attributes,
+        bool $updateExisting = false,
+        string $actorRole = 'founder'
+    ): array {
+        $title = trim($title);
+        if ($title === '') {
+            return [
+                'success' => false,
+                'reply' => 'A title is required before Hatchers OS can save that commerce config.',
+            ];
+        }
+
+        $action = [
+            'platform' => $platform,
+            'category' => $category,
+            'title' => $title,
+            'description' => (string) ($attributes['description'] ?? ''),
+            'actor_role' => $actorRole,
+            'payload' => $attributes,
+        ];
+
+        if ($updateExisting) {
+            $result = $this->updatePlatformRecord($founder, array_merge($action, [
+                'field' => 'config',
+                'value' => 'sync',
+                'target_name' => $title,
+            ]));
+        } else {
+            $result = $this->createPlatformRecord($founder, $action);
+        }
+
+        if (!($result['success'] ?? false)) {
+            return $result;
+        }
+
+        return [
+            'success' => true,
+            'reply' => 'Done. I synced that ' . $category . ' into ' . ucfirst($platform) . ' from Hatchers OS.',
+            'title' => $title,
+            'edit_url' => (string) ($result['edit_url'] ?? ''),
+            'action_type' => $updateExisting ? 'platform_record_update' : 'platform_record_create',
+            'sync_summary' => 'Hatchers OS synced a ' . $category . ' config into ' . ucfirst($platform) . '.',
+        ];
+    }
+
+    public function updateCommerceOperationFromOs(
+        Founder $founder,
+        string $platform,
+        string $category,
+        string $targetName,
+        string $field,
+        string $value,
+        array $attributes = [],
+        string $actorRole = 'founder'
+    ): array {
+        $result = $this->updatePlatformRecord($founder, [
+            'platform' => $platform,
+            'category' => $category,
+            'field' => $field,
+            'value' => $value,
+            'target_name' => trim($targetName),
+            'actor_role' => $actorRole,
+            'payload' => $attributes,
+        ]);
+
+        if (!($result['success'] ?? false)) {
+            return $result;
+        }
+
+        return [
+            'success' => true,
+            'reply' => 'Done. I updated that ' . $category . ' in ' . ucfirst($platform) . ' from Hatchers OS.',
+            'title' => (string) ($result['title'] ?? $targetName),
+            'edit_url' => (string) ($result['edit_url'] ?? ''),
+            'email_followup_sent' => (bool) ($result['email_followup_sent'] ?? false),
+            'action_type' => 'platform_record_update',
+            'sync_summary' => 'Hatchers OS updated a ' . $category . ' record in ' . ucfirst($platform) . '.',
+        ];
+    }
+
     private function executeWriteAction(Founder $founder, array $action): array
     {
         $type = trim((string) ($action['type'] ?? ''));
@@ -1212,6 +1297,10 @@ class OsAssistantActionService
             'actor_role' => (string) ($action['actor_role'] ?? 'founder'),
         ];
 
+        if (!empty($action['payload']) && is_array($action['payload'])) {
+            $payload = array_merge($payload, $action['payload']);
+        }
+
         $json = json_encode($payload);
         if ($json === false) {
             return [
@@ -1325,6 +1414,10 @@ class OsAssistantActionService
             'target' => !empty($action['target_name']) ? 'named' : 'latest',
             'target_name' => (string) ($action['target_name'] ?? ''),
         ];
+
+        if (!empty($action['payload']) && is_array($action['payload'])) {
+            $payload = array_merge($payload, $action['payload']);
+        }
 
         $json = json_encode($payload);
         if ($json === false) {

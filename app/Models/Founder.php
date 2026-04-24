@@ -24,11 +24,19 @@ class Founder extends Authenticatable
         'phone',
         'country',
         'timezone',
+        'email_verified_at',
+        'email_verification_token',
+        'email_verification_expires_at',
+        'login_verification_token',
+        'login_verification_expires_at',
         'mentor_entitled_until',
         'last_synced_at',
     ];
 
     protected $casts = [
+        'email_verified_at' => 'datetime',
+        'email_verification_expires_at' => 'datetime',
+        'login_verification_expires_at' => 'datetime',
         'mentor_entitled_until' => 'datetime',
         'last_synced_at' => 'datetime',
         'permissions_json' => 'array',
@@ -135,5 +143,10 @@ class Founder extends Authenticatable
             'integration_sync' => 'Integration sync',
             default => 'Legacy/unknown',
         };
+    }
+
+    public function hasVerifiedEmail(): bool
+    {
+        return $this->email_verified_at !== null;
     }
 }

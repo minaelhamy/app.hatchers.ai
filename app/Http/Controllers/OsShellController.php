@@ -31,6 +31,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rule;
 use Throwable;
 
@@ -70,6 +71,143 @@ class OsShellController extends Controller
         return view('os.login', [
             'pageTitle' => 'Hatchers OS Login',
         ]);
+    }
+
+    public function verifyEmailNotice(Request $request)
+    {
+        return view('os.verify-email', [
+            'pageTitle' => 'Verify Founder Email',
+            'email' => (string) ($request->query('email', session('verification_email', ''))),
+        ]);
+    }
+
+    public function verifyEmail(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'email' => ['required', 'email'],
+            'code' => ['required', 'digits:6'],
+        ]);
+
+        $founder = Founder::query()->where('email', $validated['email'])->first();
+        if (!$founder) {
+            return back()->withErrors(['email' => 'We could not find a founder account for that email address.'])->withInput();
+        }
+
+        if ($founder->hasVerifiedEmail()) {
+            return redirect()->route('login')->with('success', 'Your founder email is already verified. Please log in.');
+        }
+
+        if (
+            empty($founder->email_verification_token) ||
+            empty($founder->email_verification_expires_at) ||
+            now()->greaterThan($founder->email_verification_expires_at) ||
+            !Hash::check((string) $validated['code'], (string) $founder->email_verification_token)
+        ) {
+            return back()->withErrors(['code' => 'That verification code is invalid or expired.'])->withInput();
+        }
+
+        $founder->forceFill([
+            'email_verified_at' => now(),
+            'email_verification_token' => null,
+            'email_verification_expires_at' => null,
+        ])->save();
+
+        $this->sendFounderMail(
+            $founder->email,
+            'Welcome to Hatchers Ai Business OS',
+            'emails.founder-welcome',
+            [
+                'founder' => $founder,
+            ]
+        );
+
+        $request->session()->forget('verification_email');
+
+        return redirect()->route('login')->with('success', 'Email verified. You can now log in to Hatchers Ai Business OS.');
+    }
+
+    public function resendEmailVerification(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'email' => ['required', 'email'],
+        ]);
+
+        $founder = Founder::query()->where('email', $validated['email'])->first();
+        if (!$founder) {
+            return back()->withErrors(['email' => 'We could not find a founder account for that email address.'])->withInput();
+        }
+
+        if ($founder->hasVerifiedEmail()) {
+            return redirect()->route('login')->with('success', 'Your founder email is already verified. Please log in.');
+        }
+
+        $this->issueEmailVerification($founder);
+        $request->session()->put('verification_email', $founder->email);
+
+        return back()->with('success', 'A fresh email verification code has been sent.');
+    }
+
+    public function verifyLoginNotice(Request $request)
+    {
+        $pendingFounderId = (int) $request->session()->get('pending_login_founder_id', 0);
+        $founder = $pendingFounderId > 0 ? Founder::query()->find($pendingFounderId) : null;
+
+        if (!$founder) {
+            return redirect()->route('login')->withErrors(['login' => 'Please log in again so we can send a new verification code.']);
+        }
+
+        return view('os.verify-login', [
+            'pageTitle' => 'Verify Founder Login',
+            'email' => $founder->email,
+        ]);
+    }
+
+    public function verifyLogin(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'code' => ['required', 'digits:6'],
+        ]);
+
+        $pendingFounderId = (int) $request->session()->get('pending_login_founder_id', 0);
+        $founder = $pendingFounderId > 0 ? Founder::query()->find($pendingFounderId) : null;
+
+        if (!$founder) {
+            return redirect()->route('login')->withErrors(['login' => 'Please log in again so we can send a new verification code.']);
+        }
+
+        if (
+            empty($founder->login_verification_token) ||
+            empty($founder->login_verification_expires_at) ||
+            now()->greaterThan($founder->login_verification_expires_at) ||
+            !Hash::check((string) $validated['code'], (string) $founder->login_verification_token)
+        ) {
+            return back()->withErrors(['code' => 'That sign-in verification code is invalid or expired.'])->withInput();
+        }
+
+        $founder->forceFill([
+            'login_verification_token' => null,
+            'login_verification_expires_at' => null,
+        ])->save();
+
+        Auth::login($founder, true);
+        $request->session()->forget('pending_login_founder_id');
+        $request->session()->regenerate();
+
+        return redirect()->route('dashboard');
+    }
+
+    public function resendLoginVerification(Request $request): RedirectResponse
+    {
+        $pendingFounderId = (int) $request->session()->get('pending_login_founder_id', 0);
+        $founder = $pendingFounderId > 0 ? Founder::query()->find($pendingFounderId) : null;
+
+        if (!$founder) {
+            return redirect()->route('login')->withErrors(['login' => 'Please log in again so we can send a new verification code.']);
+        }
+
+        $this->issueLoginVerification($founder, $request);
+
+        return back()->with('success', 'A fresh sign-in verification code has been sent.');
     }
 
     public function dashboard(
@@ -294,10 +432,43 @@ class OsShellController extends Controller
         $user = Auth::user();
         $this->ensureAdminPermission($user, 'exception_resolution');
 
+        $workspace = $adminDashboardService->buildSupportWorkspace($user);
+        $workspace['mail_diagnostics'] = $this->mailDiagnostics();
+
         return view('os.admin-support', [
             'pageTitle' => 'Support Center',
-            'workspace' => $adminDashboardService->buildSupportWorkspace($user),
+            'workspace' => $workspace,
         ]);
+    }
+
+    public function adminSendSupportTestMail(Request $request): RedirectResponse
+    {
+        /** @var \App\Models\Founder $user */
+        $user = Auth::user();
+        $this->ensureAdminPermission($user, 'exception_resolution');
+
+        $validated = $request->validate([
+            'email' => ['required', 'email'],
+        ]);
+
+        try {
+            Mail::send('emails.admin-test-mail', [
+                'admin' => $user,
+                'sentAt' => now(),
+                'diagnostics' => $this->mailDiagnostics(),
+            ], function ($message) use ($validated): void {
+                $message->to((string) $validated['email'])->subject('Hatchers Ai Business OS test mail');
+            });
+        } catch (Throwable $exception) {
+            Log::error('Admin support test mail failed.', [
+                'email' => $validated['email'],
+                'message' => $exception->getMessage(),
+            ]);
+
+            return redirect()->route('admin.support')->with('error', 'The OS could not send the test mail. Please review the SMTP setup and try again.');
+        }
+
+        return redirect()->route('admin.support')->with('success', 'Test mail sent to ' . $validated['email'] . '.');
     }
 
     public function founderUpdateTaskStatus(
@@ -447,6 +618,7 @@ class OsShellController extends Controller
             'automations' => $user->automationRules()->latest()->get(),
             'triggerOptions' => $this->automationTriggerOptions(),
             'scopeOptions' => $this->automationScopeOptions(),
+            'recommendedTemplates' => $this->automationTemplates(),
         ]);
     }
 
@@ -472,6 +644,38 @@ class OsShellController extends Controller
         return redirect()
             ->route('founder.automations')
             ->with('success', 'Automation rule saved inside Hatchers Ai Business OS.');
+    }
+
+    public function founderStoreAutomationTemplate(Request $request): RedirectResponse
+    {
+        /** @var \App\Models\Founder $user */
+        $user = Auth::user();
+        if (!$user->isFounder()) {
+            return redirect()->route('dashboard');
+        }
+
+        $validated = $request->validate([
+            'template_key' => ['required', Rule::in(array_keys($this->automationTemplates()))],
+        ]);
+
+        $template = $this->automationTemplates()[$validated['template_key']];
+
+        $user->automationRules()->create([
+            'name' => $template['name'],
+            'trigger_type' => $template['trigger_type'],
+            'module_scope' => $template['module_scope'],
+            'condition_summary' => $template['condition_summary'],
+            'action_summary' => $template['action_summary'],
+            'status' => 'active',
+            'metadata_json' => [
+                'template_key' => $validated['template_key'],
+                'delivery' => $template['delivery'],
+            ],
+        ]);
+
+        return redirect()
+            ->route('founder.automations')
+            ->with('success', $template['name'] . ' automation saved inside Hatchers Ai Business OS.');
     }
 
     public function mentorFounderDetail(
@@ -654,10 +858,12 @@ class OsShellController extends Controller
             'website' => $websiteWorkspaceService->build($user),
             'launchCards' => $workspaceLaunchService->launchCards($user),
             'catalogOffers' => $this->commerceOffers($user),
+            'commerceConfigs' => $this->commerceConfigs($user),
         ]);
     }
 
     public function founderOrders(
+        Request $request,
         FounderDashboardService $founderDashboardService,
         WebsiteWorkspaceService $websiteWorkspaceService,
         WorkspaceLaunchService $workspaceLaunchService
@@ -667,17 +873,29 @@ class OsShellController extends Controller
         if (!$user->isFounder()) {
             return redirect()->route('dashboard');
         }
+
+        $filters = $request->validate([
+            'status' => ['nullable', 'string', Rule::in(['all', 'pending', 'processing', 'completed', 'cancelled'])],
+            'queue' => ['nullable', 'string', Rule::in(['all', 'pending', 'unpaid', 'ready_to_ship'])],
+            'q' => ['nullable', 'string', 'max:255'],
+        ]);
 
         return view('os.orders', [
             'pageTitle' => 'Orders',
             'dashboard' => $founderDashboardService->build($user),
             'website' => $websiteWorkspaceService->build($user),
             'launchCards' => $workspaceLaunchService->launchCards($user),
-            'orderWorkspace' => $this->commerceOperationsWorkspace($user, 'bazaar'),
+            'orderWorkspace' => $this->commerceOperationsWorkspace($user, 'bazaar', $filters),
+            'orderFilters' => [
+                'status' => (string) ($filters['status'] ?? 'all'),
+                'queue' => (string) ($filters['queue'] ?? 'all'),
+                'q' => (string) ($filters['q'] ?? ''),
+            ],
         ]);
     }
 
     public function founderBookings(
+        Request $request,
         FounderDashboardService $founderDashboardService,
         WebsiteWorkspaceService $websiteWorkspaceService,
         WorkspaceLaunchService $workspaceLaunchService
@@ -688,12 +906,23 @@ class OsShellController extends Controller
             return redirect()->route('dashboard');
         }
 
+        $filters = $request->validate([
+            'status' => ['nullable', 'string', Rule::in(['all', 'pending', 'processing', 'completed', 'cancelled'])],
+            'queue' => ['nullable', 'string', Rule::in(['all', 'pending', 'unscheduled', 'needs_staff'])],
+            'q' => ['nullable', 'string', 'max:255'],
+        ]);
+
         return view('os.bookings', [
             'pageTitle' => 'Bookings',
             'dashboard' => $founderDashboardService->build($user),
             'website' => $websiteWorkspaceService->build($user),
             'launchCards' => $workspaceLaunchService->launchCards($user),
-            'bookingWorkspace' => $this->commerceOperationsWorkspace($user, 'servio'),
+            'bookingWorkspace' => $this->commerceOperationsWorkspace($user, 'servio', $filters),
+            'bookingFilters' => [
+                'status' => (string) ($filters['status'] ?? 'all'),
+                'queue' => (string) ($filters['queue'] ?? 'all'),
+                'q' => (string) ($filters['q'] ?? ''),
+            ],
         ]);
     }
 
@@ -717,6 +946,21 @@ class OsShellController extends Controller
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:4000'],
             'price' => ['nullable', 'numeric', 'min:0'],
+            'availability' => ['nullable', Rule::in(['active', 'inactive'])],
+            'sku' => ['nullable', 'string', 'max:255'],
+            'stock' => ['nullable', 'integer', 'min:0'],
+            'low_stock' => ['nullable', 'integer', 'min:0'],
+            'adjustment_mode' => ['nullable', Rule::in(['set', 'increase', 'decrease'])],
+            'adjustment_amount' => ['nullable', 'integer', 'min:1', 'max:100000'],
+            'duration' => ['nullable', 'integer', 'min:1', 'max:1440'],
+            'duration_unit' => ['nullable', Rule::in(['minutes', 'hours'])],
+            'capacity' => ['nullable', 'integer', 'min:1', 'max:500'],
+            'staff_mode' => ['nullable', Rule::in(['auto', 'specific'])],
+            'staff_id' => ['nullable', 'string', 'max:255'],
+            'availability_days' => ['nullable', 'array'],
+            'availability_days.*' => ['string', Rule::in(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'])],
+            'open_time' => ['nullable', 'date_format:H:i'],
+            'close_time' => ['nullable', 'date_format:H:i'],
         ]);
 
         $offer = $this->parseCommerceOffer($actionPlan);
@@ -754,6 +998,121 @@ class OsShellController extends Controller
             }
         }
 
+        if ($actionPlan->platform === 'bazaar') {
+            $newSku = trim((string) ($validated['sku'] ?? ($offer['sku'] ?? '')));
+            if ($newSku !== (string) ($offer['sku'] ?? '')) {
+                $result = $actionService->updateProductFieldFromOs($user, (string) $validated['title'], 'sku', $newSku !== '' ? $newSku : 'OS-' . strtoupper(substr(md5((string) $validated['title']), 0, 8)));
+                if (!($result['success'] ?? false)) {
+                    $warnings[] = $result['reply'] ?? 'SKU sync is pending.';
+                }
+            }
+
+            $currentStock = (int) ($offer['stock'] ?? 0);
+            $requestedStock = (int) ($validated['stock'] ?? $currentStock);
+            $adjustmentMode = (string) ($validated['adjustment_mode'] ?? '');
+            $adjustmentAmount = (int) ($validated['adjustment_amount'] ?? 0);
+            if ($adjustmentAmount > 0) {
+                if ($adjustmentMode === 'increase') {
+                    $requestedStock = $currentStock + $adjustmentAmount;
+                } elseif ($adjustmentMode === 'decrease') {
+                    $requestedStock = max(0, $currentStock - $adjustmentAmount);
+                } elseif ($adjustmentMode === 'set') {
+                    $requestedStock = $adjustmentAmount;
+                }
+            }
+
+            $newStock = (string) $requestedStock;
+            if ($newStock !== (string) ($offer['stock'] ?? '0')) {
+                $result = $actionService->updateProductFieldFromOs($user, (string) $validated['title'], 'stock', $newStock);
+                if (!($result['success'] ?? false)) {
+                    $warnings[] = $result['reply'] ?? 'Stock sync is pending.';
+                }
+            }
+
+            $newLowStock = (string) ((int) ($validated['low_stock'] ?? ($offer['low_stock'] ?? 0)));
+            if ($newLowStock !== (string) ($offer['low_stock'] ?? '0')) {
+                $result = $actionService->updateProductFieldFromOs($user, (string) $validated['title'], 'low_stock', $newLowStock);
+                if (!($result['success'] ?? false)) {
+                    $warnings[] = $result['reply'] ?? 'Low-stock sync is pending.';
+                }
+            }
+        } else {
+            $newDuration = (string) ((int) ($validated['duration'] ?? ($offer['duration'] ?? 30)));
+            if ($newDuration !== (string) ($offer['duration'] ?? '30')) {
+                $result = $actionService->updateServiceFieldFromOs($user, (string) $validated['title'], 'duration', $newDuration);
+                if (!($result['success'] ?? false)) {
+                    $warnings[] = $result['reply'] ?? 'Duration sync is pending.';
+                }
+            }
+
+            $newDurationUnit = (string) ($validated['duration_unit'] ?? ($offer['duration_unit'] ?? 'minutes'));
+            if ($newDurationUnit !== (string) ($offer['duration_unit'] ?? 'minutes')) {
+                $result = $actionService->updateServiceFieldFromOs($user, (string) $validated['title'], 'duration_unit', $newDurationUnit);
+                if (!($result['success'] ?? false)) {
+                    $warnings[] = $result['reply'] ?? 'Duration unit sync is pending.';
+                }
+            }
+
+            $newCapacity = (string) ((int) ($validated['capacity'] ?? ($offer['capacity'] ?? 1)));
+            if ($newCapacity !== (string) ($offer['capacity'] ?? '1')) {
+                $result = $actionService->updateServiceFieldFromOs($user, (string) $validated['title'], 'capacity', $newCapacity);
+                if (!($result['success'] ?? false)) {
+                    $warnings[] = $result['reply'] ?? 'Capacity sync is pending.';
+                }
+            }
+
+            $newStaffMode = (string) ($validated['staff_mode'] ?? ($offer['staff_mode'] ?? 'auto'));
+            if ($newStaffMode !== (string) ($offer['staff_mode'] ?? 'auto')) {
+                $result = $actionService->updateServiceFieldFromOs($user, (string) $validated['title'], 'staff_mode', $newStaffMode);
+                if (!($result['success'] ?? false)) {
+                    $warnings[] = $result['reply'] ?? 'Staff assignment sync is pending.';
+                }
+            }
+
+            $newStaffId = trim((string) ($validated['staff_id'] ?? ($offer['staff_id'] ?? '')));
+            if ($newStaffId !== '' && $newStaffId !== (string) ($offer['staff_id'] ?? '')) {
+                $result = $actionService->updateServiceFieldFromOs($user, (string) $validated['title'], 'staff_id', $newStaffId);
+                if (!($result['success'] ?? false)) {
+                    $warnings[] = $result['reply'] ?? 'Staff member sync is pending.';
+                }
+            }
+
+            $newAvailabilityDays = $this->normalizeAvailabilityDays($validated['availability_days'] ?? ($offer['availability_days'] ?? []));
+            if (implode('|', $newAvailabilityDays) !== implode('|', $this->normalizeAvailabilityDays($offer['availability_days'] ?? []))) {
+                $result = $actionService->updateServiceFieldFromOs($user, (string) $validated['title'], 'availability_days', implode('|', $newAvailabilityDays));
+                if (!($result['success'] ?? false)) {
+                    $warnings[] = $result['reply'] ?? 'Availability days sync is pending.';
+                }
+            }
+
+            $newOpenTime = (string) ($validated['open_time'] ?? ($offer['open_time'] ?? '09:00'));
+            if ($newOpenTime !== (string) ($offer['open_time'] ?? '09:00')) {
+                $result = $actionService->updateServiceFieldFromOs($user, (string) $validated['title'], 'open_time', $newOpenTime);
+                if (!($result['success'] ?? false)) {
+                    $warnings[] = $result['reply'] ?? 'Opening time sync is pending.';
+                }
+            }
+
+            $newCloseTime = (string) ($validated['close_time'] ?? ($offer['close_time'] ?? '17:00'));
+            if ($newCloseTime !== (string) ($offer['close_time'] ?? '17:00')) {
+                $result = $actionService->updateServiceFieldFromOs($user, (string) $validated['title'], 'close_time', $newCloseTime);
+                if (!($result['success'] ?? false)) {
+                    $warnings[] = $result['reply'] ?? 'Closing time sync is pending.';
+                }
+            }
+        }
+
+        $availability = (string) ($validated['availability'] ?? ($offer['status'] ?? 'active'));
+        if ($availability !== (string) ($offer['status'] ?? 'active')) {
+            $result = $actionPlan->platform === 'bazaar'
+                ? $actionService->updateProductFieldFromOs($user, (string) $validated['title'], 'status', $availability)
+                : $actionService->updateServiceFieldFromOs($user, (string) $validated['title'], 'status', $availability);
+
+            if (!($result['success'] ?? false)) {
+                $warnings[] = $result['reply'] ?? 'Availability sync is pending.';
+            }
+        }
+
         $actionPlan->forceFill([
             'title' => (string) $validated['title'],
             'description' => $this->serializeCommerceOffer([
@@ -761,7 +1120,19 @@ class OsShellController extends Controller
                 'description' => (string) ($validated['description'] ?? ''),
                 'price' => $newPrice,
                 'engine' => $offer['engine'],
+                'sku' => (string) ($validated['sku'] ?? ($offer['sku'] ?? '')),
+                'stock' => (string) ($validated['stock'] ?? ($offer['stock'] ?? '')),
+                'low_stock' => (string) ($validated['low_stock'] ?? ($offer['low_stock'] ?? '')),
+                'duration' => (string) ($validated['duration'] ?? ($offer['duration'] ?? '')),
+                'duration_unit' => (string) ($validated['duration_unit'] ?? ($offer['duration_unit'] ?? '')),
+                'capacity' => (string) ($validated['capacity'] ?? ($offer['capacity'] ?? '')),
+                'staff_mode' => (string) ($validated['staff_mode'] ?? ($offer['staff_mode'] ?? '')),
+                'staff_id' => (string) ($validated['staff_id'] ?? ($offer['staff_id'] ?? '')),
+                'availability_days' => $validated['availability_days'] ?? ($offer['availability_days'] ?? []),
+                'open_time' => (string) ($validated['open_time'] ?? ($offer['open_time'] ?? '')),
+                'close_time' => (string) ($validated['close_time'] ?? ($offer['close_time'] ?? '')),
             ]),
+            'status' => $availability === 'inactive' ? 'paused' : 'created',
         ])->save();
 
         $atlas->syncFounderMutation($user, [
@@ -778,6 +1149,103 @@ class OsShellController extends Controller
 
         if (!empty($warnings)) {
             $redirect->with('error', implode(' ', $warnings) . ' The OS copy has still been updated.');
+        }
+
+        return $redirect;
+    }
+
+    public function founderUpdateCommerceConfig(
+        Request $request,
+        FounderActionPlan $actionPlan,
+        OsAssistantActionService $actionService,
+        AtlasIntelligenceService $atlas
+    ): RedirectResponse {
+        /** @var \App\Models\Founder $user */
+        $user = Auth::user();
+        if (!$user->isFounder()) {
+            return redirect()->route('dashboard');
+        }
+
+        if ((int) $actionPlan->founder_id !== (int) $user->id || !in_array((string) $actionPlan->platform, ['bazaar', 'servio'], true)) {
+            abort(403);
+        }
+
+        $config = $this->parseCommerceConfig($actionPlan);
+        $rules = [
+            'title' => ['required', 'string', 'max:255'],
+            'field_one' => ['nullable', 'string', 'max:255'],
+            'field_two' => ['nullable', 'string', 'max:255'],
+            'field_three' => ['nullable', 'string', 'max:255'],
+            'field_four' => ['nullable', 'string', 'max:255'],
+        ];
+
+        $validated = $request->validate($rules);
+        $errors = [];
+
+        if ($config['type'] === 'coupon') {
+            $result = $actionService->saveCommerceConfigFromOs(
+                $user,
+                (string) $actionPlan->platform,
+                'coupon',
+                (string) $validated['title'],
+                [
+                    'offer_name' => (string) $validated['title'],
+                    'offer_code' => (string) ($validated['field_one'] ?? ''),
+                    'offer_type' => (string) (($validated['field_two'] ?? '') === 'percent' ? 'percent' : 'fixed'),
+                    'offer_amount' => (string) ($validated['field_three'] ?? ''),
+                    'description' => (string) ($validated['field_four'] ?? ''),
+                    'is_available' => $actionPlan->status === 'paused' ? 2 : 1,
+                ],
+                true
+            );
+            if (!($result['success'] ?? false)) {
+                $errors[] = $result['reply'] ?? 'Coupon sync is pending.';
+            }
+        } elseif ($config['type'] === 'shipping') {
+            $result = $actionService->saveCommerceConfigFromOs(
+                $user,
+                'bazaar',
+                'shipping',
+                (string) $validated['title'],
+                [
+                    'area_name' => (string) ($validated['field_one'] ?? $validated['title']),
+                    'delivery_charge' => (string) ($validated['field_two'] ?? '0'),
+                    'description' => trim(implode(' · ', array_filter([
+                        (string) ($validated['field_three'] ?? ''),
+                        (string) ($validated['field_four'] ?? ''),
+                    ]))),
+                    'is_available' => $actionPlan->status === 'paused' ? 2 : 1,
+                ],
+                true
+            );
+            if (!($result['success'] ?? false)) {
+                $errors[] = $result['reply'] ?? 'Shipping sync is pending.';
+            }
+        }
+
+        $actionPlan->forceFill([
+            'title' => (string) $validated['title'],
+            'description' => $this->serializeCommerceConfig([
+                'type' => $config['type'],
+                'engine' => $config['engine'],
+                'field_one' => (string) ($validated['field_one'] ?? ''),
+                'field_two' => (string) ($validated['field_two'] ?? ''),
+                'field_three' => (string) ($validated['field_three'] ?? ''),
+                'field_four' => (string) ($validated['field_four'] ?? ''),
+            ]),
+        ])->save();
+
+        $atlas->syncFounderMutation($user, [
+            'role' => 'founder',
+            'action' => 'commerce_config_update',
+            'field' => (string) $config['type'],
+            'value' => (string) $validated['title'],
+            'sync_summary' => 'Founder updated a commerce config from Hatchers OS.',
+        ]);
+
+        $redirect = redirect()->route('founder.commerce')->with('success', ucfirst((string) $config['type']) . ' updated inside Hatchers Ai Business OS.');
+        if (!empty($errors)) {
+            $redirect->with('error', implode(' ', $errors) . ' The OS copy has still been updated.');
         }
 
         return $redirect;
@@ -1571,12 +2039,11 @@ class OsShellController extends Controller
         }
 
         if (!empty($company)) {
+            $company->website_engine = $validated['website_engine'];
             $company->business_model = $validated['website_mode'];
             $company->website_status = 'in_progress';
             $company->website_path = trim(strtolower((string) $validated['website_path']), '/');
-            if (!empty($result['public_url'])) {
-                $company->website_url = $result['public_url'];
-            }
+            $company->website_url = $this->buildCompanyWebsiteUrl($company, $validated['website_engine']);
             $company->save();
         }
 
@@ -1601,8 +2068,9 @@ class OsShellController extends Controller
         }
 
         if (!empty($company)) {
+            $company->website_engine = $validated['website_engine'];
             $company->website_status = 'live';
-            $company->website_url = (string) ($result['data']['public_url'] ?? $this->buildCompanyWebsiteUrl($company, $validated['website_engine']));
+            $company->website_url = $this->buildCompanyWebsiteUrl($company, $validated['website_engine']);
             $company->save();
         }
 
@@ -1648,6 +2116,581 @@ class OsShellController extends Controller
         ]);
 
         return redirect()->route('founder.commerce')->with('success', 'Starter ' . $validated['starter_mode'] . ' created from Hatchers OS.');
+    }
+
+    public function founderSaveCommerceConfig(
+        Request $request,
+        OsAssistantActionService $actionService,
+        AtlasIntelligenceService $atlas
+    ): RedirectResponse
+    {
+        /** @var \App\Models\Founder $user */
+        $user = Auth::user();
+        if (!$user->isFounder()) {
+            return redirect()->route('dashboard');
+        }
+
+        $validated = $request->validate([
+            'setting_type' => ['required', Rule::in(['coupon', 'shipping', 'booking_policy'])],
+            'setting_platform' => ['nullable', Rule::in(['bazaar', 'servio'])],
+            'title' => ['required', 'string', 'max:255'],
+            'field_one' => ['nullable', 'string', 'max:255'],
+            'field_two' => ['nullable', 'string', 'max:255'],
+            'field_three' => ['nullable', 'string', 'max:255'],
+            'field_four' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $platform = (string) ($validated['setting_platform'] ?? '');
+        if ($platform === '') {
+            $platform = in_array($validated['setting_type'], ['coupon', 'shipping'], true) ? 'bazaar' : 'servio';
+        }
+
+        $existing = FounderActionPlan::query()
+            ->where('founder_id', $user->id)
+            ->where('platform', $platform)
+            ->where('title', (string) $validated['title'])
+            ->where('description', 'like', 'Config:%')
+            ->first();
+
+        $engineReply = null;
+        if ((string) $validated['setting_type'] === 'coupon') {
+            $engineReply = $actionService->saveCommerceConfigFromOs(
+                $user,
+                $platform,
+                'coupon',
+                (string) $validated['title'],
+                [
+                    'offer_name' => (string) $validated['title'],
+                    'offer_code' => (string) ($validated['field_one'] ?? ''),
+                    'offer_type' => (string) (($validated['field_two'] ?? '') === 'percent' ? 'percent' : 'fixed'),
+                    'offer_amount' => (string) ($validated['field_three'] ?? ''),
+                    'min_amount' => 0,
+                    'usage_limit' => 0,
+                    'description' => (string) ($validated['field_four'] ?? ''),
+                    'is_available' => 1,
+                ],
+                !empty($existing)
+            );
+        } elseif ((string) $validated['setting_type'] === 'shipping' && $platform === 'bazaar') {
+            $engineReply = $actionService->saveCommerceConfigFromOs(
+                $user,
+                'bazaar',
+                'shipping',
+                (string) $validated['title'],
+                [
+                    'area_name' => (string) ($validated['field_one'] ?? $validated['title']),
+                    'delivery_charge' => (string) ($validated['field_two'] ?? '0'),
+                    'description' => trim(implode(' · ', array_filter([
+                        (string) ($validated['field_three'] ?? ''),
+                        (string) ($validated['field_four'] ?? ''),
+                    ]))),
+                    'is_available' => 1,
+                ],
+                !empty($existing)
+            );
+        }
+
+        FounderActionPlan::updateOrCreate(
+            [
+                'founder_id' => $user->id,
+                'platform' => $platform,
+                'title' => (string) $validated['title'],
+                'cta_label' => 'Manage ' . ucfirst(str_replace('_', ' ', (string) $validated['setting_type'])),
+            ],
+            [
+                'description' => $this->serializeCommerceConfig([
+                    'type' => $validated['setting_type'],
+                    'engine' => $platform,
+                    'field_one' => (string) ($validated['field_one'] ?? ''),
+                    'field_two' => (string) ($validated['field_two'] ?? ''),
+                    'field_three' => (string) ($validated['field_three'] ?? ''),
+                    'field_four' => (string) ($validated['field_four'] ?? ''),
+                ]),
+                'priority' => 55,
+                'status' => 'configured',
+                'cta_url' => route('founder.commerce'),
+            ]
+        );
+
+        $atlas->syncFounderMutation($user, [
+            'role' => 'founder',
+            'action' => $engineReply['action_type'] ?? 'commerce_config_save',
+            'field' => (string) $validated['setting_type'],
+            'value' => (string) $validated['title'],
+            'sync_summary' => $engineReply['sync_summary'] ?? 'Founder saved a commerce config from Hatchers OS.',
+        ]);
+
+        $redirect = redirect()->route('founder.commerce')->with(
+            'success',
+            ucfirst(str_replace('_', ' ', (string) $validated['setting_type'])) . ' saved in Hatchers Ai Business OS.'
+        );
+
+        if ($engineReply && !($engineReply['success'] ?? false)) {
+            $redirect->with('error', $engineReply['reply'] ?? 'The OS copy was saved, but the engine sync still needs attention.');
+        }
+
+        return $redirect;
+    }
+
+    public function founderUpdateOrderOperation(
+        Request $request,
+        OsAssistantActionService $actionService,
+        AtlasIntelligenceService $atlas
+    ): RedirectResponse {
+        /** @var \App\Models\Founder $user */
+        $user = Auth::user();
+        if (!$user->isFounder()) {
+            return redirect()->route('dashboard');
+        }
+
+        $validated = $request->validate([
+            'order_number' => ['required', 'string', 'max:255'],
+            'status' => ['required', Rule::in(['pending', 'processing', 'completed', 'cancelled'])],
+            'payment_status' => ['required', Rule::in(['unpaid', 'paid'])],
+            'vendor_note' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $operations = [
+            ['field' => 'status', 'value' => (string) $validated['status']],
+            ['field' => 'payment_status', 'value' => (string) $validated['payment_status']],
+        ];
+
+        if (trim((string) ($validated['vendor_note'] ?? '')) !== '') {
+            $operations[] = ['field' => 'vendor_note', 'value' => (string) $validated['vendor_note']];
+        }
+
+        $errors = [];
+        foreach ($operations as $operation) {
+            $result = $actionService->updateCommerceOperationFromOs(
+                $user,
+                'bazaar',
+                'order',
+                (string) $validated['order_number'],
+                (string) $operation['field'],
+                (string) $operation['value']
+            );
+
+            if (!($result['success'] ?? false)) {
+                $errors[] = $result['reply'] ?? ('Could not update order ' . $operation['field'] . '.');
+            }
+        }
+
+        $atlas->syncFounderMutation($user, [
+            'role' => 'founder',
+            'action' => 'commerce_order_update',
+            'field' => 'order',
+            'value' => (string) $validated['order_number'],
+            'sync_summary' => 'Founder updated a Bazaar order from Hatchers OS.',
+        ]);
+
+        $redirect = redirect()->route('founder.commerce.orders')->with('success', 'Order updated from Hatchers Ai Business OS.');
+        if (!empty($errors)) {
+            $redirect->with('error', implode(' ', $errors));
+        }
+
+        return $redirect;
+    }
+
+    public function founderUpdateOrderCustomer(
+        Request $request,
+        OsAssistantActionService $actionService,
+        AtlasIntelligenceService $atlas
+    ): RedirectResponse {
+        /** @var \App\Models\Founder $user */
+        $user = Auth::user();
+        if (!$user->isFounder()) {
+            return redirect()->route('dashboard');
+        }
+
+        $validated = $request->validate([
+            'order_number' => ['required', 'string', 'max:255'],
+            'customer_name' => ['required', 'string', 'max:255'],
+            'customer_email' => ['nullable', 'string', 'max:255'],
+            'customer_mobile' => ['nullable', 'string', 'max:255'],
+            'address' => ['nullable', 'string', 'max:255'],
+            'building' => ['nullable', 'string', 'max:255'],
+            'landmark' => ['nullable', 'string', 'max:255'],
+            'postal_code' => ['nullable', 'string', 'max:255'],
+            'delivery_area' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $fields = ['customer_name', 'customer_email', 'customer_mobile', 'address', 'building', 'landmark', 'postal_code', 'delivery_area'];
+        $errors = [];
+        foreach ($fields as $field) {
+            $value = (string) ($validated[$field] ?? '');
+            if ($field !== 'customer_name' && $value === '') {
+                continue;
+            }
+
+            $result = $actionService->updateCommerceOperationFromOs(
+                $user,
+                'bazaar',
+                'order',
+                (string) $validated['order_number'],
+                $field,
+                $value
+            );
+
+            if (!($result['success'] ?? false)) {
+                $errors[] = $result['reply'] ?? ('Could not update order ' . $field . '.');
+            }
+        }
+
+        $atlas->syncFounderMutation($user, [
+            'role' => 'founder',
+            'action' => 'commerce_order_customer_update',
+            'field' => 'order_customer',
+            'value' => (string) $validated['order_number'],
+            'sync_summary' => 'Founder updated Bazaar order customer details from Hatchers OS.',
+        ]);
+
+        $redirect = redirect()->route('founder.commerce.orders')->with('success', 'Order customer details updated from Hatchers Ai Business OS.');
+        if (!empty($errors)) {
+            $redirect->with('error', implode(' ', $errors));
+        }
+
+        return $redirect;
+    }
+
+    public function founderUpdateOrderFulfillment(
+        Request $request,
+        OsAssistantActionService $actionService,
+        AtlasIntelligenceService $atlas
+    ): RedirectResponse {
+        /** @var \App\Models\Founder $user */
+        $user = Auth::user();
+        if (!$user->isFounder()) {
+            return redirect()->route('dashboard');
+        }
+
+        $validated = $request->validate([
+            'order_number' => ['required', 'string', 'max:255'],
+            'delivery_date' => ['nullable', 'date'],
+            'delivery_time' => ['nullable', 'string', 'max:255'],
+            'order_notes' => ['nullable', 'string', 'max:2000'],
+            'customer_message' => ['nullable', 'string', 'max:2000'],
+            'message_channel' => ['nullable', Rule::in(['manual', 'email', 'whatsapp', 'sms'])],
+            'message_template' => ['nullable', Rule::in(array_keys($this->orderMessageTemplates()))],
+        ]);
+
+        $customerMessage = $this->resolveCommerceMessage(
+            'order',
+            (string) ($validated['message_template'] ?? ''),
+            (string) ($validated['customer_message'] ?? ''),
+            $validated
+        );
+
+        $errors = [];
+        $emailFollowupSent = false;
+        foreach (['delivery_date', 'delivery_time', 'order_notes', 'customer_message'] as $field) {
+            $value = $field === 'customer_message'
+                ? $customerMessage
+                : trim((string) ($validated[$field] ?? ''));
+            if ($value === '') {
+                continue;
+            }
+
+            $result = $actionService->updateCommerceOperationFromOs(
+                $user,
+                'bazaar',
+                'order',
+                (string) $validated['order_number'],
+                $field,
+                $value,
+                $field === 'customer_message'
+                    ? ['message_channel' => (string) ($validated['message_channel'] ?? 'manual')]
+                    : []
+            );
+
+            if (!($result['success'] ?? false)) {
+                $errors[] = $result['reply'] ?? ('Could not update order ' . $field . '.');
+                continue;
+            }
+
+            if (!empty($result['email_followup_sent'])) {
+                $emailFollowupSent = true;
+            }
+        }
+
+        $atlas->syncFounderMutation($user, [
+            'role' => 'founder',
+            'action' => 'commerce_order_fulfillment_update',
+            'field' => 'order_fulfillment',
+            'value' => (string) $validated['order_number'],
+            'sync_summary' => 'Founder updated Bazaar order fulfillment details from Hatchers OS.',
+        ]);
+
+        $success = 'Order fulfillment updated from Hatchers Ai Business OS.';
+        if ($emailFollowupSent) {
+            $success .= ' Customer email follow-up was sent through Bazaar.';
+        }
+
+        $redirect = redirect()->route('founder.commerce.orders')->with('success', $success);
+        if (!empty($errors)) {
+            $redirect->with('error', implode(' ', $errors));
+        }
+
+        return $redirect;
+    }
+
+    public function founderUpdateBookingOperation(
+        Request $request,
+        OsAssistantActionService $actionService,
+        AtlasIntelligenceService $atlas
+    ): RedirectResponse {
+        /** @var \App\Models\Founder $user */
+        $user = Auth::user();
+        if (!$user->isFounder()) {
+            return redirect()->route('dashboard');
+        }
+
+        $validated = $request->validate([
+            'booking_number' => ['required', 'string', 'max:255'],
+            'status' => ['required', Rule::in(['pending', 'processing', 'completed', 'cancelled'])],
+            'payment_status' => ['required', Rule::in(['unpaid', 'paid'])],
+            'vendor_note' => ['nullable', 'string', 'max:1000'],
+            'staff_id' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $operations = [
+            ['field' => 'status', 'value' => (string) $validated['status']],
+            ['field' => 'payment_status', 'value' => (string) $validated['payment_status']],
+        ];
+
+        if (trim((string) ($validated['vendor_note'] ?? '')) !== '') {
+            $operations[] = ['field' => 'vendor_note', 'value' => (string) $validated['vendor_note']];
+        }
+
+        if (trim((string) ($validated['staff_id'] ?? '')) !== '') {
+            $operations[] = ['field' => 'staff_id', 'value' => (string) $validated['staff_id']];
+        }
+
+        $errors = [];
+        foreach ($operations as $operation) {
+            $result = $actionService->updateCommerceOperationFromOs(
+                $user,
+                'servio',
+                'booking',
+                (string) $validated['booking_number'],
+                (string) $operation['field'],
+                (string) $operation['value']
+            );
+
+            if (!($result['success'] ?? false)) {
+                $errors[] = $result['reply'] ?? ('Could not update booking ' . $operation['field'] . '.');
+            }
+        }
+
+        $atlas->syncFounderMutation($user, [
+            'role' => 'founder',
+            'action' => 'commerce_booking_update',
+            'field' => 'booking',
+            'value' => (string) $validated['booking_number'],
+            'sync_summary' => 'Founder updated a Servio booking from Hatchers OS.',
+        ]);
+
+        $redirect = redirect()->route('founder.commerce.bookings')->with('success', 'Booking updated from Hatchers Ai Business OS.');
+        if (!empty($errors)) {
+            $redirect->with('error', implode(' ', $errors));
+        }
+
+        return $redirect;
+    }
+
+    public function founderUpdateBookingCustomer(
+        Request $request,
+        OsAssistantActionService $actionService,
+        AtlasIntelligenceService $atlas
+    ): RedirectResponse {
+        /** @var \App\Models\Founder $user */
+        $user = Auth::user();
+        if (!$user->isFounder()) {
+            return redirect()->route('dashboard');
+        }
+
+        $validated = $request->validate([
+            'booking_number' => ['required', 'string', 'max:255'],
+            'customer_name' => ['required', 'string', 'max:255'],
+            'customer_email' => ['nullable', 'string', 'max:255'],
+            'customer_mobile' => ['nullable', 'string', 'max:255'],
+            'address' => ['nullable', 'string', 'max:255'],
+            'landmark' => ['nullable', 'string', 'max:255'],
+            'postal_code' => ['nullable', 'string', 'max:255'],
+            'city' => ['nullable', 'string', 'max:255'],
+            'state' => ['nullable', 'string', 'max:255'],
+            'country' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $fields = ['customer_name', 'customer_email', 'customer_mobile', 'address', 'landmark', 'postal_code', 'city', 'state', 'country'];
+        $errors = [];
+        foreach ($fields as $field) {
+            $value = (string) ($validated[$field] ?? '');
+            if ($field !== 'customer_name' && $value === '') {
+                continue;
+            }
+
+            $result = $actionService->updateCommerceOperationFromOs(
+                $user,
+                'servio',
+                'booking',
+                (string) $validated['booking_number'],
+                $field,
+                $value
+            );
+
+            if (!($result['success'] ?? false)) {
+                $errors[] = $result['reply'] ?? ('Could not update booking ' . $field . '.');
+            }
+        }
+
+        $atlas->syncFounderMutation($user, [
+            'role' => 'founder',
+            'action' => 'commerce_booking_customer_update',
+            'field' => 'booking_customer',
+            'value' => (string) $validated['booking_number'],
+            'sync_summary' => 'Founder updated Servio booking customer details from Hatchers OS.',
+        ]);
+
+        $redirect = redirect()->route('founder.commerce.bookings')->with('success', 'Booking customer details updated from Hatchers Ai Business OS.');
+        if (!empty($errors)) {
+            $redirect->with('error', implode(' ', $errors));
+        }
+
+        return $redirect;
+    }
+
+    public function founderUpdateBookingSchedule(
+        Request $request,
+        OsAssistantActionService $actionService,
+        AtlasIntelligenceService $atlas
+    ): RedirectResponse {
+        /** @var \App\Models\Founder $user */
+        $user = Auth::user();
+        if (!$user->isFounder()) {
+            return redirect()->route('dashboard');
+        }
+
+        $validated = $request->validate([
+            'booking_number' => ['required', 'string', 'max:255'],
+            'booking_date' => ['nullable', 'date'],
+            'booking_time' => ['nullable', 'string', 'max:255'],
+            'booking_endtime' => ['nullable', 'string', 'max:255'],
+            'booking_notes' => ['nullable', 'string', 'max:2000'],
+            'customer_message' => ['nullable', 'string', 'max:2000'],
+            'message_channel' => ['nullable', Rule::in(['manual', 'email', 'whatsapp', 'sms'])],
+            'message_template' => ['nullable', Rule::in(array_keys($this->bookingMessageTemplates()))],
+        ]);
+
+        $customerMessage = $this->resolveCommerceMessage(
+            'booking',
+            (string) ($validated['message_template'] ?? ''),
+            (string) ($validated['customer_message'] ?? ''),
+            $validated
+        );
+
+        $errors = [];
+        $emailFollowupSent = false;
+        foreach (['booking_date', 'booking_time', 'booking_endtime', 'booking_notes', 'customer_message'] as $field) {
+            $value = $field === 'customer_message'
+                ? $customerMessage
+                : trim((string) ($validated[$field] ?? ''));
+            if ($value === '') {
+                continue;
+            }
+
+            $result = $actionService->updateCommerceOperationFromOs(
+                $user,
+                'servio',
+                'booking',
+                (string) $validated['booking_number'],
+                $field,
+                $value,
+                $field === 'customer_message'
+                    ? ['message_channel' => (string) ($validated['message_channel'] ?? 'manual')]
+                    : []
+            );
+
+            if (!($result['success'] ?? false)) {
+                $errors[] = $result['reply'] ?? ('Could not update booking ' . $field . '.');
+                continue;
+            }
+
+            if (!empty($result['email_followup_sent'])) {
+                $emailFollowupSent = true;
+            }
+        }
+
+        $atlas->syncFounderMutation($user, [
+            'role' => 'founder',
+            'action' => 'commerce_booking_schedule_update',
+            'field' => 'booking_schedule',
+            'value' => (string) $validated['booking_number'],
+            'sync_summary' => 'Founder updated Servio booking schedule details from Hatchers OS.',
+        ]);
+
+        $success = 'Booking schedule updated from Hatchers Ai Business OS.';
+        if ($emailFollowupSent) {
+            $success .= ' Customer email follow-up was sent through Servio.';
+        }
+
+        $redirect = redirect()->route('founder.commerce.bookings')->with('success', $success);
+        if (!empty($errors)) {
+            $redirect->with('error', implode(' ', $errors));
+        }
+
+        return $redirect;
+    }
+
+    public function founderToggleCommerceConfig(
+        Request $request,
+        OsAssistantActionService $actionService,
+        AtlasIntelligenceService $atlas
+    ): RedirectResponse {
+        /** @var \App\Models\Founder $user */
+        $user = Auth::user();
+        if (!$user->isFounder()) {
+            return redirect()->route('dashboard');
+        }
+
+        $validated = $request->validate([
+            'platform' => ['required', Rule::in(['bazaar', 'servio'])],
+            'config_type' => ['required', Rule::in(['coupon', 'shipping'])],
+            'title' => ['required', 'string', 'max:255'],
+            'status' => ['required', Rule::in(['active', 'inactive'])],
+        ]);
+
+        $result = $actionService->updateCommerceOperationFromOs(
+            $user,
+            (string) $validated['platform'],
+            (string) $validated['config_type'],
+            (string) $validated['title'],
+            'status',
+            (string) $validated['status']
+        );
+
+        FounderActionPlan::query()
+            ->where('founder_id', $user->id)
+            ->where('platform', (string) $validated['platform'])
+            ->where('title', (string) $validated['title'])
+            ->where('description', 'like', 'Config:%')
+            ->update([
+                'status' => (string) $validated['status'] === 'active' ? 'configured' : 'paused',
+            ]);
+
+        $atlas->syncFounderMutation($user, [
+            'role' => 'founder',
+            'action' => 'commerce_config_status_update',
+            'field' => (string) $validated['config_type'],
+            'value' => (string) $validated['title'] . ':' . (string) $validated['status'],
+            'sync_summary' => 'Founder updated a commerce config status from Hatchers OS.',
+        ]);
+
+        $redirect = redirect()->route('founder.commerce')->with('success', ucfirst((string) $validated['config_type']) . ' status updated from Hatchers Ai Business OS.');
+        if (!($result['success'] ?? false)) {
+            $redirect->with('error', $result['reply'] ?? 'The OS updated locally, but the engine status change still needs attention.');
+        }
+
+        return $redirect;
     }
 
     public function connectWebsiteDomain(
@@ -1726,6 +2769,7 @@ class OsShellController extends Controller
                         'role' => 'founder',
                         'auth_source' => 'os',
                         'timezone' => 'Africa/Cairo',
+                        'email_verified_at' => null,
                         'mentor_entitled_until' => !empty($plan['mentor_months']) ? now()->addMonths((int) $plan['mentor_months']) : null,
                     ]
                 );
@@ -1831,9 +2875,15 @@ class OsShellController extends Controller
                 ->withErrors(['signup' => 'Hatchers AI could not complete signup right now. Please review the form and try again.']);
         }
 
-        return redirect()->route('login')->with(
+        $founder = Founder::query()->where('email', $validated['email'])->first();
+        if ($founder) {
+            $this->issueEmailVerification($founder);
+            $request->session()->put('verification_email', $founder->email);
+        }
+
+        return redirect()->route('verification.email.notice', ['email' => $validated['email']])->with(
             'success',
-            'Your founder workspace has been created under the ' . $plan['name'] . ' plan. Please log in to continue.'
+            'Your founder workspace has been created under the ' . $plan['name'] . ' plan. We sent a verification code to your email before you can log in.'
         );
     }
 
@@ -1871,6 +2921,15 @@ class OsShellController extends Controller
                     ->withErrors(['login' => 'This account is currently ' . $founder->status . '.'])
                     ->onlyInput('login');
             }
+
+            if ($founder->isFounder() && !$founder->hasVerifiedEmail()) {
+                $this->issueEmailVerification($founder);
+                $request->session()->put('verification_email', $founder->email);
+
+                return redirect()
+                    ->route('verification.email.notice', ['email' => $founder->email])
+                    ->with('success', 'Please verify your founder email before logging in. We sent you a fresh verification code.');
+            }
         } catch (Throwable $exception) {
             Log::error('OS login failed unexpectedly.', [
                 'login' => $credentials['login'],
@@ -1880,6 +2939,15 @@ class OsShellController extends Controller
             return back()
                 ->withErrors(['login' => 'Hatchers OS could not complete login right now. Please try again in a moment.'])
                 ->onlyInput('login');
+        }
+
+        if ($founder->isFounder()) {
+            $this->issueLoginVerification($founder, $request);
+
+            return redirect()->route('verification.login.notice')->with(
+                'success',
+                'We sent a sign-in verification code to ' . $founder->email . '. Enter it to continue.'
+            );
         }
 
         Auth::login($founder, true);
@@ -2056,6 +3124,7 @@ class OsShellController extends Controller
     {
         return $founder->actionPlans()
             ->whereIn('platform', ['bazaar', 'servio'])
+            ->where('description', 'not like', 'Config:%')
             ->latest()
             ->limit(12)
             ->get()
@@ -2069,23 +3138,156 @@ class OsShellController extends Controller
                     'type' => $offer['type'],
                     'description' => $offer['description'],
                     'price' => $offer['price'],
-                    'status' => $actionPlan->status,
+                    'sku' => $offer['sku'],
+                    'stock' => $offer['stock'],
+                    'low_stock' => $offer['low_stock'],
+                    'duration' => $offer['duration'],
+                    'duration_unit' => $offer['duration_unit'],
+                    'capacity' => $offer['capacity'],
+                    'staff_mode' => $offer['staff_mode'],
+                    'staff_id' => $offer['staff_id'],
+                    'status' => $actionPlan->status === 'paused' ? 'inactive' : 'active',
                     'updated_at' => optional($actionPlan->updated_at)?->diffForHumans(),
                 ];
             })
             ->all();
     }
 
-    private function commerceOperationsWorkspace(Founder $founder, string $module): array
+    private function commerceConfigs(Founder $founder): array
+    {
+        $configs = $founder->actionPlans()
+            ->whereIn('platform', ['bazaar', 'servio'])
+            ->where('description', 'like', 'Config:%')
+            ->latest()
+            ->get()
+            ->map(function (FounderActionPlan $actionPlan): array {
+                $config = $this->parseCommerceConfig($actionPlan);
+
+                return [
+                    'id' => $actionPlan->id,
+                    'title' => $actionPlan->title,
+                    'type' => $config['type'],
+                    'engine' => $config['engine'],
+                    'status' => $actionPlan->status,
+                    'field_one' => $config['field_one'],
+                    'field_two' => $config['field_two'],
+                    'field_three' => $config['field_three'],
+                    'field_four' => $config['field_four'],
+                    'updated_at' => optional($actionPlan->updated_at)?->diffForHumans(),
+                ];
+            })
+            ->groupBy('type');
+
+        return [
+            'coupon' => $configs->get('coupon', collect())->all(),
+            'shipping' => $configs->get('shipping', collect())->all(),
+            'booking_policy' => $configs->get('booking_policy', collect())->all(),
+        ];
+    }
+
+    private function commerceOperationsWorkspace(Founder $founder, string $module, array $filters = []): array
     {
         $snapshot = $founder->moduleSnapshots()->where('module', $module)->latest('snapshot_updated_at')->first();
         $payload = $snapshot?->payload_json ?? [];
         $summary = $payload['summary'] ?? [];
         $counts = $payload['key_counts'] ?? [];
+        $recentOrders = collect($payload['recent_orders'] ?? [])->filter(fn ($item) => is_array($item))->values()->all();
+        $recentBookings = collect($payload['recent_bookings'] ?? [])->filter(fn ($item) => is_array($item))->values()->all();
+        $recentCoupons = collect($payload['recent_coupons'] ?? [])->filter(fn ($item) => is_array($item))->values()->all();
+        $shippingZones = collect($payload['shipping_zones'] ?? [])->filter(fn ($item) => is_array($item))->values()->all();
         $activity = collect($payload['recent_activity'] ?? [])
             ->filter(fn ($item) => is_string($item) && trim($item) !== '')
             ->values()
             ->all();
+        $statusFilter = strtolower(trim((string) ($filters['status'] ?? 'all')));
+        $queueFilter = strtolower(trim((string) ($filters['queue'] ?? 'all')));
+        $search = strtolower(trim((string) ($filters['q'] ?? '')));
+
+        if ($module === 'bazaar') {
+            $recentOrders = collect($recentOrders)
+                ->filter(function (array $order) use ($statusFilter, $queueFilter, $search): bool {
+                    if ($statusFilter !== '' && $statusFilter !== 'all' && strtolower((string) ($order['status'] ?? '')) !== $statusFilter) {
+                        return false;
+                    }
+
+                    if ($queueFilter !== '' && $queueFilter !== 'all') {
+                        $matchesQueue = match ($queueFilter) {
+                            'pending' => in_array((string) ($order['status'] ?? 'pending'), ['pending', 'processing'], true),
+                            'unpaid' => (string) ($order['payment_status'] ?? 'unpaid') !== 'paid',
+                            'ready_to_ship' => (string) ($order['status'] ?? '') === 'processing'
+                                && (string) ($order['payment_status'] ?? '') === 'paid',
+                            default => true,
+                        };
+
+                        if (!$matchesQueue) {
+                            return false;
+                        }
+                    }
+
+                    if ($search === '') {
+                        return true;
+                    }
+
+                    $haystack = strtolower(implode(' ', array_filter([
+                        (string) ($order['order_number'] ?? ''),
+                        (string) ($order['customer_name'] ?? ''),
+                        (string) ($order['customer_email'] ?? ''),
+                        (string) ($order['customer_mobile'] ?? ''),
+                    ])));
+
+                    return str_contains($haystack, $search);
+                })
+                ->map(function (array $order): array {
+                    $order['communication_timeline'] = $this->extractCommunicationTimeline((string) ($order['order_notes'] ?? ''));
+                    return $order;
+                })
+                ->values()
+                ->all();
+        }
+
+        if ($module === 'servio') {
+            $recentBookings = collect($recentBookings)
+                ->filter(function (array $booking) use ($statusFilter, $queueFilter, $search): bool {
+                    if ($statusFilter !== '' && $statusFilter !== 'all' && strtolower((string) ($booking['status'] ?? '')) !== $statusFilter) {
+                        return false;
+                    }
+
+                    if ($queueFilter !== '' && $queueFilter !== 'all') {
+                        $bookingHasSchedule = trim((string) ($booking['booking_date'] ?? '')) !== ''
+                            && trim((string) ($booking['booking_time'] ?? '')) !== '';
+                        $matchesQueue = match ($queueFilter) {
+                            'pending' => in_array((string) ($booking['status'] ?? 'pending'), ['pending', 'processing'], true),
+                            'unscheduled' => !$bookingHasSchedule,
+                            'needs_staff' => in_array((string) ($booking['status'] ?? 'pending'), ['pending', 'processing'], true)
+                                && trim((string) ($booking['staff_id'] ?? '')) === '',
+                            default => true,
+                        };
+
+                        if (!$matchesQueue) {
+                            return false;
+                        }
+                    }
+
+                    if ($search === '') {
+                        return true;
+                    }
+
+                    $haystack = strtolower(implode(' ', array_filter([
+                        (string) ($booking['booking_number'] ?? ''),
+                        (string) ($booking['customer_name'] ?? ''),
+                        (string) ($booking['customer_email'] ?? ''),
+                        (string) ($booking['service_name'] ?? ''),
+                    ])));
+
+                    return str_contains($haystack, $search);
+                })
+                ->map(function (array $booking): array {
+                    $booking['communication_timeline'] = $this->extractCommunicationTimeline((string) ($booking['booking_notes'] ?? ''));
+                    return $booking;
+                })
+                ->values()
+                ->all();
+        }
 
         return [
             'module' => strtoupper($module),
@@ -2102,7 +3304,16 @@ class OsShellController extends Controller
                 'bookings' => (int) ($counts['booking_count'] ?? 0),
                 'customers' => (int) ($counts['customer_count'] ?? 0),
             ],
+            'recent_orders' => $recentOrders,
+            'recent_bookings' => $recentBookings,
+            'recent_coupons' => $recentCoupons,
+            'shipping_zones' => $shippingZones,
             'activity' => $activity,
+            'filters' => [
+                'status' => $statusFilter !== '' ? $statusFilter : 'all',
+                'queue' => $queueFilter !== '' ? $queueFilter : 'all',
+                'q' => (string) ($filters['q'] ?? ''),
+            ],
         ];
     }
 
@@ -2111,11 +3322,66 @@ class OsShellController extends Controller
         $description = (string) ($actionPlan->description ?? '');
         $lines = preg_split("/\r\n|\n|\r/", $description) ?: [];
         $price = '0.00';
+        $sku = '';
+        $stock = '';
+        $lowStock = '';
+        $duration = '';
+        $durationUnit = '';
+        $capacity = '';
+        $staffMode = '';
+        $staffId = '';
+        $availabilityDays = [];
+        $openTime = '';
+        $closeTime = '';
         $body = [];
 
         foreach ($lines as $line) {
             if (str_starts_with($line, 'Price:')) {
                 $price = trim((string) substr($line, strlen('Price:')));
+                continue;
+            }
+            if (str_starts_with($line, 'Sku:')) {
+                $sku = trim((string) substr($line, strlen('Sku:')));
+                continue;
+            }
+            if (str_starts_with($line, 'Stock:')) {
+                $stock = trim((string) substr($line, strlen('Stock:')));
+                continue;
+            }
+            if (str_starts_with($line, 'LowStock:')) {
+                $lowStock = trim((string) substr($line, strlen('LowStock:')));
+                continue;
+            }
+            if (str_starts_with($line, 'Duration:')) {
+                $duration = trim((string) substr($line, strlen('Duration:')));
+                continue;
+            }
+            if (str_starts_with($line, 'DurationUnit:')) {
+                $durationUnit = trim((string) substr($line, strlen('DurationUnit:')));
+                continue;
+            }
+            if (str_starts_with($line, 'Capacity:')) {
+                $capacity = trim((string) substr($line, strlen('Capacity:')));
+                continue;
+            }
+            if (str_starts_with($line, 'StaffMode:')) {
+                $staffMode = trim((string) substr($line, strlen('StaffMode:')));
+                continue;
+            }
+            if (str_starts_with($line, 'StaffId:')) {
+                $staffId = trim((string) substr($line, strlen('StaffId:')));
+                continue;
+            }
+            if (str_starts_with($line, 'AvailabilityDays:')) {
+                $availabilityDays = $this->normalizeAvailabilityDays(explode('|', trim((string) substr($line, strlen('AvailabilityDays:')))));
+                continue;
+            }
+            if (str_starts_with($line, 'OpenTime:')) {
+                $openTime = trim((string) substr($line, strlen('OpenTime:')));
+                continue;
+            }
+            if (str_starts_with($line, 'CloseTime:')) {
+                $closeTime = trim((string) substr($line, strlen('CloseTime:')));
                 continue;
             }
 
@@ -2135,7 +3401,65 @@ class OsShellController extends Controller
             'engine' => $actionPlan->platform,
             'description' => trim(implode("\n", $body)),
             'price' => $price !== '' ? $price : '0.00',
+            'sku' => $sku,
+            'stock' => $stock !== '' ? $stock : '0',
+            'low_stock' => $lowStock !== '' ? $lowStock : '0',
+            'duration' => $duration !== '' ? $duration : '30',
+            'duration_unit' => $durationUnit !== '' ? $durationUnit : 'minutes',
+            'capacity' => $capacity !== '' ? $capacity : '1',
+            'staff_mode' => $staffMode !== '' ? $staffMode : 'auto',
+            'staff_id' => $staffId,
+            'availability_days' => $availabilityDays !== [] ? $availabilityDays : ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+            'open_time' => $openTime !== '' ? $openTime : '09:00',
+            'close_time' => $closeTime !== '' ? $closeTime : '17:00',
         ];
+    }
+
+    private function parseCommerceConfig(FounderActionPlan $actionPlan): array
+    {
+        $description = (string) ($actionPlan->description ?? '');
+        $lines = preg_split("/\r\n|\n|\r/", $description) ?: [];
+        $payload = [
+            'type' => '',
+            'engine' => $actionPlan->platform,
+            'field_one' => '',
+            'field_two' => '',
+            'field_three' => '',
+            'field_four' => '',
+        ];
+
+        foreach ($lines as $line) {
+            if (str_starts_with($line, 'Config:')) {
+                $payload['type'] = trim((string) substr($line, strlen('Config:')));
+                continue;
+            }
+
+            if (str_starts_with($line, 'Engine:')) {
+                $payload['engine'] = trim((string) substr($line, strlen('Engine:')));
+                continue;
+            }
+
+            if (str_starts_with($line, 'FieldOne:')) {
+                $payload['field_one'] = trim((string) substr($line, strlen('FieldOne:')));
+                continue;
+            }
+
+            if (str_starts_with($line, 'FieldTwo:')) {
+                $payload['field_two'] = trim((string) substr($line, strlen('FieldTwo:')));
+                continue;
+            }
+
+            if (str_starts_with($line, 'FieldThree:')) {
+                $payload['field_three'] = trim((string) substr($line, strlen('FieldThree:')));
+                continue;
+            }
+
+            if (str_starts_with($line, 'FieldFour:')) {
+                $payload['field_four'] = trim((string) substr($line, strlen('FieldFour:')));
+            }
+        }
+
+        return $payload;
     }
 
     private function serializeCommerceOffer(array $payload): string
@@ -2144,9 +3468,155 @@ class OsShellController extends Controller
             'Type: ' . trim((string) ($payload['type'] ?? 'offer')),
             'Engine: ' . trim((string) ($payload['engine'] ?? '')),
             'Price: ' . trim((string) ($payload['price'] ?? '0.00')),
+            'Sku: ' . trim((string) ($payload['sku'] ?? '')),
+            'Stock: ' . trim((string) ($payload['stock'] ?? '')),
+            'LowStock: ' . trim((string) ($payload['low_stock'] ?? '')),
+            'Duration: ' . trim((string) ($payload['duration'] ?? '')),
+            'DurationUnit: ' . trim((string) ($payload['duration_unit'] ?? '')),
+            'Capacity: ' . trim((string) ($payload['capacity'] ?? '')),
+            'StaffMode: ' . trim((string) ($payload['staff_mode'] ?? '')),
+            'StaffId: ' . trim((string) ($payload['staff_id'] ?? '')),
+            'AvailabilityDays: ' . implode('|', $this->normalizeAvailabilityDays($payload['availability_days'] ?? [])),
+            'OpenTime: ' . trim((string) ($payload['open_time'] ?? '')),
+            'CloseTime: ' . trim((string) ($payload['close_time'] ?? '')),
             '',
             trim((string) ($payload['description'] ?? '')),
         ], static fn ($value) => $value !== '')));
+    }
+
+    private function serializeCommerceConfig(array $payload): string
+    {
+        return trim(implode("\n", [
+            'Config: ' . trim((string) ($payload['type'] ?? '')),
+            'Engine: ' . trim((string) ($payload['engine'] ?? '')),
+            'FieldOne: ' . trim((string) ($payload['field_one'] ?? '')),
+            'FieldTwo: ' . trim((string) ($payload['field_two'] ?? '')),
+            'FieldThree: ' . trim((string) ($payload['field_three'] ?? '')),
+            'FieldFour: ' . trim((string) ($payload['field_four'] ?? '')),
+        ]));
+    }
+
+    private function extractCommunicationTimeline(string $notes): array
+    {
+        $lines = preg_split("/\r\n|\n|\r/", trim($notes)) ?: [];
+        $events = [];
+
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if ($line === '') {
+                continue;
+            }
+
+            if (preg_match('/^\[(?<time>[^\]]+)\]\[(?<channel>[^\]]+)\]\s*(?<message>.+)$/', $line, $matches) === 1) {
+                $events[] = [
+                    'timestamp' => trim((string) ($matches['time'] ?? '')),
+                    'channel' => trim((string) ($matches['channel'] ?? 'manual')),
+                    'message' => trim((string) ($matches['message'] ?? '')),
+                ];
+            }
+        }
+
+        return array_reverse($events);
+    }
+
+    private function normalizeAvailabilityDays(array $days): array
+    {
+        $allowed = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+        return collect($days)
+            ->map(fn ($day) => trim((string) $day))
+            ->filter(fn ($day) => in_array($day, $allowed, true))
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    private function resolveCommerceMessage(string $type, string $template, string $customMessage, array $payload): string
+    {
+        $customMessage = trim($customMessage);
+        if ($customMessage !== '') {
+            return $customMessage;
+        }
+
+        $template = trim($template);
+        if ($template === '') {
+            return '';
+        }
+
+        return $this->buildCommerceTemplateMessage($type, $template, $payload);
+    }
+
+    private function buildCommerceTemplateMessage(string $type, string $template, array $payload): string
+    {
+        if ($type === 'order') {
+            $deliveryDate = $this->formatCommerceDateForMessage((string) ($payload['delivery_date'] ?? ''));
+            $deliveryTime = trim((string) ($payload['delivery_time'] ?? ''));
+
+            return match ($template) {
+                'packed' => 'Your order has been packed and is being prepared for dispatch.',
+                'out_for_delivery' => 'Your order is out for delivery' . $this->buildScheduleSuffix($deliveryDate, $deliveryTime) . '.',
+                'delivered' => 'Your order has been marked as delivered. Thank you for ordering with Hatchers.',
+                'delayed' => 'Your order timeline has been updated. We are sorry for the delay' . $this->buildScheduleSuffix($deliveryDate, $deliveryTime) . '.',
+                default => '',
+            };
+        }
+
+        $bookingDate = $this->formatCommerceDateForMessage((string) ($payload['booking_date'] ?? ''));
+        $startTime = trim((string) ($payload['booking_time'] ?? ''));
+        $endTime = trim((string) ($payload['booking_endtime'] ?? ''));
+        $timeRange = trim(implode(' to ', array_filter([$startTime, $endTime])));
+
+        return match ($template) {
+            'confirmed' => 'Your booking is confirmed' . $this->buildScheduleSuffix($bookingDate, $timeRange) . '.',
+            'rescheduled' => 'Your booking has been rescheduled' . $this->buildScheduleSuffix($bookingDate, $timeRange) . '.',
+            'provider_assigned' => 'A team member has been assigned to your booking and we are ready for the scheduled visit.',
+            'completed' => 'Your booking has been completed. Thank you for choosing Hatchers.',
+            default => '',
+        };
+    }
+
+    private function buildScheduleSuffix(string $date, string $time): string
+    {
+        $parts = array_filter([$date, $time]);
+        if ($parts === []) {
+            return '';
+        }
+
+        return ' for ' . implode(' at ', $parts);
+    }
+
+    private function formatCommerceDateForMessage(string $date): string
+    {
+        $date = trim($date);
+        if ($date === '') {
+            return '';
+        }
+
+        try {
+            return \Carbon\Carbon::parse($date)->toFormattedDateString();
+        } catch (Throwable) {
+            return $date;
+        }
+    }
+
+    private function orderMessageTemplates(): array
+    {
+        return [
+            'packed' => 'Packed and preparing dispatch',
+            'out_for_delivery' => 'Out for delivery',
+            'delivered' => 'Delivered',
+            'delayed' => 'Delayed update',
+        ];
+    }
+
+    private function bookingMessageTemplates(): array
+    {
+        return [
+            'confirmed' => 'Booking confirmed',
+            'rescheduled' => 'Booking rescheduled',
+            'provider_assigned' => 'Provider assigned',
+            'completed' => 'Booking completed',
+        ];
     }
 
     private function founderSignupPlans(): array
@@ -2606,23 +4076,17 @@ class OsShellController extends Controller
 
     private function buildCompanyWebsiteUrl(Company $company, string $engine): string
     {
-        $fallbackHost = preg_replace('#^https?://#', '', trim((string) $company->website_url)) ?? '';
-        if ($fallbackHost === '') {
-            $fallbackHost = ($company->company_name ? str($company->company_name)->slug('-')->value() : 'your-business') . '.hatchers.site';
-        }
-
-        $host = trim((string) $company->custom_domain) !== ''
-            ? trim((string) $company->custom_domain)
-            : $fallbackHost;
-        $host = trim($host, '/');
+        $host = trim((string) $company->custom_domain);
+        $host = trim(preg_replace('#^https?://#', '', $host) ?? $host, '/');
         $path = trim((string) ($company->website_path ?? ''), '/');
+        $fallbackPath = $company->company_name ? str($company->company_name)->slug('-')->value() : 'your-business';
 
         if ($host === '') {
-            $host = 'your-business.hatchers.site';
+            $host = 'app.hatchers.ai';
         }
 
-        if (!str_contains($host, '.')) {
-            $host = $host . '.hatchers.site';
+        if ($path === '') {
+            $path = $fallbackPath;
         }
 
         return 'https://' . $host . ($path !== '' ? '/' . $path : '');
@@ -2771,6 +4235,9 @@ class OsShellController extends Controller
             'new_order' => 'When a new order arrives',
             'new_booking' => 'When a new booking arrives',
             'campaign_published' => 'When campaign content is published',
+            'order_unpaid' => 'When an order stays unpaid',
+            'booking_unscheduled' => 'When a booking has no schedule',
+            'booking_unassigned' => 'When a booking has no assigned provider',
         ];
     }
 
@@ -2782,6 +4249,55 @@ class OsShellController extends Controller
             'bazaar' => 'Bazaar',
             'servio' => 'Servio',
             'lms' => 'LMS',
+        ];
+    }
+
+    private function automationTemplates(): array
+    {
+        return [
+            'unpaid-order-reminder' => [
+                'name' => 'Unpaid order reminder',
+                'trigger_type' => 'order_unpaid',
+                'module_scope' => 'bazaar',
+                'condition_summary' => 'If an order remains unpaid after the founder has scheduled fulfillment or marked it as processing.',
+                'action_summary' => 'Send a founder prompt in the OS and prepare an email reminder for the customer with payment follow-up language.',
+                'delivery' => 'email',
+            ],
+            'unscheduled-booking-reminder' => [
+                'name' => 'Unscheduled booking reminder',
+                'trigger_type' => 'booking_unscheduled',
+                'module_scope' => 'servio',
+                'condition_summary' => 'If a booking is still pending without a confirmed date or time.',
+                'action_summary' => 'Flag it in the OS operational queue and prepare a customer update asking them to confirm the preferred slot.',
+                'delivery' => 'email',
+            ],
+            'provider-assignment-reminder' => [
+                'name' => 'Provider assignment reminder',
+                'trigger_type' => 'booking_unassigned',
+                'module_scope' => 'servio',
+                'condition_summary' => 'If a booking is active but still has no assigned provider or staff member.',
+                'action_summary' => 'Surface the booking in the OS queue and draft a customer message once a provider is assigned.',
+                'delivery' => 'email',
+            ],
+        ];
+    }
+
+    private function mailDiagnostics(): array
+    {
+        $host = trim((string) config('mail.mailers.smtp.host', ''));
+        $port = trim((string) config('mail.mailers.smtp.port', ''));
+        $username = trim((string) config('mail.mailers.smtp.username', ''));
+        $fromAddress = trim((string) config('mail.from.address', ''));
+        $encryption = trim((string) config('mail.mailers.smtp.encryption', ''));
+
+        return [
+            'mailer' => (string) config('mail.default', 'smtp'),
+            'host' => $host,
+            'port' => $port,
+            'username' => $username,
+            'from_address' => $fromAddress,
+            'encryption' => $encryption,
+            'configured' => $host !== '' && $port !== '' && $username !== '' && $fromAddress !== '',
         ];
     }
 
@@ -2801,5 +4317,69 @@ class OsShellController extends Controller
         $plans = $this->founderSignupPlans();
 
         return $plans[$planCode] ?? null;
+    }
+
+    private function issueEmailVerification(Founder $founder): void
+    {
+        $code = $this->generateVerificationCode();
+
+        $founder->forceFill([
+            'email_verification_token' => Hash::make($code),
+            'email_verification_expires_at' => now()->addMinutes(20),
+        ])->save();
+
+        $this->sendFounderMail(
+            $founder->email,
+            'Verify your founder email',
+            'emails.founder-email-verification',
+            [
+                'founder' => $founder,
+                'code' => $code,
+                'expiresAt' => now()->addMinutes(20),
+            ]
+        );
+    }
+
+    private function issueLoginVerification(Founder $founder, Request $request): void
+    {
+        $code = $this->generateVerificationCode();
+
+        $founder->forceFill([
+            'login_verification_token' => Hash::make($code),
+            'login_verification_expires_at' => now()->addMinutes(15),
+        ])->save();
+
+        $request->session()->put('pending_login_founder_id', $founder->id);
+
+        $this->sendFounderMail(
+            $founder->email,
+            'Your Hatchers Ai Business OS sign-in code',
+            'emails.founder-login-verification',
+            [
+                'founder' => $founder,
+                'code' => $code,
+                'expiresAt' => now()->addMinutes(15),
+            ]
+        );
+    }
+
+    private function sendFounderMail(string $email, string $subject, string $view, array $data): void
+    {
+        try {
+            Mail::send($view, $data, function ($message) use ($email, $subject): void {
+                $message->to($email)->subject($subject);
+            });
+        } catch (Throwable $exception) {
+            Log::error('Founder verification email failed to send.', [
+                'email' => $email,
+                'subject' => $subject,
+                'message' => $exception->getMessage(),
+            ]);
+        }
+    }
+
+    private function generateVerificationCode(): string
+    {
+        return (string) random_int(100000, 999999);
     }
 }

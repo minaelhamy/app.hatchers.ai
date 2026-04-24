@@ -152,6 +152,27 @@
             margin-top: 10px;
         }
 
+        .founder-alert {
+            border-radius: 14px;
+            padding: 14px 16px;
+            border: 1px solid rgba(220, 207, 191, 0.65);
+            background: rgba(255, 255, 255, 0.92);
+        }
+
+        .founder-alert + .founder-alert {
+            margin-top: 10px;
+        }
+
+        .founder-alert.warning {
+            border-color: rgba(154, 107, 27, 0.22);
+            background: rgba(255, 248, 238, 0.96);
+        }
+
+        .founder-alert.danger {
+            border-color: rgba(179, 34, 83, 0.20);
+            background: rgba(255, 242, 246, 0.96);
+        }
+
         .founder-row {
             display: flex;
             align-items: center;
@@ -503,6 +524,9 @@
         $calendar = $workspace['calendar'];
         $aiTools = $workspace['ai_tools'];
         $syncStatus = $dashboard['sync_status'];
+        $commerceAlerts = $dashboard['commerce_alerts'] ?? [];
+        $commerceOperations = $dashboard['commerce_operations'] ?? [];
+        $automationSummary = $dashboard['automation_summary'] ?? ['active_count' => 0, 'items' => []];
         $nextBestActions = $workspace['next_best_actions'];
     @endphp
 
@@ -644,6 +668,57 @@
                     @endforeach
                 </section>
 
+                @if (!empty($commerceOperations['queue']))
+                    <section class="founder-section">
+                        <h2>Operational Queue</h2>
+                        @foreach ($commerceOperations['queue'] as $item)
+                            <article class="founder-block">
+                                <div class="founder-row" style="align-items:flex-start;">
+                                    <div>
+                                        <div style="font-size:1.02rem;font-weight:600;">{{ $item['title'] }}</div>
+                                        <div class="founder-subtle" style="margin-top:4px;">{{ $item['description'] }}</div>
+                                    </div>
+                                    <a class="founder-badge" href="{{ $item['href'] }}" style="text-decoration:none;">{{ $item['label'] }}</a>
+                                </div>
+                            </article>
+                        @endforeach
+                    </section>
+                @endif
+
+                @if (!empty($automationSummary['items']))
+                    <section class="founder-section">
+                        <h2>Active Reminder Rules</h2>
+                        @foreach ($automationSummary['items'] as $rule)
+                            <article class="founder-block">
+                                <div class="founder-row" style="align-items:flex-start;">
+                                    <div>
+                                        <div style="font-size:1.02rem;font-weight:600;">{{ $rule['name'] }}</div>
+                                        <div class="founder-subtle" style="margin-top:4px;">{{ ucfirst($rule['module_scope']) }} · {{ ucfirst($rule['delivery']) }} · {{ $rule['status_label'] }}</div>
+                                    </div>
+                                    <a class="founder-badge" href="{{ $rule['href'] }}" style="text-decoration:none;">{{ $rule['cta_label'] }}</a>
+                                </div>
+                            </article>
+                        @endforeach
+                    </section>
+                @endif
+
+                @if (!empty($commerceAlerts))
+                    <section class="founder-section">
+                        <h2>Commerce Alerts</h2>
+                        @foreach ($commerceAlerts as $alert)
+                            <article class="founder-alert {{ $alert['type'] ?? 'warning' }}">
+                                <div style="display:flex;justify-content:space-between;gap:14px;align-items:flex-start;">
+                                    <div>
+                                        <div style="font-size:1.02rem;font-weight:600;">{{ $alert['title'] }}</div>
+                                        <div class="founder-subtle" style="margin-top:4px;">{{ $alert['description'] }}</div>
+                                    </div>
+                                    <a class="founder-badge" href="{{ $alert['href'] }}" style="text-decoration:none;">{{ $alert['label'] }}</a>
+                                </div>
+                            </article>
+                        @endforeach
+                    </section>
+                @endif
+
                 <div id="assistant-bar" class="founder-assistant-bar">
                     <div class="founder-assistant-icon">◔</div>
                     <div class="founder-assistant-input">{{ $workspace['quick_prompt'] ?: 'Ask AI anything about your project...' }}</div>
@@ -729,6 +804,48 @@
                     @endforeach
                 </div>
 
+                @if (!empty($commerceOperations))
+                    <h3 style="margin-top: 22px;">Commerce Ops</h3>
+                    <div class="tool-list">
+                        <div class="tool-item" style="display:block;">
+                            <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
+                                <div>Pending orders</div>
+                                <span class="notification-badge" style="background:rgba(154,107,27,0.12);color:#9a6b1b;">{{ $commerceOperations['pending_orders'] ?? 0 }}</span>
+                            </div>
+                        </div>
+                        <div class="tool-item" style="display:block;">
+                            <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
+                                <div>Unpaid orders</div>
+                                <span class="notification-badge" style="background:rgba(179,34,83,0.10);color:#b32253;">{{ $commerceOperations['unpaid_orders'] ?? 0 }}</span>
+                            </div>
+                        </div>
+                        <div class="tool-item" style="display:block;">
+                            <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
+                                <div>Ready to ship</div>
+                                <span class="notification-badge" style="background:rgba(44,122,87,0.12);color:#21643a;">{{ $commerceOperations['ready_to_ship_orders'] ?? 0 }}</span>
+                            </div>
+                        </div>
+                        <div class="tool-item" style="display:block;">
+                            <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
+                                <div>Pending bookings</div>
+                                <span class="notification-badge" style="background:rgba(154,107,27,0.12);color:#9a6b1b;">{{ $commerceOperations['pending_bookings'] ?? 0 }}</span>
+                            </div>
+                        </div>
+                        <div class="tool-item" style="display:block;">
+                            <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
+                                <div>Unscheduled bookings</div>
+                                <span class="notification-badge" style="background:rgba(179,34,83,0.10);color:#b32253;">{{ $commerceOperations['unscheduled_bookings'] ?? 0 }}</span>
+                            </div>
+                        </div>
+                        <div class="tool-item" style="display:block;">
+                            <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
+                                <div>Need staff assignment</div>
+                                <span class="notification-badge" style="background:rgba(154,107,27,0.12);color:#9a6b1b;">{{ $commerceOperations['needs_staff_assignment'] ?? 0 }}</span>
+                            </div>
+                        </div>
+                    </div>
+                @endif
+
                 <h3 style="margin-top: 22px;">AI Tools</h3>
                 <div class="tool-list">
                     @foreach ($aiTools as $tool)
@@ -738,6 +855,21 @@
                         </div>
                     @endforeach
                 </div>
+
+                @if (!empty($automationSummary['active_count']))
+                    <h3 style="margin-top: 22px;"><a href="{{ route('founder.automations') }}" style="text-decoration:none;color:inherit;">Reminder Rules</a></h3>
+                    <div class="tool-list">
+                        @foreach (array_slice($automationSummary['items'], 0, 3) as $rule)
+                            <a class="tool-item" href="{{ $rule['href'] }}" style="display:block;text-decoration:none;color:inherit;">
+                                <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
+                                    <div>{{ $rule['name'] }}</div>
+                                    <span class="founder-subtle">{{ $rule['delivery'] }}</span>
+                                </div>
+                                <div class="founder-subtle" style="margin-top:4px;">{{ $rule['status_label'] }}</div>
+                            </a>
+                        @endforeach
+                    </div>
+                @endif
             </div>
         </aside>
     </div>

@@ -22,6 +22,8 @@
         $recommendedCard = collect($engines)->firstWhere('key', $recommendedEngine) ?: $engines[0];
         $initialThemeOptions = $themeOptions[$recommendedEngine] ?? [];
         $dnsTargets = $website['dns_targets'];
+        $supportsProducts = in_array($businessModel, ['product', 'hybrid'], true);
+        $supportsServices = in_array($businessModel, ['service', 'hybrid'], true);
     @endphp
 
     <div class="sidebar-layout">
@@ -37,8 +39,12 @@
                 <div class="nav-group-title">Business</div>
                 <a class="nav-item active" href="/website">Website</a>
                 <a class="nav-item" href="{{ route('founder.commerce') }}">Commerce</a>
-                <a class="nav-item" href="{{ route('founder.commerce.orders') }}">Orders</a>
-                <a class="nav-item" href="{{ route('founder.commerce.bookings') }}">Bookings</a>
+                @if ($supportsProducts)
+                    <a class="nav-item" href="{{ route('founder.commerce.orders') }}">Orders</a>
+                @endif
+                @if ($supportsServices)
+                    <a class="nav-item" href="{{ route('founder.commerce.bookings') }}">Bookings</a>
+                @endif
             </div>
         </aside>
 
@@ -80,13 +86,18 @@
                         @csrf
                         <div class="stack-item">
                             <strong>Website engine</strong><br>
-                            <select name="website_engine" data-engine-select style="margin-top: 10px; width: 100%; padding: 12px; border-radius: 14px; border: 1px solid var(--line); background: #fff;">
-                                @foreach ($engines as $engine)
-                                    <option value="{{ $engine['key'] }}" @selected(old('website_engine', $recommendedEngine) === $engine['key'])>
-                                        {{ $engine['label'] }} · {{ $engine['role'] }}
-                                    </option>
-                                @endforeach
-                            </select>
+                            @if (count($engines) === 1)
+                                <input type="hidden" name="website_engine" value="{{ $engines[0]['key'] }}" data-engine-select>
+                                <div class="pill" style="margin-top:10px;">{{ $engines[0]['label'] }} · {{ $engines[0]['role'] }}</div>
+                            @else
+                                <select name="website_engine" data-engine-select style="margin-top: 10px; width: 100%; padding: 12px; border-radius: 14px; border: 1px solid var(--line); background: #fff;">
+                                    @foreach ($engines as $engine)
+                                        <option value="{{ $engine['key'] }}" @selected(old('website_engine', $recommendedEngine) === $engine['key'])>
+                                            {{ $engine['label'] }} · {{ $engine['role'] }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            @endif
                         </div>
                         <div class="stack-item">
                             <strong>Business path</strong><br>
@@ -114,8 +125,8 @@
                                 name="website_path"
                                 value="{{ old('website_path', $websitePath) }}"
                                 style="margin-top: 10px; width: 100%; padding: 12px; border-radius: 14px; border: 1px solid var(--line); background: #fff;"
-                                placeholder="home, store, services, launch">
-                            <div class="muted" style="margin-top: 10px;">This path becomes part of the public URL the founder shares from Hatchers Ai Business OS.</div>
+                                placeholder="your-company-name">
+                            <div class="muted" style="margin-top: 10px;">This becomes the public OS path at <strong>app.hatchers.ai/{{ $websitePath ?: 'your-company-name' }}</strong>.</div>
                         </div>
                         <div class="stack-item">
                             <strong>Theme</strong><br>
@@ -148,7 +159,7 @@
                         </div>
                         <div class="stack-item">
                             <strong>Current website path</strong><br>
-                            /{{ $websitePath }}
+                            app.hatchers.ai/{{ $websitePath }}
                         </div>
                         <div class="stack-item">
                             <strong>Current website status</strong><br>
@@ -156,7 +167,7 @@
                         </div>
                         <div class="stack-item">
                             <strong>Publishing note</strong><br>
-                            Once published, the OS records the site as live and uses the engine's public storefront URL as the founder-facing website.
+                            Once published, the OS records the site as live under the OS URL structure and routes the engine behind the scenes.
                         </div>
                     </div>
                     <form method="POST" action="/website/publish" style="margin-top: 18px;">
@@ -175,17 +186,26 @@
                         @csrf
                         <div class="stack-item">
                             <strong>Engine</strong><br>
-                            <select name="website_engine" data-starter-engine style="margin-top: 10px; width: 100%; padding: 12px; border-radius: 14px; border: 1px solid var(--line); background: #fff;">
-                                @foreach ($engines as $engine)
-                                    <option value="{{ $engine['key'] }}" @selected($recommendedEngine === $engine['key'])>{{ $engine['label'] }}</option>
-                                @endforeach
-                            </select>
+                            @if (count($engines) === 1)
+                                <input type="hidden" name="website_engine" value="{{ $engines[0]['key'] }}" data-starter-engine>
+                                <div class="pill" style="margin-top:10px;">{{ $engines[0]['label'] }}</div>
+                            @else
+                                <select name="website_engine" data-starter-engine style="margin-top: 10px; width: 100%; padding: 12px; border-radius: 14px; border: 1px solid var(--line); background: #fff;">
+                                    @foreach ($engines as $engine)
+                                        <option value="{{ $engine['key'] }}" @selected($recommendedEngine === $engine['key'])>{{ $engine['label'] }}</option>
+                                    @endforeach
+                                </select>
+                            @endif
                         </div>
                         <div class="stack-item">
                             <strong>Starter type</strong><br>
                             <select name="starter_mode" style="margin-top: 10px; width: 100%; padding: 12px; border-radius: 14px; border: 1px solid var(--line); background: #fff;">
-                                <option value="product" @selected($businessModel !== 'service')>First product</option>
-                                <option value="service" @selected($businessModel === 'service')>First service</option>
+                                @if ($supportsProducts)
+                                    <option value="product" @selected($businessModel !== 'service')>First product</option>
+                                @endif
+                                @if ($supportsServices)
+                                    <option value="service" @selected($businessModel === 'service')>First service</option>
+                                @endif
                             </select>
                         </div>
                         <div class="stack-item">
@@ -213,11 +233,16 @@
                         @csrf
                         <div class="stack-item">
                             <strong>Engine</strong><br>
-                            <select name="website_engine" data-domain-engine style="margin-top: 10px; width: 100%; padding: 12px; border-radius: 14px; border: 1px solid var(--line); background: #fff;">
-                                @foreach ($engines as $engine)
-                                    <option value="{{ $engine['key'] }}" @selected($recommendedEngine === $engine['key'])>{{ $engine['label'] }}</option>
-                                @endforeach
-                            </select>
+                            @if (count($engines) === 1)
+                                <input type="hidden" name="website_engine" value="{{ $engines[0]['key'] }}" data-domain-engine>
+                                <div class="pill" style="margin-top:10px;">{{ $engines[0]['label'] }}</div>
+                            @else
+                                <select name="website_engine" data-domain-engine style="margin-top: 10px; width: 100%; padding: 12px; border-radius: 14px; border: 1px solid var(--line); background: #fff;">
+                                    @foreach ($engines as $engine)
+                                        <option value="{{ $engine['key'] }}" @selected($recommendedEngine === $engine['key'])>{{ $engine['label'] }}</option>
+                                    @endforeach
+                                </select>
+                            @endif
                         </div>
                         <div class="stack-item">
                             <strong>Custom domain</strong><br>
@@ -386,7 +411,7 @@
         (() => {
             const themeMap = @json($themeOptions);
             const dnsTargets = @json($dnsTargets);
-            const engineSelect = document.querySelector('select[name="website_engine"]');
+            const engineSelect = document.querySelector('[data-engine-select]');
             const modeSelect = document.querySelector('select[name="website_mode"]');
             const themeSelect = document.querySelector('[data-theme-select]');
             const themeGrid = document.querySelector('[data-theme-grid]');
@@ -394,7 +419,7 @@
             const starterEngine = document.querySelector('[data-starter-engine]');
             const domainEngine = document.querySelector('[data-domain-engine]');
             const dnsTarget = document.querySelector('[data-dns-target]');
-            const selectedTheme = @json(old('theme_template', $recommendedCard['theme']));
+            let selectedTheme = @json(old('theme_template', $recommendedCard['theme']));
 
             if (!engineSelect || !themeSelect) {
                 return;
@@ -458,6 +483,7 @@
                         }
 
                         card.addEventListener('click', () => {
+                            selectedTheme = theme.id;
                             themeSelect.value = theme.id;
                             [...themeGrid.children].forEach((child) => {
                                 child.style.boxShadow = 'none';
@@ -490,7 +516,10 @@
                 });
             }
 
-            engineSelect.addEventListener('change', () => populateThemes(engineSelect.value));
+            engineSelect.addEventListener('change', () => {
+                selectedTheme = '';
+                populateThemes(engineSelect.value);
+            });
             if (domainEngine) {
                 domainEngine.addEventListener('change', () => {
                     if (dnsTarget) {

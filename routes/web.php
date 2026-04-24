@@ -13,6 +13,12 @@ Route::post('/integrations/identities/{role}', [IdentitySyncController::class, '
 Route::middleware('guest')->group(function () {
     Route::get('/login', [OsShellController::class, 'login'])->name('login');
     Route::post('/login', [OsShellController::class, 'authenticate'])->name('login.authenticate');
+    Route::get('/verify-email', [OsShellController::class, 'verifyEmailNotice'])->name('verification.email.notice');
+    Route::post('/verify-email', [OsShellController::class, 'verifyEmail'])->name('verification.email.verify');
+    Route::post('/verify-email/resend', [OsShellController::class, 'resendEmailVerification'])->name('verification.email.resend');
+    Route::get('/verify-login', [OsShellController::class, 'verifyLoginNotice'])->name('verification.login.notice');
+    Route::post('/verify-login', [OsShellController::class, 'verifyLogin'])->name('verification.login.verify');
+    Route::post('/verify-login/resend', [OsShellController::class, 'resendLoginVerification'])->name('verification.login.resend');
     Route::get('/onboarding', [OsShellController::class, 'onboarding'])->name('onboarding');
     Route::post('/onboarding', [OsShellController::class, 'storeOnboarding'])->name('onboarding.store');
 });
@@ -37,6 +43,15 @@ Route::middleware('auth')->group(function () {
     Route::get('/commerce/orders', [OsShellController::class, 'founderOrders'])->name('founder.commerce.orders');
     Route::get('/commerce/bookings', [OsShellController::class, 'founderBookings'])->name('founder.commerce.bookings');
     Route::post('/commerce/offers/{actionPlan}', [OsShellController::class, 'founderUpdateCommerceOffer'])->name('founder.commerce.offer.update');
+    Route::post('/commerce/configs/{actionPlan}', [OsShellController::class, 'founderUpdateCommerceConfig'])->name('founder.commerce.config.update');
+    Route::post('/commerce/settings', [OsShellController::class, 'founderSaveCommerceConfig'])->name('founder.commerce.settings.store');
+    Route::post('/commerce/settings/toggle', [OsShellController::class, 'founderToggleCommerceConfig'])->name('founder.commerce.settings.toggle');
+    Route::post('/commerce/orders/update', [OsShellController::class, 'founderUpdateOrderOperation'])->name('founder.commerce.orders.update');
+    Route::post('/commerce/orders/customer', [OsShellController::class, 'founderUpdateOrderCustomer'])->name('founder.commerce.orders.customer');
+    Route::post('/commerce/orders/fulfillment', [OsShellController::class, 'founderUpdateOrderFulfillment'])->name('founder.commerce.orders.fulfillment');
+    Route::post('/commerce/bookings/update', [OsShellController::class, 'founderUpdateBookingOperation'])->name('founder.commerce.bookings.update');
+    Route::post('/commerce/bookings/customer', [OsShellController::class, 'founderUpdateBookingCustomer'])->name('founder.commerce.bookings.customer');
+    Route::post('/commerce/bookings/schedule', [OsShellController::class, 'founderUpdateBookingSchedule'])->name('founder.commerce.bookings.schedule');
     Route::get('/settings', [OsShellController::class, 'founderSettings'])->name('founder.settings');
     Route::post('/settings', [OsShellController::class, 'founderUpdateSettings'])->name('founder.settings.update');
     Route::get('/ai-tools', [OsShellController::class, 'founderAiTools'])->name('founder.ai-tools');
@@ -45,6 +60,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/analytics', [OsShellController::class, 'founderAnalytics'])->name('founder.analytics');
     Route::get('/automations', [OsShellController::class, 'founderAutomations'])->name('founder.automations');
     Route::post('/automations', [OsShellController::class, 'founderStoreAutomation'])->name('founder.automations.store');
+    Route::post('/automations/templates', [OsShellController::class, 'founderStoreAutomationTemplate'])->name('founder.automations.templates.store');
     Route::get('/marketing', [OsShellController::class, 'founderMarketing'])->name('founder.marketing');
     Route::post('/marketing/campaign', [OsShellController::class, 'founderCreateCampaign'])->name('founder.marketing.campaign.create');
     Route::post('/marketing/campaign/archive', [OsShellController::class, 'founderArchiveCampaign'])->name('founder.marketing.campaign.archive');
@@ -60,6 +76,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/admin/system-access', [OsShellController::class, 'adminSystemAccess'])->name('admin.system-access');
     Route::get('/admin/identity', [OsShellController::class, 'adminIdentity'])->name('admin.identity');
     Route::get('/admin/support', [OsShellController::class, 'adminSupport'])->name('admin.support');
+    Route::post('/admin/support/test-mail', [OsShellController::class, 'adminSendSupportTestMail'])->name('admin.support.test-mail');
     Route::post('/admin/identity/backfill', [OsShellController::class, 'adminBackfillIdentity'])->name('admin.identity.backfill');
     Route::get('/admin/modules', [OsShellController::class, 'adminModules'])->name('admin.modules');
     Route::get('/admin/subscribers', [OsShellController::class, 'adminSubscribers'])->name('admin.subscribers');

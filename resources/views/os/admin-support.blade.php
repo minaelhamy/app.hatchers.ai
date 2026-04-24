@@ -8,6 +8,7 @@
         $staleModules = $workspace['stale_modules'];
         $exceptions = $workspace['exceptions'];
         $recentAudits = $workspace['recent_audits'];
+        $mailDiagnostics = $workspace['mail_diagnostics'] ?? [];
     @endphp
 
     <div class="sidebar-layout">
@@ -32,6 +33,20 @@
                 <h1>Run support operations from the OS.</h1>
                 <p class="muted">Welcome back, {{ $admin->full_name }}. This workspace pulls founder risk, stale module trust, and open exception handling into one operational surface.</p>
             </section>
+
+            @if (session('success'))
+                <section class="card" style="border-color: rgba(44, 122, 87, 0.25); background: rgba(44, 122, 87, 0.06); margin-bottom: 18px;">
+                    <h3 style="color: var(--success);">Action completed</h3>
+                    <p class="muted" style="margin-top: 8px;">{{ session('success') }}</p>
+                </section>
+            @endif
+
+            @if (session('error'))
+                <section class="card" style="border-color: rgba(179, 34, 83, 0.25); background: rgba(179, 34, 83, 0.06); margin-bottom: 18px;">
+                    <h3 style="color: var(--rose);">Action needs attention</h3>
+                    <p class="muted" style="margin-top: 8px;">{{ session('error') }}</p>
+                </section>
+            @endif
 
             <section class="metrics" style="margin-bottom: 22px;">
                 <div class="card metric"><div class="muted">Urgent founders</div><strong>{{ $metrics['urgent_founders'] }}</strong></div>
@@ -92,6 +107,33 @@
             </section>
 
             <section class="grid-2" style="margin-top: 22px;">
+                <div class="card">
+                    <h2>Mail Operations</h2>
+                    <p class="muted">Use this to confirm that Hatchers Ai Business OS can send founder verification and support emails before testing the live founder flow.</p>
+                    <div class="stack" style="margin-top: 14px;">
+                        <div class="stack-item">
+                            <strong>SMTP status</strong><br>
+                            <span class="muted">
+                                {{ !empty($mailDiagnostics['configured']) ? 'Configured' : 'Missing required values' }} ·
+                                {{ $mailDiagnostics['mailer'] ?? 'smtp' }} ·
+                                {{ $mailDiagnostics['host'] ?? 'host missing' }}:{{ $mailDiagnostics['port'] ?? 'port missing' }}
+                            </span>
+                            <div class="muted" style="margin-top: 6px;">
+                                {{ $mailDiagnostics['from_address'] ?? 'From address missing' }} · {{ $mailDiagnostics['encryption'] ?? 'encryption missing' }}
+                            </div>
+                        </div>
+                        <form method="POST" action="{{ route('admin.support.test-mail') }}" class="stack-item">
+                            @csrf
+                            <strong>Send test mail</strong>
+                            <div class="muted" style="margin-top: 6px;">This sends a direct OS test email using the current SMTP settings.</div>
+                            <input type="email" name="email" placeholder="ops@hatchers.ai" style="width:100%;padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:#fff;margin-top:10px;">
+                            <div class="cta-row" style="margin-top: 12px;">
+                                <button class="btn primary" type="submit">Send test mail</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
                 <div class="card">
                     <h2>Open Exception Queue</h2>
                     <div class="stack" style="margin-top: 14px;">

@@ -14,14 +14,18 @@ class WebsiteWorkspaceService
     public function build(Founder $founder): array
     {
         $company = $founder->company;
-        $businessModel = (string) ($company?->business_model ?? 'hybrid');
+        $businessModel = $this->normalizeBusinessModel((string) ($company?->business_model ?? 'hybrid'));
         $companyName = (string) ($company?->company_name ?? $founder->full_name);
         $slug = $this->slugify($companyName);
         $snapshots = $founder->moduleSnapshots->keyBy('module');
         $bazaar = $snapshots->get('bazaar');
         $servio = $snapshots->get('servio');
+        $supportedEngines = $this->supportedEngines($businessModel);
 
         $recommendedEngine = (string) ($company?->website_engine ?: $this->determineRecommendedEngine($businessModel));
+        if (!in_array($recommendedEngine, $supportedEngines, true)) {
+            $recommendedEngine = $supportedEngines[0] ?? 'servio';
+        }
         $websitePath = $this->normalizeWebsitePath((string) ($company?->website_path ?? ''));
         if ($websitePath === '') {
             $websitePath = $slug;
@@ -30,11 +34,26 @@ class WebsiteWorkspaceService
         $currentWebsiteUrl = (string) ($company?->website_url ?? '');
         if ($currentWebsiteUrl === '') {
             $currentWebsiteUrl = $this->buildPublicWebsiteUrl(
-                $recommendedEngine,
                 $slug,
                 $websitePath,
                 (string) ($company?->custom_domain ?? '')
             );
+        }
+
+        $engines = [];
+        foreach ($supportedEngines as $engine) {
+            $engines[] = $this->buildEngineCard(
+                $engine,
+                $engine === 'bazaar' ? $bazaar : $servio,
+                $slug,
+                $websitePath,
+                (string) ($company?->custom_domain ?? '')
+            );
+        }
+
+        $themeOptions = [];
+        foreach ($supportedEngines as $engine) {
+            $themeOptions[$engine] = $this->websiteProvisioningService->availableThemes($engine);
         }
 
         return [
@@ -48,14 +67,9 @@ class WebsiteWorkspaceService
             'custom_domain_example' => 'www.' . $slug . '.com',
             'custom_domain' => (string) ($company?->custom_domain ?? ''),
             'custom_domain_status' => (string) ($company?->custom_domain_status ?? 'not_connected'),
-            'engines' => [
-                $this->buildEngineCard('bazaar', $bazaar, $slug),
-                $this->buildEngineCard('servio', $servio, $slug),
-            ],
-            'theme_options' => [
-                'bazaar' => $this->websiteProvisioningService->availableThemes('bazaar'),
-                'servio' => $this->websiteProvisioningService->availableThemes('servio'),
-            ],
+            'engines' => $engines,
+            'theme_options' => $themeOptions,
+            'supported_engines' => $supportedEngines,
             'domain_model' => [
                 [
                     'title' => 'Founder workspace',
@@ -64,8 +78,8 @@ class WebsiteWorkspaceService
                 ],
                 [
                     'title' => 'Default published site',
-                    'value' => $recommendedSubdomain,
-                    'description' => 'Hatchers can publish a ready-to-use business website without waiting on a custom domain.',
+                    'value' => preg_replace('#^https?://#', '', $recommendedSubdomain) ?? $recommendedSubdomain,
+                    'description' => 'By default the public business site lives inside Hatchers Ai Business OS under app.hatchers.ai/{company}.',
                 ],
                 [
                     'title' => 'Custom domain',
@@ -81,13 +95,13 @@ class WebsiteWorkspaceService
         ];
     }
 
-    private function buildEngineCard(string $engine, ?ModuleSnapshot $snapshot, string $slug): array
+    private function buildEngineCard(string $engine, ?ModuleSnapshot $snapshot, string $slug, string $websitePath, string $customDomain): array
     {
         $payload = $snapshot?->payload_json ?? [];
         $summary = $payload['summary'] ?? [];
         $keyCounts = $payload['key_counts'] ?? [];
         $engineLabel = strtoupper($engine);
-        $defaultUrl = $this->buildRecommendedSubdomain($slug, $engine, $slug);
+        $defaultUrl = $this->buildPublicWebsiteUrl($slug, $websitePath, $customDomain);
 
         if ($engine === 'bazaar') {
             $title = (string) ($summary['website_title'] ?? 'Product storefront');
@@ -177,7 +191,7 @@ class WebsiteWorkspaceService
 
     private function buildRecommendedSubdomain(string $slug, string $engine, string $path = ''): string
     {
-        return $this->buildPublicWebsiteUrl($engine, $slug, $path, '');
+        return $this->buildPublicWebsiteUrl($slug, $path, '');
     }
 
     private function slugify(string $value): string
@@ -207,14 +221,33 @@ class WebsiteWorkspaceService
         return is_string($host) && $host !== '' ? $host : $baseUrl;
     }
 
-    private function buildPublicWebsiteUrl(string $engine, string $slug, string $path, string $customDomain): string
+    private function buildPublicWebsiteUrl(string $slug, string $path, string $customDomain): string
     {
         $host = trim($customDomain) !== ''
             ? $this->normalizeDomainHost($customDomain)
-            : $slug . '.hatchers.site';
+            : 'app.hatchers.ai';
         $normalizedPath = $this->normalizeWebsitePath($path);
+        if ($normalizedPath === '') {
+            $normalizedPath = $slug;
+        }
 
         return 'https://' . $host . ($normalizedPath !== '' ? '/' . $normalizedPath : '');
+    }
+
+    private function supportedEngines(string $businessModel): array
+    {
+        return match ($businessModel) {
+            'product' => ['bazaar'],
+            'service' => ['servio'],
+            default => ['bazaar', 'servio'],
+        };
+    }
+
+    private function normalizeBusinessModel(string $businessModel): string
+    {
+        $businessModel = strtolower(trim($businessModel));
+
+        return in_array($businessModel, ['product', 'service', 'hybrid'], true) ? $businessModel : 'hybrid';
     }
 
     private function normalizeWebsitePath(string $path): string

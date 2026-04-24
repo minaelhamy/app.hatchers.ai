@@ -26,7 +26,10 @@ class FounderDashboardService
         $growth = $this->buildGrowthSummary($commercialSummary, $snapshots);
         $atlas = $this->buildAtlasSummary($snapshots);
         $syncStatus = $this->buildSyncStatus($moduleCards);
-        $workspace = $this->buildWorkspace($founder, $company, $weeklyState, $actions, $activityFeed, $execution, $atlas, $growth, $syncStatus);
+        $commerceAlerts = $this->buildCommerceAlerts($snapshots);
+        $commerceOperations = $this->buildCommerceOperations($snapshots);
+        $automationSummary = $this->buildAutomationSummary($founder, $commerceOperations);
+        $workspace = $this->buildWorkspace($founder, $company, $weeklyState, $actions, $activityFeed, $execution, $atlas, $growth, $syncStatus, $commerceAlerts, $commerceOperations, $automationSummary);
 
         return [
             'founder' => $founder,
@@ -44,6 +47,9 @@ class FounderDashboardService
             'atlas' => $atlas,
             'actions' => $actions,
             'workspace' => $workspace,
+            'commerce_alerts' => $commerceAlerts,
+            'commerce_operations' => $commerceOperations,
+            'automation_summary' => $automationSummary,
             'metrics' => [
                 'weekly_progress_percent' => (int) ($weeklyState->weekly_progress_percent ?? 0),
                 'open_tasks' => (int) ($weeklyState->open_tasks ?? 0),
@@ -63,7 +69,10 @@ class FounderDashboardService
         array $execution,
         array $atlas,
         array $growth,
-        array $syncStatus
+        array $syncStatus,
+        array $commerceAlerts,
+        array $commerceOperations,
+        array $automationSummary
     ): array {
         $today = now();
         $firstName = trim((string) preg_replace('/\s+.*/', '', (string) $founder->full_name));
@@ -186,9 +195,69 @@ class FounderDashboardService
                 $growth,
                 $atlas,
                 $syncStatus,
-                $actions
+                $actions,
+                $commerceAlerts,
+                $commerceOperations,
+                $automationSummary
             ),
             'activity_feed_groups' => $this->buildActivityFeedGroups($activityFeed),
+            'commerce_operations' => $commerceOperations,
+            'automation_summary' => $automationSummary,
+        ];
+    }
+
+    private function buildAutomationSummary(Founder $founder, array $commerceOperations): array
+    {
+        $rules = $founder->automationRules()
+            ->where('status', 'active')
+            ->latest()
+            ->get();
+
+        $templates = [];
+        foreach ($rules as $rule) {
+            $meta = is_array($rule->metadata_json) ? $rule->metadata_json : [];
+            $templates[] = [
+                'name' => (string) $rule->name,
+                'trigger_type' => (string) $rule->trigger_type,
+                'module_scope' => (string) $rule->module_scope,
+                'delivery' => (string) ($meta['delivery'] ?? 'email'),
+                'template_key' => (string) ($meta['template_key'] ?? ''),
+            ];
+        }
+
+        $mapped = [];
+        foreach ($templates as $template) {
+            $queueCount = match ($template['trigger_type']) {
+                'order_unpaid' => (int) ($commerceOperations['unpaid_orders'] ?? 0),
+                'booking_unscheduled' => (int) ($commerceOperations['unscheduled_bookings'] ?? 0),
+                'booking_unassigned' => (int) ($commerceOperations['needs_staff_assignment'] ?? 0),
+                default => 0,
+            };
+
+            $href = match ($template['trigger_type']) {
+                'order_unpaid' => route('founder.commerce.orders', ['status' => 'all', 'queue' => 'unpaid']),
+                'booking_unscheduled' => route('founder.commerce.bookings', ['status' => 'all', 'queue' => 'unscheduled']),
+                'booking_unassigned' => route('founder.commerce.bookings', ['status' => 'all', 'queue' => 'needs_staff']),
+                default => route('founder.automations'),
+            };
+
+            $mapped[] = [
+                'name' => $template['name'],
+                'module_scope' => $template['module_scope'],
+                'delivery' => $template['delivery'],
+                'queue_count' => $queueCount,
+                'status_label' => $queueCount > 0 ? 'Watching ' . $queueCount . ' record' . ($queueCount === 1 ? '' : 's') : 'Ready',
+                'href' => $href,
+                'cta_label' => $queueCount > 0 ? 'Open queue' : 'Open automations',
+            ];
+        }
+
+        return [
+            'active_count' => count($mapped),
+            'items' => $mapped,
+            'has_unpaid_order_rule' => collect($mapped)->contains(fn (array $item) => $item['module_scope'] === 'bazaar' && str_contains(strtolower($item['name']), 'unpaid order')),
+            'has_unscheduled_booking_rule' => collect($mapped)->contains(fn (array $item) => $item['module_scope'] === 'servio' && str_contains(strtolower($item['name']), 'unscheduled booking')),
+            'has_provider_assignment_rule' => collect($mapped)->contains(fn (array $item) => $item['module_scope'] === 'servio' && str_contains(strtolower($item['name']), 'provider assignment')),
         ];
     }
 
@@ -501,7 +570,10 @@ class FounderDashboardService
         array $growth,
         array $atlas,
         array $syncStatus,
-        $actions
+        $actions,
+        array $commerceAlerts,
+        array $commerceOperations,
+        array $automationSummary
     ): array {
         $items = [];
 
@@ -544,6 +616,87 @@ class FounderDashboardService
             ];
         }
 
+        if (!empty($commerceAlerts)) {
+            $items[] = [
+                'title' => 'Resolve commerce alerts',
+                'description' => 'You have ' . count($commerceAlerts) . ' stock or availability alerts that need attention in Commerce.',
+                'label' => 'Open Commerce',
+                'href' => route('founder.commerce'),
+            ];
+        }
+
+        if ((int) ($commerceOperations['pending_orders'] ?? 0) > 0) {
+            $items[] = [
+                'title' => 'Handle pending orders',
+                'description' => 'You have ' . (int) $commerceOperations['pending_orders'] . ' Bazaar orders waiting for fulfillment updates.',
+                'label' => 'Open Orders',
+                'href' => route('founder.commerce.orders'),
+            ];
+        }
+
+        if (
+            (int) ($commerceOperations['unpaid_orders'] ?? 0) > 0
+            && empty($automationSummary['has_unpaid_order_rule'])
+        ) {
+            $items[] = [
+                'title' => 'Set an unpaid order reminder rule',
+                'description' => 'You have unpaid orders in the queue, but no saved OS reminder rule to follow them up automatically.',
+                'label' => 'Open Automations',
+                'href' => route('founder.automations'),
+            ];
+        }
+
+        if ((int) ($commerceOperations['ready_to_ship_orders'] ?? 0) > 0) {
+            $items[] = [
+                'title' => 'Dispatch ready-to-ship orders',
+                'description' => 'You have ' . (int) $commerceOperations['ready_to_ship_orders'] . ' paid orders in processing that are ready for fulfillment follow-up.',
+                'label' => 'Open Orders',
+                'href' => route('founder.commerce.orders'),
+            ];
+        }
+
+        if ((int) ($commerceOperations['pending_bookings'] ?? 0) > 0) {
+            $items[] = [
+                'title' => 'Review pending bookings',
+                'description' => 'You have ' . (int) $commerceOperations['pending_bookings'] . ' Servio bookings waiting for scheduling or confirmation.',
+                'label' => 'Open Bookings',
+                'href' => route('founder.commerce.bookings'),
+            ];
+        }
+
+        if (
+            (int) ($commerceOperations['unscheduled_bookings'] ?? 0) > 0
+            && empty($automationSummary['has_unscheduled_booking_rule'])
+        ) {
+            $items[] = [
+                'title' => 'Set an unscheduled booking reminder',
+                'description' => 'You have bookings waiting for a schedule, but no OS reminder rule is watching them yet.',
+                'label' => 'Open Automations',
+                'href' => route('founder.automations'),
+            ];
+        }
+
+        if ((int) ($commerceOperations['needs_staff_assignment'] ?? 0) > 0) {
+            $items[] = [
+                'title' => 'Assign staff to upcoming bookings',
+                'description' => 'You have ' . (int) $commerceOperations['needs_staff_assignment'] . ' active bookings without a staff assignment.',
+                'label' => 'Open Bookings',
+                'href' => route('founder.commerce.bookings'),
+            ];
+        }
+
+        if (
+            (int) ($commerceOperations['needs_staff_assignment'] ?? 0) > 0
+            && empty($automationSummary['has_provider_assignment_rule'])
+        ) {
+            $items[] = [
+                'title' => 'Set a provider assignment reminder',
+                'description' => 'You have active bookings without staff assigned, and no OS reminder rule is watching that gap.',
+                'label' => 'Open Automations',
+                'href' => route('founder.automations'),
+            ];
+        }
+
         if (trim((string) ($company?->company_brief ?? '')) === '') {
             $items[] = [
                 'title' => 'Tighten your company profile',
@@ -564,6 +717,157 @@ class FounderDashboardService
 
         return array_slice($items, 0, 4);
     }
+
+    private function buildCommerceOperations($snapshots): array
+    {
+        $bazaarPayload = $snapshots->get('bazaar')?->payload_json ?? [];
+        $servioPayload = $snapshots->get('servio')?->payload_json ?? [];
+        $recentOrders = collect($bazaarPayload['recent_orders'] ?? [])->filter(fn ($item) => is_array($item));
+        $recentBookings = collect($servioPayload['recent_bookings'] ?? [])->filter(fn ($item) => is_array($item));
+
+        $pendingOrders = $recentOrders
+            ->filter(fn (array $order) => in_array((string) ($order['status'] ?? 'pending'), ['pending', 'processing'], true))
+            ->values();
+        $unpaidOrders = $recentOrders
+            ->filter(fn (array $order) => (string) ($order['payment_status'] ?? 'unpaid') !== 'paid')
+            ->values();
+        $readyToShipOrders = $recentOrders
+            ->filter(fn (array $order) => (string) ($order['status'] ?? '') === 'processing' && (string) ($order['payment_status'] ?? '') === 'paid')
+            ->values();
+        $pendingBookings = $recentBookings
+            ->filter(fn (array $booking) => in_array((string) ($booking['status'] ?? 'pending'), ['pending', 'processing'], true))
+            ->values();
+        $unscheduledBookings = $recentBookings
+            ->filter(fn (array $booking) => trim((string) ($booking['booking_date'] ?? '')) === '' || trim((string) ($booking['booking_time'] ?? '')) === '')
+            ->values();
+        $needsStaffAssignment = $recentBookings
+            ->filter(fn (array $booking) => in_array((string) ($booking['status'] ?? 'pending'), ['pending', 'processing'], true) && trim((string) ($booking['staff_id'] ?? '')) === '')
+            ->values();
+
+        $queue = [];
+
+        foreach ($pendingOrders->take(2) as $order) {
+            $queue[] = [
+                'type' => 'order',
+                'title' => 'Order ' . (string) ($order['order_number'] ?? ''),
+                'description' => trim((string) ($order['customer_name'] ?? 'Customer')) . ' · ' . ucfirst((string) ($order['status'] ?? 'pending')),
+                'label' => ((string) ($order['payment_status'] ?? 'unpaid') === 'paid' && (string) ($order['status'] ?? '') === 'processing') ? 'Ready to ship' : 'Open Orders',
+                'href' => (string) ($order['payment_status'] ?? 'unpaid') === 'unpaid'
+                    ? route('founder.commerce.orders', ['status' => 'all', 'queue' => 'unpaid'])
+                    : (((string) ($order['payment_status'] ?? '') === 'paid' && (string) ($order['status'] ?? '') === 'processing')
+                        ? route('founder.commerce.orders', ['status' => 'all', 'queue' => 'ready_to_ship'])
+                        : route('founder.commerce.orders', ['status' => 'pending', 'queue' => 'pending'])),
+            ];
+        }
+
+        foreach ($pendingBookings->take(2) as $booking) {
+            $bookingHasSchedule = trim((string) ($booking['booking_date'] ?? '')) !== '' && trim((string) ($booking['booking_time'] ?? '')) !== '';
+            $bookingNeedsStaff = trim((string) ($booking['staff_id'] ?? '')) === '';
+            $queue[] = [
+                'type' => 'booking',
+                'title' => 'Booking ' . (string) ($booking['booking_number'] ?? ''),
+                'description' => trim((string) ($booking['customer_name'] ?? 'Customer')) . ' · ' . ucfirst((string) ($booking['status'] ?? 'pending')),
+                'label' => !$bookingHasSchedule ? 'Schedule booking' : ($bookingNeedsStaff ? 'Assign staff' : 'Open Bookings'),
+                'href' => !$bookingHasSchedule
+                    ? route('founder.commerce.bookings', ['status' => 'all', 'queue' => 'unscheduled'])
+                    : ($bookingNeedsStaff
+                        ? route('founder.commerce.bookings', ['status' => 'all', 'queue' => 'needs_staff'])
+                        : route('founder.commerce.bookings', ['status' => 'pending', 'queue' => 'pending'])),
+            ];
+        }
+
+        return [
+            'pending_orders' => $pendingOrders->count(),
+            'unpaid_orders' => $unpaidOrders->count(),
+            'ready_to_ship_orders' => $readyToShipOrders->count(),
+            'pending_bookings' => $pendingBookings->count(),
+            'unscheduled_bookings' => $unscheduledBookings->count(),
+            'needs_staff_assignment' => $needsStaffAssignment->count(),
+            'queue' => array_slice($queue, 0, 4),
+        ];
+    }
+
+    private function buildCommerceAlerts($snapshots): array
+    {
+        $alerts = [];
+        $bazaarPayload = $snapshots->get('bazaar')?->payload_json ?? [];
+        $servioPayload = $snapshots->get('servio')?->payload_json ?? [];
+
+        foreach ((array) ($bazaarPayload['recent_products'] ?? []) as $product) {
+            if (!is_array($product)) {
+                continue;
+            }
+
+            $qty = (int) ($product['qty'] ?? 0);
+            $lowQty = (int) ($product['low_qty'] ?? 0);
+            $stockManaged = (int) ($product['stock_management'] ?? 2) === 1;
+
+            if ($stockManaged && $qty <= 0) {
+                $alerts[] = [
+                    'type' => 'danger',
+                    'title' => 'Out of stock',
+                    'description' => trim((string) ($product['title'] ?? 'Product')) . ' is at zero stock in Bazaar.',
+                    'label' => 'Open Commerce',
+                    'href' => route('founder.commerce'),
+                ];
+                continue;
+            }
+
+            if ($stockManaged && $lowQty > 0 && $qty <= $lowQty) {
+                $alerts[] = [
+                    'type' => 'warning',
+                    'title' => 'Low stock alert',
+                    'description' => trim((string) ($product['title'] ?? 'Product')) . ' is at ' . $qty . ' units and has reached its low-stock threshold.',
+                    'label' => 'Open Commerce',
+                    'href' => route('founder.commerce'),
+                ];
+            }
+        }
+
+        foreach ((array) ($servioPayload['recent_services'] ?? []) as $service) {
+            if (!is_array($service)) {
+                continue;
+            }
+
+            $days = array_values(array_filter((array) ($service['availability_days'] ?? [])));
+            $status = (string) ($service['status'] ?? 'active');
+
+            if ($status !== 'active') {
+                $alerts[] = [
+                    'type' => 'warning',
+                    'title' => 'Service inactive',
+                    'description' => trim((string) ($service['title'] ?? 'Service')) . ' is currently inactive in Servio.',
+                    'label' => 'Open Commerce',
+                    'href' => route('founder.commerce'),
+                ];
+                continue;
+            }
+
+            if (count($days) === 0) {
+                $alerts[] = [
+                    'type' => 'danger',
+                    'title' => 'No availability set',
+                    'description' => trim((string) ($service['title'] ?? 'Service')) . ' does not currently have open availability days.',
+                    'label' => 'Open Commerce',
+                    'href' => route('founder.commerce'),
+                ];
+                continue;
+            }
+
+            if (count($days) <= 2) {
+                $alerts[] = [
+                    'type' => 'warning',
+                    'title' => 'Limited availability',
+                    'description' => trim((string) ($service['title'] ?? 'Service')) . ' is only open on ' . implode(', ', $days) . '.',
+                    'label' => 'Open Commerce',
+                    'href' => route('founder.commerce'),
+                ];
+            }
+        }
+
+        return array_slice($alerts, 0, 4);
+    }
+
 
     private function buildExecutionSummary($weeklyState, $snapshots): array
     {

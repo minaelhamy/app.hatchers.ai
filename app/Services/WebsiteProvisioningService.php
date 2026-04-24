@@ -50,6 +50,10 @@ class WebsiteProvisioningService
 
         usort($themes, fn ($a, $b) => (int) $a['id'] <=> (int) $b['id']);
 
+        if (empty($themes)) {
+            return $this->fallbackThemes($engine);
+        }
+
         return $themes;
     }
 
@@ -247,5 +251,16 @@ class WebsiteProvisioningService
         }
 
         return '';
+    }
+
+    private function fallbackThemes(string $engine): array
+    {
+        $prefix = $engine === 'servio' ? 'Service' : 'Store';
+
+        return [
+            ['id' => '1', 'label' => $prefix . ' Theme 1', 'preview_url' => ''],
+            ['id' => '2', 'label' => $prefix . ' Theme 2', 'preview_url' => ''],
+            ['id' => '3', 'label' => $prefix . ' Theme 3', 'preview_url' => ''],
+        ];
     }
 }
