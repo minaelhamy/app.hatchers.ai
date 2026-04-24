@@ -71,7 +71,7 @@
                 <a class="commerce-brand" href="/dashboard/founder"><img src="/brand/hatchers-ai-logo.png" alt="Hatchers AI"></a>
                 <nav class="commerce-nav">
                     <a class="commerce-nav-item" href="/dashboard/founder"><span class="commerce-nav-icon">⌂</span><span>Home</span></a>
-                    <a class="commerce-nav-item active" href="{{ route('founder.commerce') }}"><span class="commerce-nav-icon">⌁</span><span>Launch Plan</span></a>
+                    <a class="commerce-nav-item active" href="{{ route('founder.commerce') }}"><span class="commerce-nav-icon">⌁</span><span>Commerce</span></a>
                     <a class="commerce-nav-item" href="{{ route('founder.ai-tools') }}"><span class="commerce-nav-icon">✦</span><span>AI Tools</span></a>
                     <a class="commerce-nav-item" href="{{ route('founder.learning-plan') }}"><span class="commerce-nav-icon">▣</span><span>Learning Plan</span></a>
                     <a class="commerce-nav-item" href="{{ route('founder.tasks') }}"><span class="commerce-nav-icon">◌</span><span>Tasks</span></a>
@@ -89,7 +89,7 @@
 
         <main class="commerce-main">
             <div class="commerce-main-inner">
-                <h1>Launch Plan</h1>
+                <h1>Commerce</h1>
                 <p>Manage your products, services, storefront readiness, orders, and bookings from one OS workspace powered by Bazaar and Servio behind the scenes.</p>
 
                 @if (session('success'))
@@ -158,7 +158,7 @@
                                 <div class="commerce-chip">Readiness: {{ $engine['readiness_score'] }}%</div>
                                 <div class="commerce-actions">
                                     <a class="commerce-cta" href="{{ $engine['website_url'] }}" target="_blank" rel="noreferrer">Preview site</a>
-                                    <a class="commerce-secondary" href="{{ route('founder.legacy-tools') }}">Legacy access</a>
+                                    <a class="commerce-secondary" href="{{ route('website') }}">Website Workspace</a>
                                 </div>
                             </div>
                         @endforeach
@@ -246,7 +246,7 @@
                                     </div>
                                     <div class="commerce-actions">
                                         <button class="commerce-cta" type="submit">Save in OS</button>
-                                        <a class="commerce-secondary" href="{{ route('founder.legacy-tools') }}">Legacy access</a>
+                                        <a class="commerce-secondary" href="{{ route('website') }}">Website Workspace</a>
                                     </div>
                                 </form>
                             </div>
@@ -269,7 +269,7 @@
                             <div class="commerce-card-copy">Bazaar snapshots feed the OS with store health, order volume, and storefront readiness so the founder sees commerce state from one place.</div>
                             <div class="commerce-actions">
                                 <a class="commerce-cta" href="{{ route('founder.commerce.orders') }}">Open orders view</a>
-                                <a class="commerce-secondary" href="{{ route('founder.legacy-tools') }}">Legacy access</a>
+                                <a class="commerce-secondary" href="{{ route('founder.commerce.orders') }}">Orders</a>
                             </div>
                         </div>
                         <div class="commerce-card">
@@ -278,7 +278,7 @@
                             <div class="commerce-card-copy">Servio snapshots feed the OS with booking and service delivery signals while the OS becomes the founder-facing workspace.</div>
                             <div class="commerce-actions">
                                 <a class="commerce-cta" href="{{ route('founder.commerce.bookings') }}">Open bookings view</a>
-                                <a class="commerce-secondary" href="{{ route('founder.legacy-tools') }}">Legacy access</a>
+                                <a class="commerce-secondary" href="{{ route('founder.commerce.bookings') }}">Bookings</a>
                             </div>
                         </div>
                     </div>

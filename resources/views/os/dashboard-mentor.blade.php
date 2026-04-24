@@ -59,7 +59,7 @@
                                 <strong>{{ $launch['label'] }}</strong><br>
                                 {{ $launch['description'] }}
                                 <div style="margin-top: 10px;">
-                                    <a class="pill" href="{{ route('mentor.legacy-tools') }}">Legacy access</a>
+                                    <a class="pill" href="{{ route('mentor.founders.show', $founder['id']) }}">Open founder review</a>
                                 </div>
                             </div>
                         @endforeach

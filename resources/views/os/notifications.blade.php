@@ -341,7 +341,7 @@
                     </a>
                     <a class="notifications-nav-item" href="{{ route('founder.commerce') }}">
                         <span class="notifications-nav-icon">⌁</span>
-                        <span>Launch Plan</span>
+                        <span>Commerce</span>
                     </a>
                     <a class="notifications-nav-item" href="{{ route('founder.ai-tools') }}">
                         <span class="notifications-nav-icon">✦</span>

@@ -1,5 +1,8 @@
 @extends('os.layout')
 
+@section('hide_topbar', '1')
+@section('page_class', 'founder-home-page')
+
 @section('content')
     @php
         $companyName = $website['company_name'];
@@ -26,21 +29,16 @@
             <div class="pill">Website Workspace</div>
             <div class="nav-group" style="margin-top: 18px;">
                 <div class="nav-group-title">Workspace</div>
-                <a class="nav-item" href="/dashboard">Home</a>
-                <a class="nav-item" href="#">Weekly Plan</a>
-                <a class="nav-item" href="#">Atlas</a>
+                <a class="nav-item" href="/dashboard/founder">Home</a>
+                <a class="nav-item" href="{{ route('founder.tasks') }}">Tasks</a>
+                <a class="nav-item" href="{{ route('founder.ai-tools') }}">AI Tools</a>
             </div>
             <div class="nav-group">
                 <div class="nav-group-title">Business</div>
                 <a class="nav-item active" href="/website">Website</a>
-                <a class="nav-item" href="#">Products</a>
-                <a class="nav-item" href="#">Services</a>
-                <a class="nav-item" href="#">Orders &amp; Bookings</a>
-            </div>
-            <div class="nav-group">
-                <div class="nav-group-title">Growth</div>
-                <a class="nav-item" href="#">Marketing</a>
-                <a class="nav-item" href="#">Content Studio</a>
+                <a class="nav-item" href="{{ route('founder.commerce') }}">Commerce</a>
+                <a class="nav-item" href="{{ route('founder.commerce.orders') }}">Orders</a>
+                <a class="nav-item" href="{{ route('founder.commerce.bookings') }}">Bookings</a>
             </div>
         </aside>
 
@@ -337,9 +335,7 @@
                             </div>
                         </div>
                         <div class="cta-row">
-                            <a class="btn primary" href="{{ $engine['admin_url'] }}" target="_blank" rel="noreferrer">
-                                Open {{ $engine['label'] }}
-                            </a>
+                            <a class="btn primary" href="{{ route('founder.commerce') }}">Open Commerce</a>
                         </div>
                         @if (!empty($engine['updated_at']))
                             <p class="muted" style="margin-top: 14px;">Updated {{ $engine['updated_at'] }}</p>

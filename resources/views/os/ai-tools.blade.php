@@ -62,7 +62,7 @@
                 <a class="tools-brand" href="/dashboard/founder"><img src="/brand/hatchers-ai-logo.png" alt="Hatchers AI"></a>
                 <nav class="tools-nav">
                     <a class="tools-nav-item" href="/dashboard/founder"><span class="tools-nav-icon">⌂</span><span>Home</span></a>
-                    <a class="tools-nav-item" href="{{ route('founder.commerce') }}"><span class="tools-nav-icon">⌁</span><span>Launch Plan</span></a>
+                    <a class="tools-nav-item" href="{{ route('founder.commerce') }}"><span class="tools-nav-icon">⌁</span><span>Commerce</span></a>
                     <a class="tools-nav-item active" href="{{ route('founder.ai-tools') }}"><span class="tools-nav-icon">✦</span><span>AI Tools</span></a>
                     <a class="tools-nav-item" href="{{ route('founder.search') }}"><span class="tools-nav-icon">⌕</span><span>Search</span></a>
                     <a class="tools-nav-item" href="{{ route('founder.analytics') }}"><span class="tools-nav-icon">◔</span><span>Analytics</span></a>
@@ -168,7 +168,7 @@
                                     </div>
                                     <div class="tool-card-icon">{{ strtoupper(substr($launch['module'], 0, 1)) }}</div>
                                 </div>
-                                <a class="tool-card-cta" href="{{ route('founder.legacy-tools') }}">Legacy access</a>
+                                <a class="tool-card-cta" href="{{ route('founder.marketing') }}">Open in OS</a>
                             </div>
                         @endforeach
                     </div>

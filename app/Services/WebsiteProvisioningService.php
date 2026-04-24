@@ -14,18 +14,24 @@ class WebsiteProvisioningService
         $basePath = base_path('..');
 
         if ($engine === 'bazaar') {
-            $themeDirectories = File::directories($basePath . '/Bazaar/resources/views/front');
+            $themePath = $basePath . '/Bazaar/resources/views/front';
             $assetBase = rtrim((string) config('modules.bazaar.base_url'), '/')
                 . '/storage/app/public/admin-assets/images/theme/';
             $prefix = 'template-';
         } elseif ($engine === 'servio') {
-            $themeDirectories = File::directories($basePath . '/Servio/resources/views/front');
+            $themePath = $basePath . '/Servio/resources/views/front';
             $assetBase = rtrim((string) config('modules.servio.base_url'), '/')
                 . '/storage/app/public/admin-assets/images/theme/';
             $prefix = 'theme-';
         } else {
             return [];
         }
+
+        if (!File::isDirectory($themePath)) {
+            return [];
+        }
+
+        $themeDirectories = File::directories($themePath);
 
         $themes = [];
         foreach ($themeDirectories as $directory) {

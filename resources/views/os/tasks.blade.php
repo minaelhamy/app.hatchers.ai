@@ -70,7 +70,7 @@
                 <a class="tasks-brand" href="/dashboard/founder"><img src="/brand/hatchers-ai-logo.png" alt="Hatchers AI"></a>
                 <nav class="tasks-nav">
                     <a class="tasks-nav-item" href="/dashboard/founder"><span class="tasks-nav-icon">⌂</span><span>Home</span></a>
-                    <a class="tasks-nav-item" href="{{ route('founder.commerce') }}"><span class="tasks-nav-icon">⌁</span><span>Launch Plan</span></a>
+                    <a class="tasks-nav-item" href="{{ route('founder.commerce') }}"><span class="tasks-nav-icon">⌁</span><span>Commerce</span></a>
                     <a class="tasks-nav-item" href="{{ route('founder.ai-tools') }}"><span class="tasks-nav-icon">✦</span><span>AI Tools</span></a>
                     <a class="tasks-nav-item" href="{{ route('founder.learning-plan') }}"><span class="tasks-nav-icon">▣</span><span>Learning Plan</span></a>
                     <a class="tasks-nav-item active" href="{{ route('founder.tasks') }}"><span class="tasks-nav-icon">◌</span><span>Tasks</span></a>

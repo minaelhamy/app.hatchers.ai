@@ -67,14 +67,26 @@ class FounderDashboardService
     ): array {
         $today = now();
         $firstName = trim((string) preg_replace('/\s+.*/', '', (string) $founder->full_name));
-        $mentorName = $execution['mentor_name'] ?: 'your Hatchers mentor';
+        $mentorName = $execution['mentor_name'] ?: 'your weekly OS rhythm';
         $mentorLinked = trim((string) $execution['mentor_name']) !== '';
+        $hasMentorPlan = str_contains(strtolower((string) ($founder->subscription?->plan_code ?? '')), 'mentor')
+            || str_contains(strtolower((string) ($founder->subscription?->plan_name ?? '')), 'mentor');
         $mentorSession = [
-            'date_label' => strtoupper($today->format('l, M j')) . ' · 1:00PM',
-            'title' => '1 on 1 session (30 mins)',
-            'subtitle' => 'with ' . $mentorName,
-            'badge' => $execution['next_meeting_at'] ? 'Join Session' : 'Session in 1d',
-            'badge_tone' => $execution['next_meeting_at'] ? 'success' : 'neutral',
+            'section_label' => $mentorLinked || $hasMentorPlan ? 'Mentoring' : 'Execution Rhythm',
+            'date_label' => $mentorLinked
+                ? strtoupper($today->format('l, M j')) . ' · 1:00PM'
+                : strtoupper($today->format('l, M j')),
+            'title' => $mentorLinked || $hasMentorPlan ? '1 on 1 session (30 mins)' : 'Self-guided weekly check-in',
+            'subtitle' => $mentorLinked
+                ? 'with ' . $mentorName
+                : 'Use your tasks, learning plan, marketing, and website workspaces to move the week forward.',
+            'badge' => $mentorLinked
+                ? ($execution['next_meeting_at'] ? 'Join Session' : 'Session in 1d')
+                : 'Free plan',
+            'badge_tone' => $mentorLinked && $execution['next_meeting_at'] ? 'success' : 'neutral',
+            'drawer_description' => $mentorLinked
+                ? 'Join your mentor session from Hatchers Ai OS and keep your weekly execution aligned.'
+                : 'This founder workspace is currently self-guided. Use Hatchers Ai OS to drive progress through tasks, lessons, marketing, commerce, and website workflows.',
         ];
 
         $learningTitle = $actions->first()?->title ?: ($execution['weekly_focus'] ?: 'This week\'s founder sprint');
@@ -397,9 +409,9 @@ class FounderDashboardService
             $hoursSince = $updatedAt?->diffInHours(now());
 
             if ($updatedAt === null) {
-                $label = 'Offline';
-                $tone = 'danger';
-                $reason = 'No sync has reached Hatchers Ai OS yet.';
+                $label = 'Setting up';
+                $tone = 'warning';
+                $reason = 'This module has not synced founder data yet.';
             } elseif ($hoursSince !== null && $hoursSince <= 24) {
                 $label = 'Healthy';
                 $tone = 'success';
@@ -527,7 +539,7 @@ class FounderDashboardService
             $items[] = [
                 'title' => 'Publish your first offer',
                 'description' => 'Set up a starter product or service so your storefront has something real to sell or book.',
-                'label' => 'Open Launch Plan',
+                'label' => 'Open Commerce',
                 'href' => route('founder.commerce'),
             ];
         }

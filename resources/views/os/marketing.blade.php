@@ -90,7 +90,7 @@
                 <a class="marketing-brand" href="/dashboard/founder"><img src="/brand/hatchers-ai-logo.png" alt="Hatchers AI"></a>
                 <nav class="marketing-nav">
                     <a class="marketing-nav-item" href="/dashboard/founder"><span class="marketing-nav-icon">⌂</span><span>Home</span></a>
-                    <a class="marketing-nav-item" href="{{ route('founder.commerce') }}"><span class="marketing-nav-icon">⌁</span><span>Launch Plan</span></a>
+                    <a class="marketing-nav-item" href="{{ route('founder.commerce') }}"><span class="marketing-nav-icon">⌁</span><span>Commerce</span></a>
                     <a class="marketing-nav-item active" href="{{ route('founder.ai-tools') }}"><span class="marketing-nav-icon">✦</span><span>AI Tools</span></a>
                     <a class="marketing-nav-item" href="{{ route('founder.learning-plan') }}"><span class="marketing-nav-icon">▣</span><span>Learning Plan</span></a>
                     <a class="marketing-nav-item" href="{{ route('founder.tasks') }}"><span class="marketing-nav-icon">◌</span><span>Tasks</span></a>
@@ -177,7 +177,7 @@
                             <div class="marketing-card-meta">Campaigns</div>
                             <div class="marketing-card-title">Open campaign workspace</div>
                             <div class="marketing-card-copy">Review active campaigns, archived campaigns, linked posts, and the current growth goal that Atlas is using.</div>
-                            <a class="marketing-cta" href="{{ route('founder.legacy-tools') }}">Open legacy access</a>
+                            <a class="marketing-cta" href="{{ route('founder.ai-tools') }}">Back to AI Tools</a>
                         </div>
                     </div>
                 </section>
@@ -412,7 +412,7 @@
                             </div>
                             <div class="marketing-actions">
                                 <a class="marketing-cta" href="{{ route('founder.activity') }}">Open Activity Center</a>
-                                <a class="marketing-secondary" href="{{ route('founder.legacy-tools') }}">Legacy access</a>
+                                <a class="marketing-secondary" href="{{ route('founder.ai-tools') }}">Back to AI Tools</a>
                             </div>
                         </div>
                     </div>

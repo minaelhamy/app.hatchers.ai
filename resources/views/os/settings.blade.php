@@ -59,7 +59,7 @@
                 <a class="settings-brand" href="/dashboard/founder"><img src="/brand/hatchers-ai-logo.png" alt="Hatchers AI"></a>
                 <nav class="settings-nav">
                     <a class="settings-nav-item" href="/dashboard/founder"><span class="settings-nav-icon">⌂</span><span>Home</span></a>
-                    <a class="settings-nav-item" href="{{ route('founder.commerce') }}"><span class="settings-nav-icon">⌁</span><span>Launch Plan</span></a>
+                    <a class="settings-nav-item" href="{{ route('founder.commerce') }}"><span class="settings-nav-icon">⌁</span><span>Commerce</span></a>
                     <a class="settings-nav-item" href="{{ route('founder.ai-tools') }}"><span class="settings-nav-icon">✦</span><span>AI Tools</span></a>
                     <a class="settings-nav-item" href="{{ route('founder.learning-plan') }}"><span class="settings-nav-icon">▣</span><span>Learning Plan</span></a>
                     <a class="settings-nav-item active" href="{{ route('founder.settings') }}"><span class="settings-nav-icon">⚙</span><span>Settings</span></a>

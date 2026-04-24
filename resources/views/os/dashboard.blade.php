@@ -524,7 +524,7 @@
                     </a>
                     <a class="founder-nav-item" href="{{ route('founder.commerce') }}">
                         <span class="founder-nav-icon">⌁</span>
-                        <span>Launch Plan</span>
+                        <span>Commerce</span>
                     </a>
                     <a class="founder-nav-item" href="{{ route('founder.ai-tools') }}">
                         <span class="founder-nav-icon">✦</span>
@@ -565,13 +565,13 @@
                 </section>
 
                 <section class="founder-section">
-                    <h2>Mentoring</h2>
+                    <h2>{{ $mentor['section_label'] }}</h2>
                     <article class="founder-block founder-mentor-card"
                         data-open-drawer="task"
                         data-drawer-title="{{ e($mentor['title']) }}"
                         data-drawer-due="{{ e($mentor['date_label']) }}"
                         data-drawer-owner="{{ e($mentor['subtitle']) }}"
-                        data-drawer-description="Join your mentor session from Hatchers Ai OS and keep your weekly execution aligned."
+                        data-drawer-description="{{ e($mentor['drawer_description']) }}"
                         data-drawer-badge="{{ e($mentor['badge']) }}"
                         data-drawer-comments='@json($notifications)'>
                         <div class="founder-row">

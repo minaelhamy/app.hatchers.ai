@@ -443,8 +443,6 @@
             $dashboardLabel = 'Admin';
         } elseif ($authUser?->role === 'mentor') {
             $dashboardLabel = 'Mentor';
-        } elseif ($authUser?->role === 'founder') {
-            $dashboardLabel = 'Founder';
         }
     @endphp
     <div class="shell">
@@ -458,13 +456,8 @@
                     </span>
                 </a>
                 <nav class="top-links">
-                    <a class="top-link" href="/plans">Plans</a>
                     @auth
                         <a class="top-link" href="/dashboard">{{ $dashboardLabel }}</a>
-                        @if ($authUser->role === 'founder')
-                            <a class="top-link" href="/website">Website</a>
-                        @endif
-                        <span class="top-link" style="pointer-events: none;">{{ ucfirst($authUser->role) }}</span>
                     @endauth
                     @auth
                         <form method="POST" action="/logout" style="margin: 0;">
@@ -472,6 +465,7 @@
                             <button class="top-link" type="submit" style="cursor: pointer;">Logout</button>
                         </form>
                     @else
+                        <a class="top-link" href="/plans">Plans</a>
                         <a class="top-link" href="/login">Login</a>
                     @endauth
                 </nav>

@@ -20,7 +20,6 @@
             </div>
             <div class="nav-group">
                 <div class="nav-group-title">Quick Links</div>
-                <a class="nav-item" href="{{ route('mentor.legacy-tools') }}">Legacy Access</a>
                 <a class="nav-item" href="{{ route('dashboard.mentor') }}">Mentor Overview</a>
             </div>
         </aside>

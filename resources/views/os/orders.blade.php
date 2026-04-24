@@ -44,7 +44,7 @@
                 <a class="ops-brand" href="/dashboard/founder"><img src="/brand/hatchers-ai-logo.png" alt="Hatchers AI"></a>
                 <nav class="ops-nav">
                     <a class="ops-nav-item" href="/dashboard/founder"><span class="ops-nav-icon">⌂</span><span>Home</span></a>
-                    <a class="ops-nav-item active" href="{{ route('founder.commerce') }}"><span class="ops-nav-icon">⌁</span><span>Launch Plan</span></a>
+                    <a class="ops-nav-item active" href="{{ route('founder.commerce') }}"><span class="ops-nav-icon">⌁</span><span>Commerce</span></a>
                     <a class="ops-nav-item" href="{{ route('founder.ai-tools') }}"><span class="ops-nav-icon">✦</span><span>AI Tools</span></a>
                     <a class="ops-nav-item" href="{{ route('founder.learning-plan') }}"><span class="ops-nav-icon">▣</span><span>Learning Plan</span></a>
                     <a class="ops-nav-item" href="{{ route('founder.tasks') }}"><span class="ops-nav-icon">◌</span><span>Tasks</span></a>
@@ -80,8 +80,7 @@
                             <div class="muted">Readiness {{ $ops['readiness_score'] }}% · Last synced {{ $ops['updated_at'] ?: 'Not synced yet' }}</div>
                             <div class="muted">This page is the OS-native operations view for Bazaar order data.</div>
                             <div style="margin-top:8px;">
-                                <a class="pill" href="{{ route('founder.commerce') }}">Back to Launch Plan</a>
-                                <a class="pill" href="{{ route('founder.legacy-tools') }}">Legacy access</a>
+                                <a class="pill" href="{{ route('founder.commerce') }}">Back to Commerce</a>
                             </div>
                         </div>
                     </div>
