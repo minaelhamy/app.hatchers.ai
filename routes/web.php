@@ -75,6 +75,11 @@ Route::middleware('auth')->group(function () {
     Route::get('/admin/control', [OsShellController::class, 'adminControl'])->name('admin.control');
     Route::get('/admin/system-access', [OsShellController::class, 'adminSystemAccess'])->name('admin.system-access');
     Route::get('/admin/identity', [OsShellController::class, 'adminIdentity'])->name('admin.identity');
+    Route::get('/admin/commerce', [OsShellController::class, 'adminCommerce'])->name('admin.commerce');
+    Route::post('/admin/commerce/catalog', [OsShellController::class, 'adminStoreCommerceCatalog'])->name('admin.commerce.catalog.store');
+    Route::post('/admin/commerce/catalog/update', [OsShellController::class, 'adminUpdateCommerceCatalog'])->name('admin.commerce.catalog.update');
+    Route::post('/admin/commerce/offer/update', [OsShellController::class, 'adminUpdateCommerceOffer'])->name('admin.commerce.offer.update');
+    Route::post('/admin/commerce/operation/update', [OsShellController::class, 'adminUpdateCommerceOperation'])->name('admin.commerce.operation.update');
     Route::get('/admin/support', [OsShellController::class, 'adminSupport'])->name('admin.support');
     Route::post('/admin/support/test-mail', [OsShellController::class, 'adminSendSupportTestMail'])->name('admin.support.test-mail');
     Route::post('/admin/identity/backfill', [OsShellController::class, 'adminBackfillIdentity'])->name('admin.identity.backfill');
@@ -97,3 +102,13 @@ Route::middleware('auth')->group(function () {
     Route::post('/assistant/chat', [OsShellController::class, 'assistantChat'])->name('assistant.chat');
     Route::post('/logout', [OsShellController::class, 'logout'])->name('logout');
 });
+
+Route::post('/{websitePath}/request-order', [OsShellController::class, 'publicWebsiteOrderRequest'])
+    ->where('websitePath', '[A-Za-z0-9\-/]+')
+    ->name('public.website.order');
+Route::post('/{websitePath}/request-booking', [OsShellController::class, 'publicWebsiteBookingRequest'])
+    ->where('websitePath', '[A-Za-z0-9\-/]+')
+    ->name('public.website.booking');
+Route::get('/{websitePath}', [OsShellController::class, 'publicWebsite'])
+    ->where('websitePath', '[A-Za-z0-9\-/]+')
+    ->name('public.website');

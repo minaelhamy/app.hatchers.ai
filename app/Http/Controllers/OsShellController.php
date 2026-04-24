@@ -21,6 +21,7 @@ use App\Services\LmsIdentityBridgeService;
 use App\Services\MentorDashboardService;
 use App\Services\OsAssistantActionService;
 use App\Services\OsOperationsLogService;
+use App\Services\PublicWebsiteService;
 use App\Services\WebsiteProvisioningService;
 use App\Services\WebsiteWorkspaceService;
 use App\Services\WorkspaceLaunchService;
@@ -426,6 +427,18 @@ class OsShellController extends Controller
         ]);
     }
 
+    public function adminCommerce(Request $request, AdminDashboardService $adminDashboardService)
+    {
+        /** @var \App\Models\Founder $user */
+        $user = Auth::user();
+        $this->ensureAdminPermission($user, 'commerce_control');
+
+        return view('os.admin-commerce', [
+            'pageTitle' => 'Commerce Control',
+            'workspace' => $adminDashboardService->buildCommerceWorkspace($user, $request->query()),
+        ]);
+    }
+
     public function adminSupport(AdminDashboardService $adminDashboardService)
     {
         /** @var \App\Models\Founder $user */
@@ -439,6 +452,255 @@ class OsShellController extends Controller
             'pageTitle' => 'Support Center',
             'workspace' => $workspace,
         ]);
+    }
+
+    public function adminStoreCommerceCatalog(
+        Request $request,
+        OsAssistantActionService $assistantActionService,
+        OsOperationsLogService $logService
+    ): RedirectResponse {
+        /** @var \App\Models\Founder $user */
+        $user = Auth::user();
+        $this->ensureAdminPermission($user, 'commerce_control');
+
+        $validated = $request->validate([
+            'founder_id' => ['required', 'integer', 'exists:founders,id'],
+            'platform' => ['required', Rule::in(['bazaar', 'servio'])],
+            'resource' => ['required', Rule::in(['category', 'tax', 'staff'])],
+            'title' => ['required', 'string', 'max:255'],
+            'value' => ['nullable', 'numeric', 'min:0'],
+            'tax_type' => ['nullable', Rule::in(['percent', 'fixed'])],
+            'email' => ['nullable', 'email', 'max:255'],
+            'mobile' => ['nullable', 'string', 'max:50'],
+        ]);
+
+        $founder = Founder::query()->where('role', 'founder')->findOrFail((int) $validated['founder_id']);
+        $platform = (string) $validated['platform'];
+        $resource = (string) $validated['resource'];
+
+        $attributes = [
+            'title' => (string) $validated['title'],
+        ];
+
+        if ($resource === 'tax') {
+            $attributes['value'] = (string) ($validated['value'] ?? '');
+            $attributes['type'] = (string) ($validated['tax_type'] ?? 'percent');
+        }
+
+        if ($resource === 'staff') {
+            $attributes['email'] = (string) ($validated['email'] ?? '');
+            $attributes['mobile'] = (string) ($validated['mobile'] ?? '');
+        }
+
+        $result = $assistantActionService->createCommerceCatalogEntryFromOs(
+            $founder,
+            $platform,
+            $resource,
+            $attributes,
+            'admin'
+        );
+
+        if (!($result['success'] ?? false)) {
+            return redirect()
+                ->route('admin.commerce', $request->only(['search', 'business_model', 'engine']))
+                ->with('error', $result['reply'] ?? 'The OS could not create that commerce catalog item.');
+        }
+
+        $logService->recordAudit(
+            $user,
+            'admin_commerce_catalog_create',
+            $platform,
+            $founder->id,
+            'Admin created a ' . $resource . ' for ' . $founder->full_name . ' in ' . strtoupper($platform) . '.',
+            [
+                'platform' => $platform,
+                'resource' => $resource,
+                'title' => $attributes['title'],
+            ]
+        );
+
+        return redirect()
+            ->route('admin.commerce', $request->only(['search', 'business_model', 'engine']))
+            ->with('success', $result['reply'] ?? 'Commerce catalog item created.');
+    }
+
+    public function adminUpdateCommerceCatalog(
+        Request $request,
+        OsAssistantActionService $assistantActionService,
+        OsOperationsLogService $logService
+    ): RedirectResponse {
+        /** @var \App\Models\Founder $user */
+        $user = Auth::user();
+        $this->ensureAdminPermission($user, 'commerce_control');
+
+        $validated = $request->validate([
+            'founder_id' => ['required', 'integer', 'exists:founders,id'],
+            'platform' => ['required', Rule::in(['bazaar', 'servio'])],
+            'resource' => ['required', Rule::in(['category', 'tax', 'staff'])],
+            'target_name' => ['required', 'string', 'max:255'],
+            'field' => ['required', Rule::in(['title', 'name', 'status', 'value', 'type', 'email', 'mobile'])],
+            'value' => ['required', 'string', 'max:255'],
+        ]);
+
+        $founder = Founder::query()->where('role', 'founder')->findOrFail((int) $validated['founder_id']);
+        $platform = (string) $validated['platform'];
+        $resource = (string) $validated['resource'];
+        $targetName = (string) $validated['target_name'];
+        $field = (string) $validated['field'];
+        $value = (string) $validated['value'];
+
+        $result = $assistantActionService->updateCommerceCatalogEntryFromOs(
+            $founder,
+            $platform,
+            $resource,
+            $targetName,
+            $field,
+            $value,
+            'admin'
+        );
+
+        if (!($result['success'] ?? false)) {
+            return redirect()
+                ->route('admin.commerce', $request->only(['search', 'business_model', 'engine']))
+                ->with('error', $result['reply'] ?? 'The OS could not update that commerce catalog item.');
+        }
+
+        $logService->recordAudit(
+            $user,
+            'admin_commerce_catalog_update',
+            $platform,
+            $founder->id,
+            'Admin updated a ' . $resource . ' for ' . $founder->full_name . ' in ' . strtoupper($platform) . '.',
+            [
+                'platform' => $platform,
+                'resource' => $resource,
+                'target_name' => $targetName,
+                'field' => $field,
+                'value' => $value,
+            ]
+        );
+
+        return redirect()
+            ->route('admin.commerce', $request->only(['search', 'business_model', 'engine']))
+            ->with('success', $result['reply'] ?? 'Commerce catalog item updated.');
+    }
+
+    public function adminUpdateCommerceOffer(
+        Request $request,
+        OsAssistantActionService $assistantActionService,
+        OsOperationsLogService $logService
+    ): RedirectResponse {
+        /** @var \App\Models\Founder $user */
+        $user = Auth::user();
+        $this->ensureAdminPermission($user, 'commerce_control');
+
+        $validated = $request->validate([
+            'founder_id' => ['required', 'integer', 'exists:founders,id'],
+            'platform' => ['required', Rule::in(['bazaar', 'servio'])],
+            'target_name' => ['required', 'string', 'max:255'],
+            'field' => ['required', Rule::in(['variants', 'extras', 'additional_services', 'staff_ids', 'availability_days', 'open_time', 'close_time', 'status'])],
+            'value' => ['required', 'string', 'max:4000'],
+        ]);
+
+        $founder = Founder::query()->where('role', 'founder')->findOrFail((int) $validated['founder_id']);
+        $platform = (string) $validated['platform'];
+        $targetName = (string) $validated['target_name'];
+        $field = (string) $validated['field'];
+        $value = (string) $validated['value'];
+
+        $result = $platform === 'bazaar'
+            ? $assistantActionService->updateProductFieldFromOs($founder, $targetName, $field, $value, 'admin')
+            : $assistantActionService->updateServiceFieldFromOs($founder, $targetName, $field, $value, 'admin');
+
+        if (!($result['success'] ?? false)) {
+            return redirect()
+                ->route('admin.commerce', $request->only(['search', 'business_model', 'engine']))
+                ->with('error', $result['reply'] ?? 'The OS could not update that commerce offer.');
+        }
+
+        $logService->recordAudit(
+            $user,
+            'admin_commerce_offer_update',
+            $platform,
+            $founder->id,
+            'Admin updated a ' . strtoupper($platform) . ' offer field for ' . $founder->full_name . '.',
+            [
+                'platform' => $platform,
+                'target_name' => $targetName,
+                'field' => $field,
+                'value' => $value,
+            ]
+        );
+
+        return redirect()
+            ->route('admin.commerce', $request->only(['search', 'business_model', 'engine']))
+            ->with('success', $result['reply'] ?? 'Commerce offer updated.');
+    }
+
+    public function adminUpdateCommerceOperation(
+        Request $request,
+        OsAssistantActionService $assistantActionService,
+        OsOperationsLogService $logService
+    ): RedirectResponse {
+        /** @var \App\Models\Founder $user */
+        $user = Auth::user();
+        $this->ensureAdminPermission($user, 'commerce_control');
+
+        $validated = $request->validate([
+            'founder_id' => ['required', 'integer', 'exists:founders,id'],
+            'platform' => ['required', Rule::in(['bazaar', 'servio'])],
+            'category' => ['required', Rule::in(['order', 'booking', 'shipping'])],
+            'target_name' => ['required', 'string', 'max:255'],
+            'field' => ['required', Rule::in(['status', 'payment_status', 'vendor_note', 'delivery_date', 'delivery_time', 'staff_id', 'booking_date', 'booking_time', 'booking_endtime', 'booking_notes', 'customer_message', 'area_name', 'delivery_charge'])],
+            'value' => ['required', 'string', 'max:4000'],
+            'message_channel' => ['nullable', Rule::in(['manual', 'email', 'whatsapp', 'sms'])],
+        ]);
+
+        $founder = Founder::query()->where('role', 'founder')->findOrFail((int) $validated['founder_id']);
+        $platform = (string) $validated['platform'];
+        $category = (string) $validated['category'];
+        $targetName = (string) $validated['target_name'];
+        $field = (string) $validated['field'];
+        $value = (string) $validated['value'];
+
+        $result = $assistantActionService->updateCommerceOperationFromOs(
+            $founder,
+            $platform,
+            $category,
+            $targetName,
+            $field,
+            $value,
+            [
+                'message_channel' => (string) ($validated['message_channel'] ?? 'manual'),
+            ],
+            'admin'
+        );
+
+        if (!($result['success'] ?? false)) {
+            return redirect()
+                ->route('admin.commerce', $request->only(['search', 'business_model', 'engine']))
+                ->with('error', $result['reply'] ?? 'The OS could not update that commerce operation.');
+        }
+
+        $logService->recordAudit(
+            $user,
+            'admin_commerce_operation_update',
+            $platform,
+            $founder->id,
+            'Admin updated a ' . $category . ' for ' . $founder->full_name . ' in ' . strtoupper($platform) . '.',
+            [
+                'platform' => $platform,
+                'category' => $category,
+                'target_name' => $targetName,
+                'field' => $field,
+                'value' => $value,
+                'message_channel' => (string) ($validated['message_channel'] ?? 'manual'),
+            ]
+        );
+
+        return redirect()
+            ->route('admin.commerce', $request->only(['search', 'business_model', 'engine']))
+            ->with('success', $result['reply'] ?? 'Commerce operation updated.');
     }
 
     public function adminSendSupportTestMail(Request $request): RedirectResponse
@@ -859,6 +1121,7 @@ class OsShellController extends Controller
             'launchCards' => $workspaceLaunchService->launchCards($user),
             'catalogOffers' => $this->commerceOffers($user),
             'commerceConfigs' => $this->commerceConfigs($user),
+            'commerceCatalogs' => $this->commerceCatalogs($user),
         ]);
     }
 
@@ -947,6 +1210,8 @@ class OsShellController extends Controller
             'description' => ['nullable', 'string', 'max:4000'],
             'price' => ['nullable', 'numeric', 'min:0'],
             'availability' => ['nullable', Rule::in(['active', 'inactive'])],
+            'category_name' => ['nullable', 'string', 'max:255'],
+            'tax_rules_text' => ['nullable', 'string', 'max:4000'],
             'sku' => ['nullable', 'string', 'max:255'],
             'stock' => ['nullable', 'integer', 'min:0'],
             'low_stock' => ['nullable', 'integer', 'min:0'],
@@ -957,15 +1222,24 @@ class OsShellController extends Controller
             'capacity' => ['nullable', 'integer', 'min:1', 'max:500'],
             'staff_mode' => ['nullable', Rule::in(['auto', 'specific'])],
             'staff_id' => ['nullable', 'string', 'max:255'],
+            'staff_ids_text' => ['nullable', 'string', 'max:4000'],
             'availability_days' => ['nullable', 'array'],
             'availability_days.*' => ['string', Rule::in(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'])],
             'open_time' => ['nullable', 'date_format:H:i'],
             'close_time' => ['nullable', 'date_format:H:i'],
+            'additional_services_text' => ['nullable', 'string', 'max:4000'],
+            'variants_text' => ['nullable', 'string', 'max:4000'],
+            'extras_text' => ['nullable', 'string', 'max:4000'],
         ]);
 
         $offer = $this->parseCommerceOffer($actionPlan);
         $originalTitle = $actionPlan->title;
         $warnings = [];
+        $taxRules = $offer['tax_rules'] ?? [];
+        $additionalServices = $offer['additional_services'] ?? [];
+        $variants = $offer['variants'] ?? [];
+        $extras = $offer['extras'] ?? [];
+        $staffIds = $offer['staff_ids'] ?? [];
 
         if ((string) $validated['title'] !== $originalTitle) {
             $result = $actionPlan->platform === 'bazaar'
@@ -995,6 +1269,28 @@ class OsShellController extends Controller
 
             if (!($result['success'] ?? false)) {
                 $warnings[] = $result['reply'] ?? 'Price sync is pending.';
+            }
+        }
+
+        $newCategoryName = trim((string) ($validated['category_name'] ?? ($offer['category_name'] ?? '')));
+        if ($newCategoryName !== '' && $newCategoryName !== (string) ($offer['category_name'] ?? '')) {
+            $result = $actionPlan->platform === 'bazaar'
+                ? $actionService->updateProductFieldFromOs($user, (string) $validated['title'], 'category_name', $newCategoryName)
+                : $actionService->updateServiceFieldFromOs($user, (string) $validated['title'], 'category_name', $newCategoryName);
+
+            if (!($result['success'] ?? false)) {
+                $warnings[] = $result['reply'] ?? 'Category sync is pending.';
+            }
+        }
+
+        $taxRules = $this->parseTaxRulesText((string) ($validated['tax_rules_text'] ?? $this->formatTaxRulesText($offer['tax_rules'] ?? [])));
+        if (json_encode($taxRules) !== json_encode($offer['tax_rules'] ?? [])) {
+            $result = $actionPlan->platform === 'bazaar'
+                ? $actionService->updateProductFieldFromOs($user, (string) $validated['title'], 'tax_rules', json_encode($taxRules, JSON_UNESCAPED_UNICODE))
+                : $actionService->updateServiceFieldFromOs($user, (string) $validated['title'], 'tax_rules', json_encode($taxRules, JSON_UNESCAPED_UNICODE));
+
+            if (!($result['success'] ?? false)) {
+                $warnings[] = $result['reply'] ?? 'Tax sync is pending.';
             }
         }
 
@@ -1034,6 +1330,22 @@ class OsShellController extends Controller
                 $result = $actionService->updateProductFieldFromOs($user, (string) $validated['title'], 'low_stock', $newLowStock);
                 if (!($result['success'] ?? false)) {
                     $warnings[] = $result['reply'] ?? 'Low-stock sync is pending.';
+                }
+            }
+
+            $variants = $this->parseVariantsText((string) ($validated['variants_text'] ?? $this->formatVariantsText($offer['variants'] ?? [])));
+            if (json_encode($variants) !== json_encode($offer['variants'] ?? [])) {
+                $result = $actionService->updateProductFieldFromOs($user, (string) $validated['title'], 'variants', json_encode($variants, JSON_UNESCAPED_UNICODE));
+                if (!($result['success'] ?? false)) {
+                    $warnings[] = $result['reply'] ?? 'Variant sync is pending.';
+                }
+            }
+
+            $extras = $this->parseExtrasText((string) ($validated['extras_text'] ?? $this->formatExtrasText($offer['extras'] ?? [])));
+            if (json_encode($extras) !== json_encode($offer['extras'] ?? [])) {
+                $result = $actionService->updateProductFieldFromOs($user, (string) $validated['title'], 'extras', json_encode($extras, JSON_UNESCAPED_UNICODE));
+                if (!($result['success'] ?? false)) {
+                    $warnings[] = $result['reply'] ?? 'Extras sync is pending.';
                 }
             }
         } else {
@@ -1077,6 +1389,14 @@ class OsShellController extends Controller
                 }
             }
 
+            $staffIds = $this->parseStaffIdsText((string) ($validated['staff_ids_text'] ?? $this->formatStaffIdsText($offer['staff_ids'] ?? [])));
+            if (implode('|', $staffIds) !== implode('|', $offer['staff_ids'] ?? [])) {
+                $result = $actionService->updateServiceFieldFromOs($user, (string) $validated['title'], 'staff_ids', implode('|', $staffIds));
+                if (!($result['success'] ?? false)) {
+                    $warnings[] = $result['reply'] ?? 'Staff roster sync is pending.';
+                }
+            }
+
             $newAvailabilityDays = $this->normalizeAvailabilityDays($validated['availability_days'] ?? ($offer['availability_days'] ?? []));
             if (implode('|', $newAvailabilityDays) !== implode('|', $this->normalizeAvailabilityDays($offer['availability_days'] ?? []))) {
                 $result = $actionService->updateServiceFieldFromOs($user, (string) $validated['title'], 'availability_days', implode('|', $newAvailabilityDays));
@@ -1100,6 +1420,14 @@ class OsShellController extends Controller
                     $warnings[] = $result['reply'] ?? 'Closing time sync is pending.';
                 }
             }
+
+            $additionalServices = $this->parseAdditionalServicesText((string) ($validated['additional_services_text'] ?? $this->formatAdditionalServicesText($offer['additional_services'] ?? [])));
+            if (json_encode($additionalServices) !== json_encode($offer['additional_services'] ?? [])) {
+                $result = $actionService->updateServiceFieldFromOs($user, (string) $validated['title'], 'additional_services', json_encode($additionalServices, JSON_UNESCAPED_UNICODE));
+                if (!($result['success'] ?? false)) {
+                    $warnings[] = $result['reply'] ?? 'Additional services sync is pending.';
+                }
+            }
         }
 
         $availability = (string) ($validated['availability'] ?? ($offer['status'] ?? 'active'));
@@ -1120,6 +1448,8 @@ class OsShellController extends Controller
                 'description' => (string) ($validated['description'] ?? ''),
                 'price' => $newPrice,
                 'engine' => $offer['engine'],
+                'category_name' => (string) ($validated['category_name'] ?? ($offer['category_name'] ?? '')),
+                'tax_rules' => $taxRules,
                 'sku' => (string) ($validated['sku'] ?? ($offer['sku'] ?? '')),
                 'stock' => (string) ($validated['stock'] ?? ($offer['stock'] ?? '')),
                 'low_stock' => (string) ($validated['low_stock'] ?? ($offer['low_stock'] ?? '')),
@@ -1128,9 +1458,13 @@ class OsShellController extends Controller
                 'capacity' => (string) ($validated['capacity'] ?? ($offer['capacity'] ?? '')),
                 'staff_mode' => (string) ($validated['staff_mode'] ?? ($offer['staff_mode'] ?? '')),
                 'staff_id' => (string) ($validated['staff_id'] ?? ($offer['staff_id'] ?? '')),
+                'staff_ids' => $staffIds,
                 'availability_days' => $validated['availability_days'] ?? ($offer['availability_days'] ?? []),
                 'open_time' => (string) ($validated['open_time'] ?? ($offer['open_time'] ?? '')),
                 'close_time' => (string) ($validated['close_time'] ?? ($offer['close_time'] ?? '')),
+                'additional_services' => $additionalServices ?? ($offer['additional_services'] ?? []),
+                'variants' => $variants,
+                'extras' => $extras,
             ]),
             'status' => $availability === 'inactive' ? 'paused' : 'created',
         ])->save();
@@ -1892,7 +2226,7 @@ class OsShellController extends Controller
             'timezone' => ['required', 'string', 'max:120'],
             'status' => ['required', Rule::in(['active', 'paused', 'blocked'])],
             'permissions' => ['nullable', 'array'],
-            'permissions.*' => ['string', Rule::in(['subscriber_reporting', 'founder_operations', 'mentor_management', 'module_monitoring', 'exception_resolution', 'system_access'])],
+            'permissions.*' => ['string', Rule::in(['subscriber_reporting', 'founder_operations', 'mentor_management', 'commerce_control', 'module_monitoring', 'exception_resolution', 'system_access'])],
         ]);
 
         $adminOperationsService->updateAdminProfile($adminId, $validated);
@@ -2032,6 +2366,7 @@ class OsShellController extends Controller
         } elseif ($validated['website_mode'] === 'service') {
             $validated['website_engine'] = 'servio';
         }
+        $validated['website_engine'] = $this->resolveWebsiteEngineForBusinessModel($validated['website_engine'], $validated['website_mode']);
 
         $result = $websiteProvisioningService->applyWebsiteSetup($founder, $validated);
         if (!$result['ok']) {
@@ -2061,6 +2396,10 @@ class OsShellController extends Controller
         $validated = $request->validate([
             'website_engine' => ['required', Rule::in(['bazaar', 'servio'])],
         ]);
+        $validated['website_engine'] = $this->resolveWebsiteEngineForBusinessModel(
+            $validated['website_engine'],
+            (string) ($company?->business_model ?? '')
+        );
 
         $result = $websiteProvisioningService->publishWebsite($founder, $validated['website_engine']);
         if (!$result['ok']) {
@@ -2075,6 +2414,161 @@ class OsShellController extends Controller
         }
 
         return redirect()->route('website')->with('success', 'Website published from Hatchers OS.');
+    }
+
+    public function publicWebsite(string $websitePath, PublicWebsiteService $publicWebsiteService)
+    {
+        $company = $this->resolvePublicWebsiteCompany($websitePath);
+        if (!$company) {
+            abort(404);
+        }
+
+        return view('os.public-website', [
+            'pageTitle' => (string) ($company->company_name ?: 'Business Website'),
+            'site' => $publicWebsiteService->build($company),
+        ]);
+    }
+
+    public function publicWebsiteOrderRequest(
+        string $websitePath,
+        Request $request,
+        OsAssistantActionService $assistantActionService,
+        PublicWebsiteService $publicWebsiteService
+    ): RedirectResponse {
+        $company = $this->resolvePublicWebsiteCompany($websitePath);
+        if (!$company) {
+            abort(404);
+        }
+
+        $site = $publicWebsiteService->build($company);
+        if (($site['business_model'] ?? 'hybrid') === 'service') {
+            return redirect()->route('public.website', ['websitePath' => $websitePath])->with('error', 'This website currently accepts booking requests, not product orders.');
+        }
+
+        $validated = $request->validate([
+            'offer_title' => ['required', 'string', 'max:255'],
+            'customer_name' => ['required', 'string', 'max:255'],
+            'customer_email' => ['required', 'email', 'max:255'],
+            'customer_mobile' => ['required', 'string', 'max:255'],
+            'quantity' => ['nullable', 'integer', 'min:1', 'max:99'],
+            'selected_variant' => ['nullable', 'string', 'max:255'],
+            'selected_extras' => ['nullable', 'array'],
+            'selected_extras.*' => ['string', 'max:255'],
+            'address' => ['required', 'string', 'max:255'],
+            'building' => ['required', 'string', 'max:255'],
+            'landmark' => ['required', 'string', 'max:255'],
+            'postal_code' => ['required', 'string', 'max:255'],
+            'delivery_area' => ['required', 'string', 'max:255'],
+            'notes' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $founder = $company->founder;
+        if (!$founder) {
+            return redirect()->route('public.website', ['websitePath' => $websitePath])->with('error', 'This public site is missing a founder account connection.');
+        }
+
+        $result = $assistantActionService->createPublicCommerceRequest(
+            $founder,
+            'bazaar',
+            'order',
+            (string) $validated['offer_title'],
+            [
+                'target_name' => (string) $validated['offer_title'],
+                'customer_name' => (string) $validated['customer_name'],
+                'customer_email' => (string) $validated['customer_email'],
+                'customer_mobile' => (string) $validated['customer_mobile'],
+                'quantity' => (string) ((int) ($validated['quantity'] ?? 1)),
+                'selected_variant' => (string) ($validated['selected_variant'] ?? ''),
+                'selected_extras' => $validated['selected_extras'] ?? [],
+                'address' => (string) $validated['address'],
+                'building' => (string) $validated['building'],
+                'landmark' => (string) $validated['landmark'],
+                'postal_code' => (string) $validated['postal_code'],
+                'delivery_area' => (string) $validated['delivery_area'],
+                'description' => (string) ($validated['notes'] ?? ''),
+                'notes' => (string) ($validated['notes'] ?? ''),
+            ]
+        );
+
+        $redirect = redirect()->route('public.website', ['websitePath' => $websitePath]);
+        if (!($result['success'] ?? false)) {
+            return $redirect->with('error', $result['reply'] ?? 'The order request could not be created right now.');
+        }
+
+        return $redirect->with('success', 'Order request sent. The founder can now manage it from Hatchers Ai Business OS.');
+    }
+
+    public function publicWebsiteBookingRequest(
+        string $websitePath,
+        Request $request,
+        OsAssistantActionService $assistantActionService,
+        PublicWebsiteService $publicWebsiteService
+    ): RedirectResponse {
+        $company = $this->resolvePublicWebsiteCompany($websitePath);
+        if (!$company) {
+            abort(404);
+        }
+
+        $site = $publicWebsiteService->build($company);
+        if (($site['business_model'] ?? 'hybrid') === 'product') {
+            return redirect()->route('public.website', ['websitePath' => $websitePath])->with('error', 'This website currently accepts product orders, not service bookings.');
+        }
+
+        $validated = $request->validate([
+            'offer_title' => ['required', 'string', 'max:255'],
+            'customer_name' => ['required', 'string', 'max:255'],
+            'customer_email' => ['required', 'email', 'max:255'],
+            'customer_mobile' => ['required', 'string', 'max:255'],
+            'booking_date' => ['required', 'date'],
+            'booking_time' => ['required', 'date_format:H:i'],
+            'booking_endtime' => ['required', 'date_format:H:i'],
+            'selected_additional_services' => ['nullable', 'array'],
+            'selected_additional_services.*' => ['string', 'max:255'],
+            'address' => ['nullable', 'string', 'max:255'],
+            'landmark' => ['nullable', 'string', 'max:255'],
+            'postal_code' => ['nullable', 'string', 'max:255'],
+            'city' => ['nullable', 'string', 'max:255'],
+            'state' => ['nullable', 'string', 'max:255'],
+            'country' => ['nullable', 'string', 'max:255'],
+            'notes' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $founder = $company->founder;
+        if (!$founder) {
+            return redirect()->route('public.website', ['websitePath' => $websitePath])->with('error', 'This public site is missing a founder account connection.');
+        }
+
+        $result = $assistantActionService->createPublicCommerceRequest(
+            $founder,
+            'servio',
+            'booking',
+            (string) $validated['offer_title'],
+            [
+                'target_name' => (string) $validated['offer_title'],
+                'customer_name' => (string) $validated['customer_name'],
+                'customer_email' => (string) $validated['customer_email'],
+                'customer_mobile' => (string) $validated['customer_mobile'],
+                'booking_date' => (string) $validated['booking_date'],
+                'booking_time' => (string) $validated['booking_time'],
+                'booking_endtime' => (string) $validated['booking_endtime'],
+                'selected_additional_services' => $validated['selected_additional_services'] ?? [],
+                'address' => (string) ($validated['address'] ?? ''),
+                'landmark' => (string) ($validated['landmark'] ?? ''),
+                'postal_code' => (string) ($validated['postal_code'] ?? ''),
+                'city' => (string) ($validated['city'] ?? ''),
+                'state' => (string) ($validated['state'] ?? ''),
+                'country' => (string) ($validated['country'] ?? ''),
+                'description' => (string) ($validated['notes'] ?? ''),
+                'notes' => (string) ($validated['notes'] ?? ''),
+            ]
+        );
+
+        $redirect = redirect()->route('public.website', ['websitePath' => $websitePath]);
+        if (!($result['success'] ?? false)) {
+            return $redirect->with('error', $result['reply'] ?? 'The booking request could not be created right now.');
+        }
+
+        return $redirect->with('success', 'Booking request sent. The founder can now manage it from Hatchers Ai Business OS.');
     }
 
     public function createWebsiteStarter(
@@ -2705,6 +3199,10 @@ class OsShellController extends Controller
             'website_engine' => ['required', Rule::in(['bazaar', 'servio'])],
             'custom_domain' => ['required', 'string', 'max:255'],
         ]);
+        $validated['website_engine'] = $this->resolveWebsiteEngineForBusinessModel(
+            $validated['website_engine'],
+            (string) ($founder->company?->business_model ?? '')
+        );
 
         $result = $websiteProvisioningService->connectCustomDomain($founder, $validated);
         if (!$result['ok']) {
@@ -3138,6 +3636,9 @@ class OsShellController extends Controller
                     'type' => $offer['type'],
                     'description' => $offer['description'],
                     'price' => $offer['price'],
+                    'category_name' => $offer['category_name'],
+                    'tax_rules' => $offer['tax_rules'],
+                    'tax_rules_text' => $this->formatTaxRulesText($offer['tax_rules']),
                     'sku' => $offer['sku'],
                     'stock' => $offer['stock'],
                     'low_stock' => $offer['low_stock'],
@@ -3146,6 +3647,17 @@ class OsShellController extends Controller
                     'capacity' => $offer['capacity'],
                     'staff_mode' => $offer['staff_mode'],
                     'staff_id' => $offer['staff_id'],
+                    'staff_ids' => $offer['staff_ids'],
+                    'staff_ids_text' => $this->formatStaffIdsText($offer['staff_ids']),
+                    'availability_days' => $offer['availability_days'],
+                    'open_time' => $offer['open_time'],
+                    'close_time' => $offer['close_time'],
+                    'additional_services' => $offer['additional_services'],
+                    'additional_services_text' => $this->formatAdditionalServicesText($offer['additional_services']),
+                    'variants' => $offer['variants'],
+                    'variants_text' => $this->formatVariantsText($offer['variants']),
+                    'extras' => $offer['extras'],
+                    'extras_text' => $this->formatExtrasText($offer['extras']),
                     'status' => $actionPlan->status === 'paused' ? 'inactive' : 'active',
                     'updated_at' => optional($actionPlan->updated_at)?->diffForHumans(),
                 ];
@@ -3182,6 +3694,27 @@ class OsShellController extends Controller
             'coupon' => $configs->get('coupon', collect())->all(),
             'shipping' => $configs->get('shipping', collect())->all(),
             'booking_policy' => $configs->get('booking_policy', collect())->all(),
+        ];
+    }
+
+    private function commerceCatalogs(Founder $founder): array
+    {
+        $bazaar = $founder->moduleSnapshots()->where('module', 'bazaar')->latest('snapshot_updated_at')->first()?->payload_json ?? [];
+        $servio = $founder->moduleSnapshots()->where('module', 'servio')->latest('snapshot_updated_at')->first()?->payload_json ?? [];
+
+        return [
+            'bazaar' => [
+                'categories' => collect($bazaar['recent_categories'] ?? [])->filter(fn ($item) => is_array($item))->values()->all(),
+                'taxes' => collect($bazaar['recent_taxes'] ?? [])->filter(fn ($item) => is_array($item))->values()->all(),
+                'products' => collect($bazaar['recent_products'] ?? [])->filter(fn ($item) => is_array($item))->values()->all(),
+            ],
+            'servio' => [
+                'categories' => collect($servio['recent_categories'] ?? [])->filter(fn ($item) => is_array($item))->values()->all(),
+                'taxes' => collect($servio['recent_taxes'] ?? [])->filter(fn ($item) => is_array($item))->values()->all(),
+                'additional_services' => collect($servio['recent_additional_services'] ?? [])->filter(fn ($item) => is_array($item))->values()->all(),
+                'services' => collect($servio['recent_services'] ?? [])->filter(fn ($item) => is_array($item))->values()->all(),
+                'staff' => collect($servio['recent_staff'] ?? [])->filter(fn ($item) => is_array($item))->values()->all(),
+            ],
         ];
     }
 
@@ -3330,9 +3863,15 @@ class OsShellController extends Controller
         $capacity = '';
         $staffMode = '';
         $staffId = '';
+        $staffIds = [];
         $availabilityDays = [];
         $openTime = '';
         $closeTime = '';
+        $categoryName = '';
+        $taxRules = [];
+        $additionalServices = [];
+        $variants = [];
+        $extras = [];
         $body = [];
 
         foreach ($lines as $line) {
@@ -3372,6 +3911,10 @@ class OsShellController extends Controller
                 $staffId = trim((string) substr($line, strlen('StaffId:')));
                 continue;
             }
+            if (str_starts_with($line, 'StaffIdsJson:')) {
+                $staffIds = $this->decodeCommerceStringList(substr($line, strlen('StaffIdsJson:')));
+                continue;
+            }
             if (str_starts_with($line, 'AvailabilityDays:')) {
                 $availabilityDays = $this->normalizeAvailabilityDays(explode('|', trim((string) substr($line, strlen('AvailabilityDays:')))));
                 continue;
@@ -3382,6 +3925,26 @@ class OsShellController extends Controller
             }
             if (str_starts_with($line, 'CloseTime:')) {
                 $closeTime = trim((string) substr($line, strlen('CloseTime:')));
+                continue;
+            }
+            if (str_starts_with($line, 'Category:')) {
+                $categoryName = trim((string) substr($line, strlen('Category:')));
+                continue;
+            }
+            if (str_starts_with($line, 'TaxRulesJson:')) {
+                $taxRules = $this->decodeCommerceJsonList(substr($line, strlen('TaxRulesJson:')), ['name', 'value', 'type']);
+                continue;
+            }
+            if (str_starts_with($line, 'AdditionalServicesJson:')) {
+                $additionalServices = $this->decodeCommerceJsonList(substr($line, strlen('AdditionalServicesJson:')), ['name', 'price']);
+                continue;
+            }
+            if (str_starts_with($line, 'VariantsJson:')) {
+                $variants = $this->decodeCommerceJsonList(substr($line, strlen('VariantsJson:')), ['name', 'price', 'qty', 'low_stock']);
+                continue;
+            }
+            if (str_starts_with($line, 'ExtrasJson:')) {
+                $extras = $this->decodeCommerceJsonList(substr($line, strlen('ExtrasJson:')), ['name', 'price']);
                 continue;
             }
 
@@ -3401,6 +3964,8 @@ class OsShellController extends Controller
             'engine' => $actionPlan->platform,
             'description' => trim(implode("\n", $body)),
             'price' => $price !== '' ? $price : '0.00',
+            'category_name' => $categoryName,
+            'tax_rules' => $taxRules,
             'sku' => $sku,
             'stock' => $stock !== '' ? $stock : '0',
             'low_stock' => $lowStock !== '' ? $lowStock : '0',
@@ -3409,9 +3974,13 @@ class OsShellController extends Controller
             'capacity' => $capacity !== '' ? $capacity : '1',
             'staff_mode' => $staffMode !== '' ? $staffMode : 'auto',
             'staff_id' => $staffId,
+            'staff_ids' => $staffIds !== [] ? $staffIds : $this->parseStaffIdsText($staffId),
             'availability_days' => $availabilityDays !== [] ? $availabilityDays : ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
             'open_time' => $openTime !== '' ? $openTime : '09:00',
             'close_time' => $closeTime !== '' ? $closeTime : '17:00',
+            'additional_services' => $additionalServices,
+            'variants' => $variants,
+            'extras' => $extras,
         ];
     }
 
@@ -3468,6 +4037,8 @@ class OsShellController extends Controller
             'Type: ' . trim((string) ($payload['type'] ?? 'offer')),
             'Engine: ' . trim((string) ($payload['engine'] ?? '')),
             'Price: ' . trim((string) ($payload['price'] ?? '0.00')),
+            'Category: ' . trim((string) ($payload['category_name'] ?? '')),
+            'TaxRulesJson: ' . json_encode($this->normalizeTaxRules($payload['tax_rules'] ?? []), JSON_UNESCAPED_UNICODE),
             'Sku: ' . trim((string) ($payload['sku'] ?? '')),
             'Stock: ' . trim((string) ($payload['stock'] ?? '')),
             'LowStock: ' . trim((string) ($payload['low_stock'] ?? '')),
@@ -3476,9 +4047,13 @@ class OsShellController extends Controller
             'Capacity: ' . trim((string) ($payload['capacity'] ?? '')),
             'StaffMode: ' . trim((string) ($payload['staff_mode'] ?? '')),
             'StaffId: ' . trim((string) ($payload['staff_id'] ?? '')),
+            'StaffIdsJson: ' . json_encode($this->parseStaffIdsText($this->formatStaffIdsText($payload['staff_ids'] ?? [])), JSON_UNESCAPED_UNICODE),
             'AvailabilityDays: ' . implode('|', $this->normalizeAvailabilityDays($payload['availability_days'] ?? [])),
             'OpenTime: ' . trim((string) ($payload['open_time'] ?? '')),
             'CloseTime: ' . trim((string) ($payload['close_time'] ?? '')),
+            'AdditionalServicesJson: ' . json_encode($this->normalizeAdditionalServices($payload['additional_services'] ?? []), JSON_UNESCAPED_UNICODE),
+            'VariantsJson: ' . json_encode($this->normalizeVariants($payload['variants'] ?? []), JSON_UNESCAPED_UNICODE),
+            'ExtrasJson: ' . json_encode($this->normalizeExtras($payload['extras'] ?? []), JSON_UNESCAPED_UNICODE),
             '',
             trim((string) ($payload['description'] ?? '')),
         ], static fn ($value) => $value !== '')));
@@ -3529,6 +4104,203 @@ class OsShellController extends Controller
             ->unique()
             ->values()
             ->all();
+    }
+
+    private function decodeCommerceJsonList(string $json, array $keys): array
+    {
+        $decoded = json_decode(trim($json), true);
+        if (!is_array($decoded)) {
+            return [];
+        }
+
+        return collect($decoded)
+            ->filter(fn ($item) => is_array($item))
+            ->map(function (array $item) use ($keys): array {
+                $normalized = [];
+                foreach ($keys as $key) {
+                    $normalized[$key] = trim((string) ($item[$key] ?? ''));
+                }
+                return $normalized;
+            })
+            ->filter(function (array $item) use ($keys): bool {
+                foreach ($keys as $key) {
+                    if ($item[$key] !== '') {
+                        return true;
+                    }
+                }
+                return false;
+            })
+            ->values()
+            ->all();
+    }
+
+    private function decodeCommerceStringList(string $json): array
+    {
+        $decoded = json_decode(trim($json), true);
+        if (!is_array($decoded)) {
+            return [];
+        }
+
+        return collect($decoded)->map(fn ($item) => trim((string) $item))->filter()->values()->all();
+    }
+
+    private function parseTaxRulesText(string $text): array
+    {
+        $lines = preg_split("/\r\n|\n|\r/", trim($text)) ?: [];
+
+        return $this->normalizeTaxRules(collect($lines)
+            ->map(function (string $line): array {
+                $parts = array_map('trim', explode('|', $line));
+                return [
+                    'name' => (string) ($parts[0] ?? ''),
+                    'value' => (string) ($parts[1] ?? ''),
+                    'type' => strtolower((string) ($parts[2] ?? 'percent')),
+                ];
+            })
+            ->all());
+    }
+
+    private function normalizeTaxRules(array $rules): array
+    {
+        return collect($rules)
+            ->filter(fn ($item) => is_array($item))
+            ->map(function (array $item): array {
+                $type = strtolower(trim((string) ($item['type'] ?? 'percent')));
+                return [
+                    'name' => trim((string) ($item['name'] ?? '')),
+                    'value' => trim((string) ($item['value'] ?? '')),
+                    'type' => in_array($type, ['fixed', 'flat', 'amount'], true) ? 'fixed' : 'percent',
+                ];
+            })
+            ->filter(fn (array $item) => $item['name'] !== '' && $item['value'] !== '')
+            ->values()
+            ->all();
+    }
+
+    private function formatTaxRulesText(array $rules): string
+    {
+        return collect($this->normalizeTaxRules($rules))
+            ->map(fn (array $rule) => implode(' | ', [$rule['name'], $rule['value'], $rule['type']]))
+            ->implode("\n");
+    }
+
+    private function parseAdditionalServicesText(string $text): array
+    {
+        $lines = preg_split("/\r\n|\n|\r/", trim($text)) ?: [];
+
+        return $this->normalizeAdditionalServices(collect($lines)
+            ->map(function (string $line): array {
+                $parts = array_map('trim', explode('|', $line));
+                return [
+                    'name' => (string) ($parts[0] ?? ''),
+                    'price' => (string) ($parts[1] ?? '0'),
+                ];
+            })
+            ->all());
+    }
+
+    private function normalizeAdditionalServices(array $services): array
+    {
+        return collect($services)
+            ->filter(fn ($item) => is_array($item))
+            ->map(fn (array $item) => [
+                'name' => trim((string) ($item['name'] ?? '')),
+                'price' => trim((string) ($item['price'] ?? '0')),
+            ])
+            ->filter(fn (array $item) => $item['name'] !== '')
+            ->values()
+            ->all();
+    }
+
+    private function formatAdditionalServicesText(array $services): string
+    {
+        return collect($this->normalizeAdditionalServices($services))
+            ->map(fn (array $service) => implode(' | ', [$service['name'], $service['price'] !== '' ? $service['price'] : '0']))
+            ->implode("\n");
+    }
+
+    private function parseVariantsText(string $text): array
+    {
+        $lines = preg_split("/\r\n|\n|\r/", trim($text)) ?: [];
+
+        return $this->normalizeVariants(collect($lines)->map(function (string $line): array {
+            $parts = array_map('trim', explode('|', $line));
+            return [
+                'name' => (string) ($parts[0] ?? ''),
+                'price' => (string) ($parts[1] ?? '0'),
+                'qty' => (string) ($parts[2] ?? '0'),
+                'low_stock' => (string) ($parts[3] ?? '0'),
+            ];
+        })->all());
+    }
+
+    private function normalizeVariants(array $variants): array
+    {
+        return collect($variants)
+            ->filter(fn ($item) => is_array($item))
+            ->map(fn (array $item) => [
+                'name' => trim((string) ($item['name'] ?? '')),
+                'price' => trim((string) ($item['price'] ?? '0')),
+                'qty' => trim((string) ($item['qty'] ?? '0')),
+                'low_stock' => trim((string) ($item['low_stock'] ?? '0')),
+            ])
+            ->filter(fn (array $item) => $item['name'] !== '')
+            ->values()
+            ->all();
+    }
+
+    private function formatVariantsText(array $variants): string
+    {
+        return collect($this->normalizeVariants($variants))
+            ->map(fn (array $variant) => implode(' | ', [$variant['name'], $variant['price'], $variant['qty'], $variant['low_stock']]))
+            ->implode("\n");
+    }
+
+    private function parseExtrasText(string $text): array
+    {
+        $lines = preg_split("/\r\n|\n|\r/", trim($text)) ?: [];
+
+        return $this->normalizeExtras(collect($lines)->map(function (string $line): array {
+            $parts = array_map('trim', explode('|', $line));
+            return [
+                'name' => (string) ($parts[0] ?? ''),
+                'price' => (string) ($parts[1] ?? '0'),
+            ];
+        })->all());
+    }
+
+    private function normalizeExtras(array $extras): array
+    {
+        return collect($extras)
+            ->filter(fn ($item) => is_array($item))
+            ->map(fn (array $item) => [
+                'name' => trim((string) ($item['name'] ?? '')),
+                'price' => trim((string) ($item['price'] ?? '0')),
+            ])
+            ->filter(fn (array $item) => $item['name'] !== '')
+            ->values()
+            ->all();
+    }
+
+    private function formatExtrasText(array $extras): string
+    {
+        return collect($this->normalizeExtras($extras))
+            ->map(fn (array $extra) => implode(' | ', [$extra['name'], $extra['price']]))
+            ->implode("\n");
+    }
+
+    private function parseStaffIdsText(string $text): array
+    {
+        return collect(preg_split('/[\s,|]+/', trim($text)) ?: [])
+            ->map(fn ($item) => trim((string) $item))
+            ->filter()
+            ->values()
+            ->all();
+    }
+
+    private function formatStaffIdsText(array $staffIds): string
+    {
+        return implode(', ', $this->parseStaffIdsText(implode('|', $staffIds)));
     }
 
     private function resolveCommerceMessage(string $type, string $template, string $customMessage, array $payload): string
@@ -3679,6 +4451,27 @@ class OsShellController extends Controller
                 ],
             ],
         ];
+    }
+
+    private function resolvePublicWebsiteCompany(string $websitePath): ?Company
+    {
+        $normalizedPath = trim(strtolower($websitePath), '/');
+        if ($normalizedPath === '') {
+            return null;
+        }
+
+        return Company::query()
+            ->where('website_status', 'live')
+            ->with('founder')
+            ->get()
+            ->first(function (Company $company) use ($normalizedPath): bool {
+                $path = trim(strtolower((string) ($company->website_path ?? '')), '/');
+                if ($path === '') {
+                    $path = strtolower((string) str($company->company_name ?: 'your-business')->slug('-'));
+                }
+
+                return $path === $normalizedPath;
+            });
     }
 
     private function founderIndustryOptions(): array
@@ -4090,6 +4883,22 @@ class OsShellController extends Controller
         }
 
         return 'https://' . $host . ($path !== '' ? '/' . $path : '');
+    }
+
+    private function resolveWebsiteEngineForBusinessModel(string $engine, string $businessModel): string
+    {
+        $engine = strtolower(trim($engine));
+        $businessModel = strtolower(trim($businessModel));
+
+        if ($businessModel === 'service') {
+            return 'servio';
+        }
+
+        if ($businessModel === 'product') {
+            return 'bazaar';
+        }
+
+        return in_array($engine, ['bazaar', 'servio'], true) ? $engine : 'bazaar';
     }
 
     private function buildFounderSearchResults(Founder $founder, array $dashboard, string $query): array

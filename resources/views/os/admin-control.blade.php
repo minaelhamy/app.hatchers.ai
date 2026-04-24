@@ -22,6 +22,7 @@
                 <a class="nav-item" href="{{ route('admin.subscribers') }}">Subscribers</a>
                 <a class="nav-item" href="{{ route('admin.system-access') }}">System Access</a>
                 <a class="nav-item" href="{{ route('admin.identity') }}">Identity</a>
+                <a class="nav-item" href="{{ route('admin.commerce') }}">Commerce Control</a>
                 <a class="nav-item" href="{{ route('admin.modules') }}">Module Monitoring</a>
                 <a class="nav-item" href="{{ route('admin.support') }}">Support Center</a>
             </div>

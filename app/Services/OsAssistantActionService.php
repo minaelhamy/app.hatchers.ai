@@ -315,6 +315,151 @@ class OsAssistantActionService
         ];
     }
 
+    public function createCommerceCatalogEntryFromOs(
+        Founder $founder,
+        string $platform,
+        string $resource,
+        array $attributes,
+        string $actorRole = 'admin'
+    ): array {
+        $platform = trim(strtolower($platform));
+        $resource = trim(strtolower($resource));
+
+        if (!in_array($platform, ['bazaar', 'servio'], true)) {
+            return [
+                'success' => false,
+                'reply' => 'That commerce engine is not supported for admin catalog creation yet.',
+            ];
+        }
+
+        if (!in_array($resource, ['category', 'tax', 'staff'], true)) {
+            return [
+                'success' => false,
+                'reply' => 'That catalog resource is not supported yet.',
+            ];
+        }
+
+        $payload = array_merge($attributes, [
+            'resource' => $resource,
+        ]);
+
+        $result = $this->createPlatformRecord($founder, [
+            'platform' => $platform,
+            'category' => 'catalog',
+            'title' => (string) ($attributes['title'] ?? ucfirst($resource)),
+            'description' => (string) ($attributes['description'] ?? ''),
+            'actor_role' => $actorRole,
+            'payload' => $payload,
+        ]);
+
+        if (!($result['success'] ?? false)) {
+            return $result;
+        }
+
+        return [
+            'success' => true,
+            'reply' => 'Done. I created that ' . $resource . ' in ' . ucfirst($platform) . ' from Hatchers OS admin.',
+            'title' => (string) ($result['title'] ?? ($attributes['title'] ?? ucfirst($resource))),
+            'edit_url' => (string) ($result['edit_url'] ?? ''),
+            'action_type' => 'platform_record_create',
+            'sync_summary' => 'Hatchers OS admin created a ' . $resource . ' in ' . ucfirst($platform) . '.',
+        ];
+    }
+
+    public function updateCommerceCatalogEntryFromOs(
+        Founder $founder,
+        string $platform,
+        string $resource,
+        string $targetName,
+        string $field,
+        string $value,
+        string $actorRole = 'admin'
+    ): array {
+        $platform = trim(strtolower($platform));
+        $resource = trim(strtolower($resource));
+
+        if (!in_array($platform, ['bazaar', 'servio'], true)) {
+            return [
+                'success' => false,
+                'reply' => 'That commerce engine is not supported for admin catalog updates yet.',
+            ];
+        }
+
+        if (!in_array($resource, ['category', 'tax', 'staff'], true)) {
+            return [
+                'success' => false,
+                'reply' => 'That catalog resource is not supported for admin updates yet.',
+            ];
+        }
+
+        $result = $this->updatePlatformRecord($founder, [
+            'platform' => $platform,
+            'category' => 'catalog',
+            'field' => $field,
+            'value' => $value,
+            'target_name' => trim($targetName),
+            'actor_role' => $actorRole,
+            'payload' => [
+                'resource' => $resource,
+            ],
+        ]);
+
+        if (!($result['success'] ?? false)) {
+            return $result;
+        }
+
+        return [
+            'success' => true,
+            'reply' => 'Done. I updated that ' . $resource . ' in ' . ucfirst($platform) . ' from Hatchers OS admin.',
+            'title' => (string) ($result['title'] ?? $targetName),
+            'edit_url' => (string) ($result['edit_url'] ?? ''),
+            'action_type' => 'platform_record_update',
+            'sync_summary' => 'Hatchers OS admin updated a ' . $resource . ' in ' . ucfirst($platform) . '.',
+        ];
+    }
+
+    public function createPublicCommerceRequest(
+        Founder $founder,
+        string $platform,
+        string $category,
+        string $title,
+        array $attributes
+    ): array {
+        $platform = trim(strtolower($platform));
+        $category = trim(strtolower($category));
+
+        if (!in_array($platform, ['bazaar', 'servio'], true) || !in_array($category, ['order', 'booking'], true)) {
+            return [
+                'success' => false,
+                'reply' => 'That public commerce request is not supported yet.',
+            ];
+        }
+
+        $result = $this->createPlatformRecord($founder, [
+            'platform' => $platform,
+            'category' => $category,
+            'title' => $title,
+            'description' => (string) ($attributes['description'] ?? ''),
+            'actor_role' => 'public_visitor',
+            'payload' => $attributes,
+        ]);
+
+        if (!($result['success'] ?? false)) {
+            return $result;
+        }
+
+        return [
+            'success' => true,
+            'reply' => $category === 'order'
+                ? 'A new order request was created from the public OS website.'
+                : 'A new booking request was created from the public OS website.',
+            'title' => (string) ($result['title'] ?? $title),
+            'edit_url' => (string) ($result['edit_url'] ?? ''),
+            'action_type' => 'platform_record_create',
+            'sync_summary' => 'A public website visitor created a ' . $category . ' through Hatchers OS.',
+        ];
+    }
+
     private function executeWriteAction(Founder $founder, array $action): array
     {
         $type = trim((string) ($action['type'] ?? ''));

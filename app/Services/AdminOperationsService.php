@@ -219,6 +219,7 @@ class AdminOperationsService
                 'subscriber_reporting',
                 'founder_operations',
                 'mentor_management',
+                'commerce_control',
                 'module_monitoring',
                 'exception_resolution',
                 'system_access',

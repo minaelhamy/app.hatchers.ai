@@ -60,6 +60,7 @@
         $engines = collect($website['engines']);
         $catalogOffers = $catalogOffers ?? [];
         $commerceConfigs = $commerceConfigs ?? ['coupon' => [], 'shipping' => [], 'booking_policy' => []];
+        $commerceCatalogs = $commerceCatalogs ?? ['bazaar' => ['categories' => [], 'taxes' => []], 'servio' => ['categories' => [], 'taxes' => [], 'additional_services' => []]];
         $supportsProducts = in_array($businessModel, ['product', 'hybrid'], true);
         $supportsServices = in_array($businessModel, ['service', 'hybrid'], true);
         $automationSummary = $dashboard['automation_summary'] ?? ['active_count' => 0, 'items' => [], 'has_unpaid_order_rule' => false, 'has_unscheduled_booking_rule' => false, 'has_provider_assignment_rule' => false];
@@ -142,6 +143,62 @@
                 </section>
 
                 <section class="commerce-section">
+                    <h2>Live Catalog Sync</h2>
+                    <div class="commerce-grid">
+                        @if ($supportsProducts)
+                            <div class="commerce-card">
+                                <div class="commerce-card-meta">Bazaar Categories & Taxes</div>
+                                <div class="commerce-card-title">Live product catalog definitions</div>
+                                <div class="commerce-card-copy">These are the current Bazaar-side categories and tax rules visible to the OS after sync.</div>
+                                @forelse ($commerceCatalogs['bazaar']['categories'] as $category)
+                                    <div class="commerce-chip">{{ $category['title'] }} · {{ ucfirst($category['status']) }}</div>
+                                @empty
+                                    <div class="commerce-chip">No Bazaar categories synced yet</div>
+                                @endforelse
+                                @forelse ($commerceCatalogs['bazaar']['taxes'] as $tax)
+                                    <div class="commerce-chip">{{ $tax['title'] }} · {{ $tax['value'] }} {{ $tax['type'] }} · {{ ucfirst($tax['status']) }}</div>
+                                @empty
+                                    <div class="commerce-chip">No Bazaar taxes synced yet</div>
+                                @endforelse
+                                @foreach (($commerceCatalogs['bazaar']['products'] ?? []) as $product)
+                                    @foreach (($product['variants'] ?? []) as $variant)
+                                        <div class="commerce-chip">{{ $product['title'] }} → {{ $variant['name'] }} · {{ $variant['qty'] }} in stock</div>
+                                    @endforeach
+                                    @foreach (($product['extras'] ?? []) as $extra)
+                                        <div class="commerce-chip">{{ $product['title'] }} + {{ $extra['name'] }} · {{ number_format((float) ($extra['price'] ?? 0), 2) }}</div>
+                                    @endforeach
+                                @endforeach
+                            </div>
+                        @endif
+                        @if ($supportsServices)
+                            <div class="commerce-card">
+                                <div class="commerce-card-meta">Servio Categories, Taxes, And Add-ons</div>
+                                <div class="commerce-card-title">Live service catalog definitions</div>
+                                <div class="commerce-card-copy">These are the current Servio-side categories, tax rules, and service add-ons visible to the OS after sync.</div>
+                                @forelse ($commerceCatalogs['servio']['categories'] as $category)
+                                    <div class="commerce-chip">{{ $category['title'] }} · {{ ucfirst($category['status']) }}</div>
+                                @empty
+                                    <div class="commerce-chip">No Servio categories synced yet</div>
+                                @endforelse
+                                @forelse ($commerceCatalogs['servio']['taxes'] as $tax)
+                                    <div class="commerce-chip">{{ $tax['title'] }} · {{ $tax['value'] }} {{ $tax['type'] }} · {{ ucfirst($tax['status']) }}</div>
+                                @empty
+                                    <div class="commerce-chip">No Servio taxes synced yet</div>
+                                @endforelse
+                                @forelse ($commerceCatalogs['servio']['additional_services'] as $service)
+                                    <div class="commerce-chip">{{ $service['title'] }} · {{ number_format((float) ($service['price'] ?? 0), 2) }}</div>
+                                @empty
+                                    <div class="commerce-chip">No Servio add-on services synced yet</div>
+                                @endforelse
+                                @foreach (($commerceCatalogs['servio']['staff'] ?? []) as $staff)
+                                    <div class="commerce-chip">{{ $staff['title'] }} · ID {{ $staff['id'] }}</div>
+                                @endforeach
+                            </div>
+                        @endif
+                    </div>
+                </section>
+
+                <section class="commerce-section">
                     <h2>OS-Native Offer Setup</h2>
                     <div class="commerce-grid">
                         @if ($supportsProducts)
@@ -207,6 +264,10 @@
                                     <textarea id="offer-description-{{ $offer['id'] }}" name="description">{{ $offer['description'] }}</textarea>
                                     <label for="offer-price-{{ $offer['id'] }}">Price</label>
                                     <input id="offer-price-{{ $offer['id'] }}" name="price" type="number" step="0.01" min="0" value="{{ $offer['price'] }}">
+                                    <label for="offer-category-{{ $offer['id'] }}">Category</label>
+                                    <input id="offer-category-{{ $offer['id'] }}" name="category_name" type="text" value="{{ $offer['category_name'] ?? '' }}" placeholder="{{ $offer['engine'] === 'bazaar' ? 'Treats, Accessories, Grooming' : 'Walking, Training, Home visits' }}">
+                                    <label for="offer-tax-rules-{{ $offer['id'] }}">Tax rules</label>
+                                    <textarea id="offer-tax-rules-{{ $offer['id'] }}" name="tax_rules_text" placeholder="VAT | 15 | percent&#10;Service fee | 5 | fixed">{{ $offer['tax_rules_text'] ?? '' }}</textarea>
                                     @if ($offer['engine'] === 'bazaar')
                                         <label for="offer-sku-{{ $offer['id'] }}">SKU</label>
                                         <input id="offer-sku-{{ $offer['id'] }}" name="sku" type="text" value="{{ $offer['sku'] }}">
@@ -223,6 +284,10 @@
                                         </select>
                                         <label for="offer-adjustment-amount-{{ $offer['id'] }}">Adjustment quantity</label>
                                         <input id="offer-adjustment-amount-{{ $offer['id'] }}" name="adjustment_amount" type="number" min="1" step="1" placeholder="10">
+                                        <label for="offer-variants-{{ $offer['id'] }}">Variants</label>
+                                        <textarea id="offer-variants-{{ $offer['id'] }}" name="variants_text" placeholder="Small | 19.99 | 12 | 3&#10;Large | 29.99 | 8 | 2">{{ $offer['variants_text'] ?? '' }}</textarea>
+                                        <label for="offer-extras-{{ $offer['id'] }}">Extras</label>
+                                        <textarea id="offer-extras-{{ $offer['id'] }}" name="extras_text" placeholder="Gift wrap | 5&#10;Rush packaging | 10">{{ $offer['extras_text'] ?? '' }}</textarea>
                                     @else
                                         <label for="offer-duration-{{ $offer['id'] }}">Duration</label>
                                         <input id="offer-duration-{{ $offer['id'] }}" name="duration" type="number" min="1" step="1" value="{{ $offer['duration'] }}">
@@ -240,6 +305,8 @@
                                         </select>
                                         <label for="offer-staff-id-{{ $offer['id'] }}">Staff member id</label>
                                         <input id="offer-staff-id-{{ $offer['id'] }}" name="staff_id" type="text" value="{{ $offer['staff_id'] }}" placeholder="Optional specific staff id">
+                                        <label for="offer-staff-ids-{{ $offer['id'] }}">Assignable staff ids</label>
+                                        <input id="offer-staff-ids-{{ $offer['id'] }}" name="staff_ids_text" type="text" value="{{ $offer['staff_ids_text'] ?? '' }}" placeholder="12, 18, 24">
                                         <label><span>Available days</span>
                                             <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;">
                                                 @foreach (['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] as $day)
@@ -254,6 +321,8 @@
                                         <input id="offer-open-time-{{ $offer['id'] }}" name="open_time" type="time" value="{{ $offer['open_time'] ?? '09:00' }}">
                                         <label for="offer-close-time-{{ $offer['id'] }}">Close time</label>
                                         <input id="offer-close-time-{{ $offer['id'] }}" name="close_time" type="time" value="{{ $offer['close_time'] ?? '17:00' }}">
+                                        <label for="offer-additional-services-{{ $offer['id'] }}">Additional services</label>
+                                        <textarea id="offer-additional-services-{{ $offer['id'] }}" name="additional_services_text" placeholder="Nail trim | 10&#10;Dog pickup | 15">{{ $offer['additional_services_text'] ?? '' }}</textarea>
                                     @endif
                                     <label for="offer-status-{{ $offer['id'] }}">Availability</label>
                                     <select id="offer-status-{{ $offer['id'] }}" name="availability">
