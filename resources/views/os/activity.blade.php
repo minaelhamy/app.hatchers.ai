@@ -58,26 +58,19 @@
 
     <div class="activity-shell">
         <aside class="activity-sidebar">
-            <div class="activity-sidebar-inner">
-                <a class="activity-brand" href="/dashboard/founder"><img src="/brand/hatchers-ai-logo.png" alt="Hatchers AI"></a>
-                <nav class="activity-nav">
-                    <a class="activity-nav-item" href="/dashboard/founder"><span class="activity-nav-icon">⌂</span><span>Home</span></a>
-                    <a class="activity-nav-item" href="{{ route('founder.first-100') }}"><span class="activity-nav-icon">◎</span><span>First 100</span></a>
-                    <a class="activity-nav-item active" href="{{ route('founder.activity') }}"><span class="activity-nav-icon">◫</span><span>Activity</span></a>
-                    <a class="activity-nav-item" href="{{ route('founder.commerce') }}"><span class="activity-nav-icon">⌁</span><span>Commerce</span></a>
-                    <a class="activity-nav-item" href="{{ route('founder.ai-tools') }}"><span class="activity-nav-icon">✦</span><span>AI Tools</span></a>
-                    <a class="activity-nav-item" href="{{ route('founder.learning-plan') }}"><span class="activity-nav-icon">▣</span><span>Learning Plan</span></a>
-                    <a class="activity-nav-item" href="{{ route('founder.tasks') }}"><span class="activity-nav-icon">◌</span><span>Tasks</span></a>
-                    <a class="activity-nav-item" href="{{ route('founder.settings') }}"><span class="activity-nav-icon">⚙</span><span>Settings</span></a>
-                </nav>
-            </div>
-            <div class="activity-sidebar-footer">
-                <div class="activity-user">
-                    <div class="activity-avatar">{{ strtoupper(substr($founder->full_name, 0, 1)) }}</div>
-                    <div>{{ $founder->full_name }}</div>
-                </div>
-                <form method="POST" action="/logout" style="margin:0;">@csrf<button class="activity-nav-icon" type="submit" style="border:0;background:transparent;cursor:pointer;">↘</button></form>
-            </div>
+            @include('os.partials.founder-sidebar', [
+                'founder' => $founder,
+                'businessModel' => $founder->company->business_model ?? 'hybrid',
+                'activeKey' => 'activity',
+                'navClass' => 'activity-nav',
+                'itemClass' => 'activity-nav-item',
+                'iconClass' => 'activity-nav-icon',
+                'innerClass' => 'activity-sidebar-inner',
+                'brandClass' => 'activity-brand',
+                'footerClass' => 'activity-sidebar-footer',
+                'userClass' => 'activity-user',
+                'avatarClass' => 'activity-avatar',
+            ])
         </aside>
 
         <main class="activity-main">

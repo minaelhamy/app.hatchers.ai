@@ -55,23 +55,19 @@
 
     <div class="settings-shell">
         <aside class="settings-sidebar">
-            <div class="settings-sidebar-inner">
-                <a class="settings-brand" href="/dashboard/founder"><img src="/brand/hatchers-ai-logo.png" alt="Hatchers AI"></a>
-                <nav class="settings-nav">
-                    <a class="settings-nav-item" href="/dashboard/founder"><span class="settings-nav-icon">⌂</span><span>Home</span></a>
-                    <a class="settings-nav-item" href="{{ route('founder.commerce') }}"><span class="settings-nav-icon">⌁</span><span>Commerce</span></a>
-                    <a class="settings-nav-item" href="{{ route('founder.ai-tools') }}"><span class="settings-nav-icon">✦</span><span>AI Tools</span></a>
-                    <a class="settings-nav-item" href="{{ route('founder.learning-plan') }}"><span class="settings-nav-icon">▣</span><span>Learning Plan</span></a>
-                    <a class="settings-nav-item active" href="{{ route('founder.settings') }}"><span class="settings-nav-icon">⚙</span><span>Settings</span></a>
-                </nav>
-            </div>
-            <div class="settings-sidebar-footer">
-                <div class="settings-user">
-                    <div class="settings-avatar">{{ strtoupper(substr($founder->full_name, 0, 1)) }}</div>
-                    <div>{{ $founder->full_name }}</div>
-                </div>
-                <form method="POST" action="/logout" style="margin:0;">@csrf<button class="settings-nav-icon" type="submit" style="border:0;background:transparent;cursor:pointer;">↘</button></form>
-            </div>
+            @include('os.partials.founder-sidebar', [
+                'founder' => $founder,
+                'businessModel' => $founder->company->business_model ?? 'hybrid',
+                'activeKey' => 'settings',
+                'navClass' => 'settings-nav',
+                'itemClass' => 'settings-nav-item',
+                'iconClass' => 'settings-nav-icon',
+                'innerClass' => 'settings-sidebar-inner',
+                'brandClass' => 'settings-brand',
+                'footerClass' => 'settings-sidebar-footer',
+                'userClass' => 'settings-user',
+                'avatarClass' => 'settings-avatar',
+            ])
         </aside>
 
         <main class="settings-main">

@@ -40,25 +40,19 @@
 
     <div class="media-shell">
         <aside class="media-sidebar">
-            <div class="media-sidebar-inner">
-                <a class="media-brand" href="/dashboard/founder"><img src="/brand/hatchers-ai-logo.png" alt="Hatchers AI"></a>
-                <nav class="media-nav">
-                    <a class="media-nav-item" href="/dashboard/founder"><span class="media-nav-icon">⌂</span><span>Home</span></a>
-                    <a class="media-nav-item" href="{{ route('founder.activity') }}"><span class="media-nav-icon">◫</span><span>Activity</span></a>
-                    <a class="media-nav-item" href="{{ route('founder.commerce') }}"><span class="media-nav-icon">⌁</span><span>Commerce</span></a>
-                    <a class="media-nav-item" href="{{ route('founder.ai-tools') }}"><span class="media-nav-icon">✦</span><span>AI Tools</span></a>
-                    <a class="media-nav-item active" href="{{ route('founder.media-library') }}"><span class="media-nav-icon">▤</span><span>Media Library</span></a>
-                    <a class="media-nav-item" href="{{ route('founder.analytics') }}"><span class="media-nav-icon">◔</span><span>Analytics</span></a>
-                    <a class="media-nav-item" href="{{ route('website') }}"><span class="media-nav-icon">▥</span><span>Website</span></a>
-                </nav>
-            </div>
-            <div class="media-sidebar-footer">
-                <div class="media-user">
-                    <div class="media-avatar">{{ strtoupper(substr($founder->full_name, 0, 1)) }}</div>
-                    <div>{{ $founder->full_name }}</div>
-                </div>
-                <form method="POST" action="/logout" style="margin:0;">@csrf<button class="media-nav-icon" type="submit" style="border:0;background:transparent;cursor:pointer;">↘</button></form>
-            </div>
+            @include('os.partials.founder-sidebar', [
+                'founder' => $founder,
+                'businessModel' => $founder->company->business_model ?? 'hybrid',
+                'activeKey' => 'ai-tools',
+                'navClass' => 'media-nav',
+                'itemClass' => 'media-nav-item',
+                'iconClass' => 'media-nav-icon',
+                'innerClass' => 'media-sidebar-inner',
+                'brandClass' => 'media-brand',
+                'footerClass' => 'media-sidebar-footer',
+                'userClass' => 'media-user',
+                'avatarClass' => 'media-avatar',
+            ])
         </aside>
 
         <main class="media-main">

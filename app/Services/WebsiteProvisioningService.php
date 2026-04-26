@@ -67,6 +67,16 @@ class WebsiteProvisioningService
             ];
         }
 
+        if (!$this->bridgeConfigured($engine)) {
+            return [
+                'ok' => true,
+                'data' => [
+                    'public_url' => $this->fallbackPublicUrl($founder, (string) ($input['website_path'] ?? '')),
+                ],
+                'bridge_status' => 'pending',
+            ];
+        }
+
         $payload = [
             'category' => 'website',
             'operation' => 'update',
@@ -97,6 +107,16 @@ class WebsiteProvisioningService
             return [
                 'ok' => false,
                 'error' => 'A valid website engine is required before publishing.',
+            ];
+        }
+
+        if (!$this->bridgeConfigured($engine)) {
+            return [
+                'ok' => true,
+                'data' => [
+                    'public_url' => $this->fallbackPublicUrl($founder, (string) ($founder->company?->website_path ?? '')),
+                ],
+                'bridge_status' => 'pending',
             ];
         }
 
@@ -238,6 +258,33 @@ class WebsiteProvisioningService
         $host = parse_url($baseUrl, PHP_URL_HOST);
 
         return is_string($host) && $host !== '' ? $host : $baseUrl;
+    }
+
+    private function bridgeConfigured(string $engine): bool
+    {
+        $sharedSecret = trim((string) env('WEBSITE_PLATFORM_SHARED_SECRET', ''));
+        $baseUrl = rtrim((string) config('modules.' . $engine . '.base_url'), '/');
+
+        return $sharedSecret !== '' && $baseUrl !== '';
+    }
+
+    private function fallbackPublicUrl(Founder $founder, string $path = ''): string
+    {
+        $host = trim((string) ($founder->company?->custom_domain ?? ''));
+        $host = trim(preg_replace('#^https?://#', '', $host) ?? $host, '/');
+        if ($host === '') {
+            $host = 'app.hatchers.ai';
+        }
+
+        $normalizedPath = trim(strtolower($path), '/');
+        if ($normalizedPath === '') {
+            $normalizedPath = trim(strtolower((string) ($founder->company?->website_path ?? '')), '/');
+        }
+        if ($normalizedPath === '') {
+            $normalizedPath = str((string) ($founder->company?->company_name ?: $founder->full_name))->slug('-')->value() ?: 'your-business';
+        }
+
+        return 'https://' . $host . '/' . $normalizedPath;
     }
 
     private function resolveThemePreviewUrl(string $basePath, string $engine, string $id, string $assetBase): string

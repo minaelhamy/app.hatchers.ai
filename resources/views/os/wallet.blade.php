@@ -62,26 +62,19 @@
 
     <div class="wallet-shell">
         <aside class="wallet-sidebar">
-            <div class="wallet-sidebar-inner">
-                <a class="wallet-brand" href="/dashboard/founder"><img src="/brand/hatchers-ai-logo.png" alt="Hatchers AI"></a>
-                <nav class="wallet-nav">
-                    <a class="wallet-nav-item" href="/dashboard/founder"><span class="wallet-nav-icon">⌂</span><span>Home</span></a>
-                    <a class="wallet-nav-item" href="{{ route('founder.first-100') }}"><span class="wallet-nav-icon">◎</span><span>First 100</span></a>
-                    <a class="wallet-nav-item" href="{{ route('founder.commerce') }}"><span class="wallet-nav-icon">⌁</span><span>Commerce</span></a>
-                    <a class="wallet-nav-item active" href="{{ route('founder.commerce.wallet') }}"><span class="wallet-nav-icon">$</span><span>Wallet</span></a>
-                    <a class="wallet-nav-item" href="{{ route('founder.commerce.orders') }}"><span class="wallet-nav-icon">▤</span><span>Orders</span></a>
-                    <a class="wallet-nav-item" href="{{ route('founder.commerce.bookings') }}"><span class="wallet-nav-icon">◫</span><span>Bookings</span></a>
-                    <a class="wallet-nav-item" href="{{ route('website') }}"><span class="wallet-nav-icon">◧</span><span>Website</span></a>
-                    <a class="wallet-nav-item" href="{{ route('founder.settings') }}"><span class="wallet-nav-icon">⚙</span><span>Settings</span></a>
-                </nav>
-            </div>
-            <div class="wallet-sidebar-footer">
-                <div class="wallet-user">
-                    <div class="wallet-avatar">{{ strtoupper(substr($founder->full_name, 0, 1)) }}</div>
-                    <div>{{ $founder->full_name }}</div>
-                </div>
-                <form method="POST" action="/logout" style="margin:0;">@csrf<button class="wallet-nav-icon" type="submit" style="border:0;background:transparent;cursor:pointer;">↘</button></form>
-            </div>
+            @include('os.partials.founder-sidebar', [
+                'founder' => $founder,
+                'businessModel' => $founder->company->business_model ?? 'hybrid',
+                'activeKey' => 'wallet',
+                'navClass' => 'wallet-nav',
+                'itemClass' => 'wallet-nav-item',
+                'iconClass' => 'wallet-nav-icon',
+                'innerClass' => 'wallet-sidebar-inner',
+                'brandClass' => 'wallet-brand',
+                'footerClass' => 'wallet-sidebar-footer',
+                'userClass' => 'wallet-user',
+                'avatarClass' => 'wallet-avatar',
+            ])
         </aside>
 
         <main class="wallet-main">

@@ -86,24 +86,19 @@
 
     <div class="marketing-shell">
         <aside class="marketing-sidebar">
-            <div class="marketing-sidebar-inner">
-                <a class="marketing-brand" href="/dashboard/founder"><img src="/brand/hatchers-ai-logo.png" alt="Hatchers AI"></a>
-                <nav class="marketing-nav">
-                    <a class="marketing-nav-item" href="/dashboard/founder"><span class="marketing-nav-icon">⌂</span><span>Home</span></a>
-                    <a class="marketing-nav-item" href="{{ route('founder.commerce') }}"><span class="marketing-nav-icon">⌁</span><span>Commerce</span></a>
-                    <a class="marketing-nav-item active" href="{{ route('founder.ai-tools') }}"><span class="marketing-nav-icon">✦</span><span>AI Tools</span></a>
-                    <a class="marketing-nav-item" href="{{ route('founder.learning-plan') }}"><span class="marketing-nav-icon">▣</span><span>Learning Plan</span></a>
-                    <a class="marketing-nav-item" href="{{ route('founder.tasks') }}"><span class="marketing-nav-icon">◌</span><span>Tasks</span></a>
-                    <a class="marketing-nav-item" href="{{ route('founder.settings') }}"><span class="marketing-nav-icon">⚙</span><span>Settings</span></a>
-                </nav>
-            </div>
-            <div class="marketing-sidebar-footer">
-                <div class="marketing-user">
-                    <div class="marketing-avatar">{{ strtoupper(substr($founder->full_name, 0, 1)) }}</div>
-                    <div>{{ $founder->full_name }}</div>
-                </div>
-                <form method="POST" action="/logout" style="margin:0;">@csrf<button class="marketing-nav-icon" type="submit" style="border:0;background:transparent;cursor:pointer;">↘</button></form>
-            </div>
+            @include('os.partials.founder-sidebar', [
+                'founder' => $founder,
+                'businessModel' => $founder->company->business_model ?? 'hybrid',
+                'activeKey' => 'marketing',
+                'navClass' => 'marketing-nav',
+                'itemClass' => 'marketing-nav-item',
+                'iconClass' => 'marketing-nav-icon',
+                'innerClass' => 'marketing-sidebar-inner',
+                'brandClass' => 'marketing-brand',
+                'footerClass' => 'marketing-sidebar-footer',
+                'userClass' => 'marketing-user',
+                'avatarClass' => 'marketing-avatar',
+            ])
         </aside>
 
         <main class="marketing-main">

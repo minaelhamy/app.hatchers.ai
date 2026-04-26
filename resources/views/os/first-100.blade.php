@@ -75,26 +75,19 @@
 
     <div class="tracker-shell">
         <aside class="tracker-sidebar">
-            <div class="tracker-sidebar-inner">
-                <a class="tracker-brand" href="/dashboard/founder"><img src="/brand/hatchers-ai-logo.png" alt="Hatchers AI"></a>
-                <nav class="tracker-nav">
-                    <a class="tracker-nav-item" href="/dashboard/founder"><span class="tracker-nav-icon">⌂</span><span>Home</span></a>
-                    <a class="tracker-nav-item active" href="{{ route('founder.first-100') }}"><span class="tracker-nav-icon">◎</span><span>First 100</span></a>
-                    <a class="tracker-nav-item" href="{{ route('founder.pods') }}"><span class="tracker-nav-icon">◍</span><span>Pods</span></a>
-                    <a class="tracker-nav-item" href="{{ route('founder.activity') }}"><span class="tracker-nav-icon">◫</span><span>Activity</span></a>
-                    <a class="tracker-nav-item" href="{{ route('founder.commerce') }}"><span class="tracker-nav-icon">⌁</span><span>Commerce</span></a>
-                    <a class="tracker-nav-item" href="{{ route('founder.marketing') }}"><span class="tracker-nav-icon">✦</span><span>Marketing</span></a>
-                    <a class="tracker-nav-item" href="{{ route('website') }}"><span class="tracker-nav-icon">◧</span><span>Website</span></a>
-                    <a class="tracker-nav-item" href="{{ route('founder.settings') }}"><span class="tracker-nav-icon">⚙</span><span>Settings</span></a>
-                </nav>
-            </div>
-            <div class="tracker-sidebar-footer">
-                <div class="tracker-user">
-                    <div class="tracker-avatar">{{ strtoupper(substr($founder->full_name, 0, 1)) }}</div>
-                    <div>{{ $founder->full_name }}</div>
-                </div>
-                <form method="POST" action="/logout" style="margin:0;">@csrf<button class="tracker-nav-icon" type="submit" style="border:0;background:transparent;cursor:pointer;">↘</button></form>
-            </div>
+            @include('os.partials.founder-sidebar', [
+                'founder' => $founder,
+                'businessModel' => $businessModel,
+                'activeKey' => 'first-100',
+                'navClass' => 'tracker-nav',
+                'itemClass' => 'tracker-nav-item',
+                'iconClass' => 'tracker-nav-icon',
+                'innerClass' => 'tracker-sidebar-inner',
+                'brandClass' => 'tracker-brand',
+                'footerClass' => 'tracker-sidebar-footer',
+                'userClass' => 'tracker-user',
+                'avatarClass' => 'tracker-avatar',
+            ])
         </aside>
 
         <main class="tracker-main">

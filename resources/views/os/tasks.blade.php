@@ -66,24 +66,19 @@
 
     <div class="tasks-shell">
         <aside class="tasks-sidebar">
-            <div class="tasks-sidebar-inner">
-                <a class="tasks-brand" href="/dashboard/founder"><img src="/brand/hatchers-ai-logo.png" alt="Hatchers AI"></a>
-                <nav class="tasks-nav">
-                    <a class="tasks-nav-item" href="/dashboard/founder"><span class="tasks-nav-icon">⌂</span><span>Home</span></a>
-                    <a class="tasks-nav-item" href="{{ route('founder.commerce') }}"><span class="tasks-nav-icon">⌁</span><span>Commerce</span></a>
-                    <a class="tasks-nav-item" href="{{ route('founder.ai-tools') }}"><span class="tasks-nav-icon">✦</span><span>AI Tools</span></a>
-                    <a class="tasks-nav-item" href="{{ route('founder.learning-plan') }}"><span class="tasks-nav-icon">▣</span><span>Learning Plan</span></a>
-                    <a class="tasks-nav-item active" href="{{ route('founder.tasks') }}"><span class="tasks-nav-icon">◌</span><span>Tasks</span></a>
-                    <a class="tasks-nav-item" href="{{ route('founder.settings') }}"><span class="tasks-nav-icon">⚙</span><span>Settings</span></a>
-                </nav>
-            </div>
-            <div class="tasks-sidebar-footer">
-                <div class="tasks-user">
-                    <div class="tasks-avatar">{{ strtoupper(substr($founder->full_name, 0, 1)) }}</div>
-                    <div>{{ $founder->full_name }}</div>
-                </div>
-                <form method="POST" action="/logout" style="margin:0;">@csrf<button class="tasks-nav-icon" type="submit" style="border:0;background:transparent;cursor:pointer;">↘</button></form>
-            </div>
+            @include('os.partials.founder-sidebar', [
+                'founder' => $founder,
+                'businessModel' => $founder->company->business_model ?? 'hybrid',
+                'activeKey' => 'tasks',
+                'navClass' => 'tasks-nav',
+                'itemClass' => 'tasks-nav-item',
+                'iconClass' => 'tasks-nav-icon',
+                'innerClass' => 'tasks-sidebar-inner',
+                'brandClass' => 'tasks-brand',
+                'footerClass' => 'tasks-sidebar-footer',
+                'userClass' => 'tasks-user',
+                'avatarClass' => 'tasks-avatar',
+            ])
         </aside>
 
         <main class="tasks-main">

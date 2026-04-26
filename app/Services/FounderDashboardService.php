@@ -176,6 +176,7 @@ class FounderDashboardService
             'mentor_session' => $mentorSession,
             'learning_item' => $learningItem,
             'learning_plan_entries' => $this->buildLearningPlanEntries($learningItem, $actions, $founder, $activityFeed),
+            'guided_path' => $this->buildGuidedPath($company, $execution, $commerceOperations, $revenueOs),
             'task_cards' => array_slice($taskCards, 0, 3),
             'task_center_entries' => $taskCards,
             'notifications' => $notifications,
@@ -210,6 +211,57 @@ class FounderDashboardService
             'daily_revenue_plan' => $revenueOs['daily_plan'] ?? ['tasks' => []],
             'first_hundred_summary' => $revenueOs,
         ];
+    }
+
+    private function buildGuidedPath($company, array $execution, array $commerceOperations, array $revenueOs): array
+    {
+        $identifiedLeads = (int) ($revenueOs['metrics']['identified_leads'] ?? 0);
+        $customersWon = (int) ($revenueOs['metrics']['customers_won'] ?? 0);
+        $websiteStatus = strtolower((string) ($company?->website_status ?? 'not_started'));
+
+        $path = [
+            [
+                'title' => 'Work today\'s tasks',
+                'description' => $execution['open_tasks'] > 0
+                    ? 'You have ' . $execution['open_tasks'] . ' open task' . ($execution['open_tasks'] === 1 ? '' : 's') . ' waiting in the OS.'
+                    : 'Keep momentum by reviewing the current task queue and marking progress.',
+                'href' => route('founder.tasks'),
+                'label' => 'Open Tasks',
+            ],
+            [
+                'title' => $websiteStatus === 'live' ? 'Review your live website' : 'Finish your website launch',
+                'description' => $websiteStatus === 'live'
+                    ? 'Your public OS website is already live. Review the message, offer, and booking or checkout flow.'
+                    : 'Website publishing is part of the main founder path. Finish it here before spreading traffic.',
+                'href' => route('website'),
+                'label' => $websiteStatus === 'live' ? 'Open Website' : 'Finish Website',
+            ],
+        ];
+
+        if ($customersWon === 0 || $identifiedLeads < 10) {
+            $path[] = [
+                'title' => 'Start customer outreach',
+                'description' => 'Your next revenue unlock is getting more named leads into the First 100 tracker.',
+                'href' => route('founder.first-100'),
+                'label' => 'Open First 100',
+            ];
+        } elseif ((int) ($commerceOperations['pending_orders'] ?? 0) > 0 || (int) ($commerceOperations['pending_bookings'] ?? 0) > 0) {
+            $path[] = [
+                'title' => 'Clear the operations queue',
+                'description' => 'Orders or bookings need action right now, so the dashboard should push you into commerce next.',
+                'href' => route('founder.commerce'),
+                'label' => 'Open Commerce',
+            ];
+        } else {
+            $path[] = [
+                'title' => 'Push marketing forward',
+                'description' => 'Your build foundation is in place. Use Marketing to turn the current offer into real demand.',
+                'href' => route('founder.marketing'),
+                'label' => 'Open Marketing',
+            ];
+        }
+
+        return $path;
     }
 
     private function buildAutomationSummary(Founder $founder, array $commerceOperations): array

@@ -70,24 +70,19 @@
 
     <div class="learning-shell">
         <aside class="learning-sidebar">
-            <div class="learning-sidebar-inner">
-                <a class="learning-brand" href="/dashboard/founder"><img src="/brand/hatchers-ai-logo.png" alt="Hatchers AI"></a>
-                <nav class="learning-nav">
-                    <a class="learning-nav-item" href="/dashboard/founder"><span class="learning-nav-icon">⌂</span><span>Home</span></a>
-                    <a class="learning-nav-item" href="{{ route('founder.commerce') }}"><span class="learning-nav-icon">⌁</span><span>Commerce</span></a>
-                    <a class="learning-nav-item" href="{{ route('founder.ai-tools') }}"><span class="learning-nav-icon">✦</span><span>AI Tools</span></a>
-                    <a class="learning-nav-item active" href="{{ route('founder.learning-plan') }}"><span class="learning-nav-icon">▣</span><span>Learning Plan</span></a>
-                    <a class="learning-nav-item" href="{{ route('founder.tasks') }}"><span class="learning-nav-icon">◌</span><span>Tasks</span></a>
-                    <a class="learning-nav-item" href="{{ route('founder.settings') }}"><span class="learning-nav-icon">⚙</span><span>Settings</span></a>
-                </nav>
-            </div>
-            <div class="learning-sidebar-footer">
-                <div class="learning-user">
-                    <div class="learning-avatar">{{ strtoupper(substr($founder->full_name, 0, 1)) }}</div>
-                    <div>{{ $founder->full_name }}</div>
-                </div>
-                <form method="POST" action="/logout" style="margin:0;">@csrf<button class="learning-nav-icon" type="submit" style="border:0;background:transparent;cursor:pointer;">↘</button></form>
-            </div>
+            @include('os.partials.founder-sidebar', [
+                'founder' => $founder,
+                'businessModel' => $founder->company->business_model ?? 'hybrid',
+                'activeKey' => 'learning-plan',
+                'navClass' => 'learning-nav',
+                'itemClass' => 'learning-nav-item',
+                'iconClass' => 'learning-nav-icon',
+                'innerClass' => 'learning-sidebar-inner',
+                'brandClass' => 'learning-brand',
+                'footerClass' => 'learning-sidebar-footer',
+                'userClass' => 'learning-user',
+                'avatarClass' => 'learning-avatar',
+            ])
         </aside>
 
         <main class="learning-main">

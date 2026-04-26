@@ -77,25 +77,19 @@
 
     <div class="commerce-shell">
         <aside class="commerce-sidebar">
-            <div class="commerce-sidebar-inner">
-                <a class="commerce-brand" href="/dashboard/founder"><img src="/brand/hatchers-ai-logo.png" alt="Hatchers AI"></a>
-                <nav class="commerce-nav">
-                    <a class="commerce-nav-item" href="/dashboard/founder"><span class="commerce-nav-icon">⌂</span><span>Home</span></a>
-                    <a class="commerce-nav-item active" href="{{ route('founder.commerce') }}"><span class="commerce-nav-icon">⌁</span><span>Commerce</span></a>
-                    <a class="commerce-nav-item" href="{{ route('founder.commerce.wallet') }}"><span class="commerce-nav-icon">$</span><span>Wallet</span></a>
-                    <a class="commerce-nav-item" href="{{ route('website') }}"><span class="commerce-nav-icon">◫</span><span>Website</span></a>
-                    <a class="commerce-nav-item" href="{{ route('founder.ai-tools') }}"><span class="commerce-nav-icon">✦</span><span>AI Tools</span></a>
-                    <a class="commerce-nav-item" href="{{ route('founder.tasks') }}"><span class="commerce-nav-icon">◌</span><span>Tasks</span></a>
-                    <a class="commerce-nav-item" href="{{ route('founder.settings') }}"><span class="commerce-nav-icon">⚙</span><span>Settings</span></a>
-                </nav>
-            </div>
-            <div class="commerce-sidebar-footer">
-                <div class="commerce-user">
-                    <div class="commerce-avatar">{{ strtoupper(substr($founder->full_name, 0, 1)) }}</div>
-                    <div>{{ $founder->full_name }}</div>
-                </div>
-                <form method="POST" action="/logout" style="margin:0;">@csrf<button class="commerce-nav-icon" type="submit" style="border:0;background:transparent;cursor:pointer;">↘</button></form>
-            </div>
+            @include('os.partials.founder-sidebar', [
+                'founder' => $founder,
+                'businessModel' => $businessModel,
+                'activeKey' => 'commerce',
+                'navClass' => 'commerce-nav',
+                'itemClass' => 'commerce-nav-item',
+                'iconClass' => 'commerce-nav-icon',
+                'innerClass' => 'commerce-sidebar-inner',
+                'brandClass' => 'commerce-brand',
+                'footerClass' => 'commerce-sidebar-footer',
+                'userClass' => 'commerce-user',
+                'avatarClass' => 'commerce-avatar',
+            ])
         </aside>
 
         <main class="commerce-main">

@@ -45,7 +45,7 @@ return new class extends Migration
             $table->timestamp('last_used_at')->nullable();
             $table->timestamps();
 
-            $table->unique(['founder_id', 'channel_key']);
+            $table->unique(['founder_id', 'channel_key'], 'flc_founder_channel_uq');
             $table->index(['founder_id', 'status']);
         });
 
@@ -65,7 +65,7 @@ return new class extends Migration
             $table->json('meta_json')->nullable();
             $table->timestamps();
 
-            $table->unique(['founder_id', 'thread_key']);
+            $table->unique(['founder_id', 'thread_key'], 'fct_founder_thread_uq');
             $table->index(['founder_id', 'status']);
             $table->index(['founder_id', 'next_follow_up_at']);
         });
@@ -90,7 +90,7 @@ return new class extends Migration
             $table->timestamp('applied_at')->nullable();
             $table->timestamps();
 
-            $table->unique(['founder_id', 'recommendation_key']);
+            $table->unique(['founder_id', 'recommendation_key'], 'fpr_founder_reco_uq');
             $table->index(['founder_id', 'status']);
         });
 
@@ -111,7 +111,7 @@ return new class extends Migration
             $table->timestamp('last_synced_at')->nullable();
             $table->timestamps();
 
-            $table->unique(['founder_id', 'status']);
+            $table->unique(['founder_id', 'status'], 'f100_founder_status_uq');
         });
     }
 

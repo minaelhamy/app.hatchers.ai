@@ -58,28 +58,19 @@
 
     <div class="tools-shell">
         <aside class="tools-sidebar">
-            <div class="tools-sidebar-inner">
-                <a class="tools-brand" href="/dashboard/founder"><img src="/brand/hatchers-ai-logo.png" alt="Hatchers AI"></a>
-                <nav class="tools-nav">
-                    <a class="tools-nav-item" href="/dashboard/founder"><span class="tools-nav-icon">⌂</span><span>Home</span></a>
-                    <a class="tools-nav-item" href="{{ route('founder.commerce') }}"><span class="tools-nav-icon">⌁</span><span>Commerce</span></a>
-                    <a class="tools-nav-item active" href="{{ route('founder.ai-tools') }}"><span class="tools-nav-icon">✦</span><span>AI Tools</span></a>
-                    <a class="tools-nav-item" href="{{ route('founder.search') }}"><span class="tools-nav-icon">⌕</span><span>Search</span></a>
-                    <a class="tools-nav-item" href="{{ route('founder.analytics') }}"><span class="tools-nav-icon">◔</span><span>Analytics</span></a>
-                    <a class="tools-nav-item" href="{{ route('founder.media-library') }}"><span class="tools-nav-icon">▤</span><span>Media Library</span></a>
-                    <a class="tools-nav-item" href="{{ route('founder.automations') }}"><span class="tools-nav-icon">↻</span><span>Automations</span></a>
-                    <a class="tools-nav-item" href="{{ route('founder.learning-plan') }}"><span class="tools-nav-icon">▣</span><span>Learning Plan</span></a>
-                    <a class="tools-nav-item" href="{{ route('founder.tasks') }}"><span class="tools-nav-icon">◌</span><span>Tasks</span></a>
-                    <a class="tools-nav-item" href="{{ route('founder.settings') }}"><span class="tools-nav-icon">⚙</span><span>Settings</span></a>
-                </nav>
-            </div>
-            <div class="tools-sidebar-footer">
-                <div class="tools-user">
-                    <div class="tools-avatar">{{ strtoupper(substr($founder->full_name, 0, 1)) }}</div>
-                    <div>{{ $founder->full_name }}</div>
-                </div>
-                <form method="POST" action="/logout" style="margin:0;">@csrf<button class="tools-nav-icon" type="submit" style="border:0;background:transparent;cursor:pointer;">↘</button></form>
-            </div>
+            @include('os.partials.founder-sidebar', [
+                'founder' => $founder,
+                'businessModel' => $founder->company->business_model ?? 'hybrid',
+                'activeKey' => 'ai-tools',
+                'navClass' => 'tools-nav',
+                'itemClass' => 'tools-nav-item',
+                'iconClass' => 'tools-nav-icon',
+                'innerClass' => 'tools-sidebar-inner',
+                'brandClass' => 'tools-brand',
+                'footerClass' => 'tools-sidebar-footer',
+                'userClass' => 'tools-user',
+                'avatarClass' => 'tools-avatar',
+            ])
         </aside>
 
         <main class="tools-main">

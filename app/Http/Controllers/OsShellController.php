@@ -3823,7 +3823,11 @@ class OsShellController extends Controller
             $company->save();
         }
 
-        return redirect()->route('website')->with('success', 'Website setup saved. Hatchers OS updated the underlying website engine for you.');
+        $successMessage = ($result['bridge_status'] ?? null) === 'pending'
+            ? 'Website setup saved in Hatchers OS. Your public OS website path is ready now, and engine sync can be completed later.'
+            : 'Website setup saved. Hatchers OS updated the underlying website engine for you.';
+
+        return redirect()->route('website')->with('success', $successMessage);
     }
 
     public function publishWebsite(
@@ -3856,7 +3860,11 @@ class OsShellController extends Controller
             $company->save();
         }
 
-        return redirect()->route('website')->with('success', 'Website published from Hatchers OS.');
+        $successMessage = ($result['bridge_status'] ?? null) === 'pending'
+            ? 'Website published on Hatchers OS. Your app.hatchers.ai public site is live now, while engine bridge sync remains optional.'
+            : 'Website published from Hatchers OS.';
+
+        return redirect()->route('website')->with('success', $successMessage);
     }
 
     public function publicWebsite(string $websitePath, PublicWebsiteService $publicWebsiteService)

@@ -533,57 +533,19 @@
 
     <div class="founder-home">
         <aside class="founder-sidebar">
-            <div class="founder-sidebar-inner">
-                <a class="founder-brand" href="/dashboard/founder">
-                    <img src="/brand/hatchers-ai-logo.png" alt="Hatchers AI">
-                </a>
-
-                <nav class="founder-nav">
-                    <a class="founder-nav-item active" href="/dashboard/founder">
-                        <span class="founder-nav-icon">⌂</span>
-                        <span>Home</span>
-                    </a>
-                    <a class="founder-nav-item" href="{{ route('founder.activity') }}">
-                        <span class="founder-nav-icon">◫</span>
-                        <span>Activity</span>
-                    </a>
-                    <a class="founder-nav-item" href="{{ route('founder.first-100') }}">
-                        <span class="founder-nav-icon">◎</span>
-                        <span>First 100</span>
-                    </a>
-                    <a class="founder-nav-item" href="{{ route('founder.commerce') }}">
-                        <span class="founder-nav-icon">⌁</span>
-                        <span>Commerce</span>
-                    </a>
-                    <a class="founder-nav-item" href="{{ route('founder.ai-tools') }}">
-                        <span class="founder-nav-icon">✦</span>
-                        <span>AI Tools</span>
-                    </a>
-                    <a class="founder-nav-item" href="{{ route('founder.learning-plan') }}">
-                        <span class="founder-nav-icon">▣</span>
-                        <span>Learning Plan</span>
-                    </a>
-                    <a class="founder-nav-item" href="{{ route('founder.tasks') }}">
-                        <span class="founder-nav-icon">◌</span>
-                        <span>Tasks</span>
-                    </a>
-                    <a class="founder-nav-item" href="{{ route('founder.settings') }}">
-                        <span class="founder-nav-icon">⚙</span>
-                        <span>Settings</span>
-                    </a>
-                </nav>
-            </div>
-
-            <div class="founder-sidebar-footer">
-                <div class="founder-user">
-                    <div class="founder-avatar">{{ strtoupper(substr($founder->full_name, 0, 1)) }}</div>
-                    <div class="founder-user-name">{{ $founder->full_name }}</div>
-                </div>
-                <form method="POST" action="/logout" style="margin: 0;">
-                    @csrf
-                    <button class="founder-nav-icon" type="submit" style="border: 0; background: transparent; cursor: pointer;">↘</button>
-                </form>
-            </div>
+            @include('os.partials.founder-sidebar', [
+                'founder' => $founder,
+                'businessModel' => $company->business_model ?? 'hybrid',
+                'activeKey' => 'home',
+                'navClass' => 'founder-nav',
+                'itemClass' => 'founder-nav-item',
+                'iconClass' => 'founder-nav-icon',
+                'innerClass' => 'founder-sidebar-inner',
+                'brandClass' => 'founder-brand',
+                'footerClass' => 'founder-sidebar-footer',
+                'userClass' => 'founder-user',
+                'avatarClass' => 'founder-avatar',
+            ])
         </aside>
 
         <main class="founder-main">
@@ -633,6 +595,21 @@
                             <div class="founder-badge">{{ $learning['badge'] }}</div>
                         </div>
                     </article>
+                </section>
+
+                <section class="founder-section">
+                    <h2>Start Here Today</h2>
+                    @foreach (($workspace['guided_path'] ?? []) as $step)
+                        <article class="founder-block">
+                            <div class="founder-row" style="align-items:flex-start;">
+                                <div>
+                                    <div style="font-size: 1.04rem; font-weight: 600;">{{ $step['title'] }}</div>
+                                    <div class="founder-subtle" style="margin-top: 4px;">{{ $step['description'] }}</div>
+                                </div>
+                                <a class="founder-badge info" href="{{ $step['href'] }}" style="text-decoration:none;">{{ $step['label'] }}</a>
+                            </div>
+                        </article>
+                    @endforeach
                 </section>
 
                 <section class="founder-section">

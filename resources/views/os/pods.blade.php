@@ -8,13 +8,27 @@
 
     <div class="sidebar-layout">
         <aside class="sidebar-card">
-            <div class="pill">Community Pods</div>
+            <div class="pill">Founder Workspace</div>
             <div class="nav-group" style="margin-top: 18px;">
-                <div class="nav-group-title">Founder View</div>
+                <div class="nav-group-title">Core</div>
                 <a class="nav-item" href="/dashboard/founder">Home</a>
+                <a class="nav-item" href="{{ route('founder.tasks') }}">Tasks</a>
                 <a class="nav-item" href="{{ route('founder.first-100') }}">First 100</a>
-                <a class="nav-item active" href="{{ route('founder.pods') }}">Pods</a>
+                <a class="nav-item" href="{{ route('founder.marketing') }}">Marketing</a>
+            </div>
+            <div class="nav-group">
+                <div class="nav-group-title">Build</div>
+                <a class="nav-item" href="{{ route('website') }}">Website</a>
                 <a class="nav-item" href="{{ route('founder.commerce') }}">Commerce</a>
+                <a class="nav-item" href="{{ route('founder.commerce.wallet') }}">Wallet</a>
+            </div>
+            <div class="nav-group">
+                <div class="nav-group-title">More</div>
+                <a class="nav-item" href="{{ route('founder.activity') }}">Activity</a>
+                <a class="nav-item" href="{{ route('founder.ai-tools') }}">AI Tools</a>
+                <a class="nav-item active" href="{{ route('founder.pods') }}">Pods</a>
+                <a class="nav-item" href="{{ route('founder.learning-plan') }}">Learning Plan</a>
+                <a class="nav-item" href="{{ route('founder.settings') }}">Settings</a>
             </div>
         </aside>
 

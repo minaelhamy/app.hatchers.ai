@@ -38,25 +38,19 @@
     @php $founder = $dashboard['founder']; @endphp
     <div class="analytics-shell">
         <aside class="analytics-sidebar">
-            <div class="analytics-sidebar-inner">
-                <a class="analytics-brand" href="/dashboard/founder"><img src="/brand/hatchers-ai-logo.png" alt="Hatchers AI"></a>
-                <nav class="analytics-nav">
-                    <a class="analytics-nav-item" href="/dashboard/founder"><span class="analytics-nav-icon">⌂</span><span>Home</span></a>
-                    <a class="analytics-nav-item" href="{{ route('founder.activity') }}"><span class="analytics-nav-icon">◫</span><span>Activity</span></a>
-                    <a class="analytics-nav-item" href="{{ route('founder.commerce') }}"><span class="analytics-nav-icon">⌁</span><span>Commerce</span></a>
-                    <a class="analytics-nav-item" href="{{ route('founder.ai-tools') }}"><span class="analytics-nav-icon">✦</span><span>AI Tools</span></a>
-                    <a class="analytics-nav-item" href="{{ route('founder.media-library') }}"><span class="analytics-nav-icon">▤</span><span>Media Library</span></a>
-                    <a class="analytics-nav-item active" href="{{ route('founder.analytics') }}"><span class="analytics-nav-icon">◔</span><span>Analytics</span></a>
-                    <a class="analytics-nav-item" href="{{ route('founder.settings') }}"><span class="analytics-nav-icon">⚙</span><span>Settings</span></a>
-                </nav>
-            </div>
-            <div class="analytics-sidebar-footer">
-                <div class="analytics-user">
-                    <div class="analytics-avatar">{{ strtoupper(substr($founder->full_name, 0, 1)) }}</div>
-                    <div>{{ $founder->full_name }}</div>
-                </div>
-                <form method="POST" action="/logout" style="margin:0;">@csrf<button class="analytics-nav-icon" type="submit" style="border:0;background:transparent;cursor:pointer;">↘</button></form>
-            </div>
+            @include('os.partials.founder-sidebar', [
+                'founder' => $founder,
+                'businessModel' => $founder->company->business_model ?? 'hybrid',
+                'activeKey' => 'ai-tools',
+                'navClass' => 'analytics-nav',
+                'itemClass' => 'analytics-nav-item',
+                'iconClass' => 'analytics-nav-icon',
+                'innerClass' => 'analytics-sidebar-inner',
+                'brandClass' => 'analytics-brand',
+                'footerClass' => 'analytics-sidebar-footer',
+                'userClass' => 'analytics-user',
+                'avatarClass' => 'analytics-avatar',
+            ])
         </aside>
 
         <main class="analytics-main">
