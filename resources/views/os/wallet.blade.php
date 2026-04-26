@@ -66,6 +66,7 @@
                 <a class="wallet-brand" href="/dashboard/founder"><img src="/brand/hatchers-ai-logo.png" alt="Hatchers AI"></a>
                 <nav class="wallet-nav">
                     <a class="wallet-nav-item" href="/dashboard/founder"><span class="wallet-nav-icon">⌂</span><span>Home</span></a>
+                    <a class="wallet-nav-item" href="{{ route('founder.first-100') }}"><span class="wallet-nav-icon">◎</span><span>First 100</span></a>
                     <a class="wallet-nav-item" href="{{ route('founder.commerce') }}"><span class="wallet-nav-icon">⌁</span><span>Commerce</span></a>
                     <a class="wallet-nav-item active" href="{{ route('founder.commerce.wallet') }}"><span class="wallet-nav-icon">$</span><span>Wallet</span></a>
                     <a class="wallet-nav-item" href="{{ route('founder.commerce.orders') }}"><span class="wallet-nav-icon">▤</span><span>Orders</span></a>

@@ -19,11 +19,17 @@
         $themeOptions = $website['theme_options'];
         $domainModel = $website['domain_model'];
         $nextSteps = $website['next_steps'];
+        $generationStatus = $website['website_generation_status'];
+        $autopilot = $website['autopilot'] ?? [];
+        $autopilotDraft = $autopilot['draft'] ?? null;
+        $launchSystem = $autopilot['launch_system'] ?? null;
         $recommendedCard = collect($engines)->firstWhere('key', $recommendedEngine) ?: $engines[0];
         $initialThemeOptions = $themeOptions[$recommendedEngine] ?? [];
         $dnsTargets = $website['dns_targets'];
         $supportsProducts = in_array($businessModel, ['product', 'hybrid'], true);
         $supportsServices = in_array($businessModel, ['service', 'hybrid'], true);
+        $defaultWebsiteTitle = old('website_title', $autopilotDraft['title'] ?? $recommendedCard['website_title']);
+        $defaultThemeTemplate = old('theme_template', $autopilotDraft['theme_template'] ?? $recommendedCard['theme']);
     @endphp
 
     <div class="sidebar-layout">
@@ -75,6 +81,138 @@
                     <span class="pill">Website status: {{ ucfirst(str_replace('_', ' ', $websiteStatus)) }}</span>
                     <span class="pill">Recommended engine: {{ strtoupper($recommendedEngine) }}</span>
                     <span class="pill">Custom domain: {{ ucfirst(str_replace('_', ' ', $customDomainStatus)) }}</span>
+                    <span class="pill">Draft status: {{ ucfirst(str_replace('_', ' ', $generationStatus)) }}</span>
+                </div>
+            </section>
+
+            <section class="grid-2" style="margin-top: 22px;">
+                <div class="card">
+                    <h2>Website Autopilot</h2>
+                    <p class="muted" style="margin-bottom: 14px;">Hatchers uses the founder brief, ICP, and vertical blueprint to draft the first site structure before the founder starts editing.</p>
+                    @if ($autopilotDraft)
+                        <div class="stack">
+                            <div class="stack-item">
+                                <strong>{{ $autopilotDraft['title'] ?: $companyName }}</strong><br>
+                                <span class="muted">{{ $autopilotDraft['hero']['headline'] ?? 'First website draft ready' }}</span>
+                            </div>
+                            <div class="stack-item">
+                                <strong>Blueprint and audience</strong><br>
+                                {{ $autopilot['blueprint_name'] ?: 'Blueprint pending' }} · {{ $autopilot['primary_icp_name'] ?: 'ICP pending' }}<br>
+                                <span class="muted">{{ $autopilot['problem_solved'] ?: 'Founder problem statement will shape the site message here.' }}</span>
+                            </div>
+                            <div class="stack-item">
+                                <strong>Sell Like Crazy angle</strong><br>
+                                {{ $autopilotDraft['sell_like_crazy']['core_promise'] ?? 'Core promise pending' }}<br>
+                                <span class="muted">{{ $autopilotDraft['sell_like_crazy']['lead_angle'] ?? '' }}</span>
+                            </div>
+                            <div class="stack-item">
+                                <strong>Starter offer</strong><br>
+                                {{ $autopilotDraft['starter_offer']['title'] ?? 'Starter offer pending' }} · {{ $autopilotDraft['starter_offer']['price'] ?? '0' }}<br>
+                                <span class="muted">{{ $autopilotDraft['starter_offer']['description'] ?? '' }}</span>
+                            </div>
+                            <div class="stack-item">
+                                <strong>Image direction</strong><br>
+                                <span class="muted">{{ implode(' · ', $autopilotDraft['image_queries'] ?? []) ?: 'Image queries pending' }}</span>
+                            </div>
+                            @if (!empty($autopilotDraft['atlas_handoff']['asset_slots'] ?? []))
+                                <div class="stack-item">
+                                    <strong>Atlas asset handoff</strong><br>
+                                    <span class="muted">Atlas has the website asset brief and slot plan for image selection.</span>
+                                    @foreach (($autopilotDraft['atlas_handoff']['asset_slots'] ?? []) as $slot)
+                                        <div class="muted" style="margin-top:8px;">
+                                            {{ $slot['slot_label'] ?? 'Slot' }} · {{ $slot['query'] ?? '' }} · {{ ucfirst(str_replace('_', ' ', $slot['status'] ?? 'requested')) }}
+                                        </div>
+                                        @if (!empty($slot['preview_url']))
+                                            <div style="margin-top:8px;">
+                                                <img src="{{ $slot['preview_url'] }}" alt="{{ $slot['alt_text'] ?? ($slot['slot_label'] ?? 'Website asset') }}" style="width:100%;max-width:220px;border-radius:14px;border:1px solid var(--line);display:block;">
+                                            </div>
+                                        @endif
+                                    @endforeach
+                                </div>
+                            @endif
+                            <div class="stack-item">
+                                <strong>Launch checklist</strong><br>
+                                @foreach (($autopilotDraft['launch_checklist'] ?? []) as $check)
+                                    <div class="muted">{{ $check }}</div>
+                                @endforeach
+                            </div>
+                            @if (!empty($autopilotDraft['funnel_blocks'] ?? []))
+                                <div class="stack-item">
+                                    <strong>Sell Like Crazy funnel blocks</strong><br>
+                                    @foreach (($autopilotDraft['funnel_blocks'] ?? []) as $blockKey => $block)
+                                        <div class="muted" style="margin-top:8px;">
+                                            {{ ucwords(str_replace('_', ' ', $blockKey)) }} ·
+                                            {{ is_array($block) ? (($block['title'] ?? $block['body'] ?? ($block[0]['question'] ?? 'Configured'))) : 'Configured' }}
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @endif
+                            <div class="stack-item">
+                                <strong>Launch system status</strong><br>
+                                <span class="muted">
+                                    @if ($launchSystem)
+                                        {{ ucfirst(str_replace('_', ' ', $launchSystem['status'] ?? 'active')) }} · {{ strtoupper($launchSystem['selected_engine'] ?? '') }} · {{ $launchSystem['applied_at'] ? 'Applied ' . $launchSystem['applied_at'] : 'Not applied yet' }}
+                                    @else
+                                        This draft has not been locked into the active launch system yet.
+                                    @endif
+                                </span>
+                            </div>
+                        </div>
+                    @else
+                        <div class="stack">
+                            <div class="stack-item">
+                                <strong>Ready to draft the first site</strong><br>
+                                <span class="muted">Use the founder brief and ICP to generate the first hero, CTA, offer, image direction, and theme suggestion automatically.</span>
+                            </div>
+                        </div>
+                    @endif
+                    <form method="POST" action="{{ route('website.generate') }}" style="margin-top: 18px;">
+                        @csrf
+                        <button class="btn primary" type="submit">{{ $autopilotDraft ? 'Regenerate Website Draft' : 'Generate My First Website' }}</button>
+                    </form>
+                    @if ($autopilotDraft)
+                        <form method="POST" action="{{ route('website.launch-system.apply') }}" style="margin-top: 12px;">
+                            @csrf
+                            <button class="btn secondary" type="submit">{{ $launchSystem ? 'Refresh Active Launch System' : 'Apply Funnel To Launch System' }}</button>
+                        </form>
+                        <div class="cta-row" style="margin-top:12px;flex-wrap:wrap;">
+                            @foreach (['hero' => 'Regenerate Hero', 'cta' => 'Regenerate CTA', 'offer_stack' => 'Regenerate Offer Stack', 'faq' => 'Regenerate FAQ'] as $blockKey => $label)
+                                <form method="POST" action="{{ route('website.draft.regenerate-block') }}" style="margin:0;">
+                                    @csrf
+                                    <input type="hidden" name="block" value="{{ $blockKey }}">
+                                    <button class="btn" type="submit">{{ $label }}</button>
+                                </form>
+                            @endforeach
+                        </div>
+                    @endif
+                </div>
+
+                <div class="card">
+                    <h2>Draft Preview</h2>
+                    <p class="muted" style="margin-bottom: 14px;">This is the current OS-side website plan before the founder fine-tunes the live setup.</p>
+                    @if ($autopilotDraft)
+                        <div class="stack">
+                            @foreach (($autopilotDraft['sections'] ?? []) as $section)
+                                <div class="stack-item">
+                                    @if (!empty($section['asset']['preview_url']))
+                                        <div style="margin-bottom:10px;">
+                                            <img src="{{ $section['asset']['preview_url'] }}" alt="{{ $section['asset']['alt_text'] ?? ($section['title'] ?? 'Website section image') }}" style="width:100%;max-width:280px;border-radius:14px;border:1px solid var(--line);display:block;">
+                                        </div>
+                                    @endif
+                                    <strong>{{ $section['title'] ?? 'Section' }}</strong><br>
+                                    <span class="muted">{{ $section['body'] ?? '' }}</span>
+                                    @foreach (($section['bullets'] ?? []) as $bullet)
+                                        <div class="muted">{{ $bullet }}</div>
+                                    @endforeach
+                                </div>
+                            @endforeach
+                        </div>
+                    @else
+                        <div class="stack-item">
+                            <strong>No draft yet</strong><br>
+                            <span class="muted">Once Hatchers generates the first site, the section plan appears here for founder review.</span>
+                        </div>
+                    @endif
                 </div>
             </section>
 
@@ -114,7 +252,7 @@
                             <input
                                 type="text"
                                 name="website_title"
-                                value="{{ old('website_title', $recommendedCard['website_title']) }}"
+                                value="{{ $defaultWebsiteTitle }}"
                                 style="margin-top: 10px; width: 100%; padding: 12px; border-radius: 14px; border: 1px solid var(--line); background: #fff;"
                                 placeholder="Enter the public website title">
                         </div>
@@ -132,7 +270,7 @@
                             <strong>Theme</strong><br>
                             <select name="theme_template" data-theme-select style="margin-top: 10px; width: 100%; padding: 12px; border-radius: 14px; border: 1px solid var(--line); background: #fff;">
                                 @foreach ($initialThemeOptions as $theme)
-                                    <option value="{{ $theme['id'] }}" @selected(old('theme_template', $recommendedCard['theme']) === $theme['id'])>
+                                    <option value="{{ $theme['id'] }}" @selected($defaultThemeTemplate === $theme['id'])>
                                         {{ $theme['label'] }}
                                     </option>
                                 @endforeach

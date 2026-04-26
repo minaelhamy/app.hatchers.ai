@@ -9,7 +9,10 @@ class PublicWebsiteService
     public function build(Company $company): array
     {
         $founder = $company->founder;
+        $company->loadMissing('websiteGenerationRuns');
         $snapshots = $founder?->moduleSnapshots?->keyBy('module') ?? collect();
+        $latestDraft = $company->websiteGenerationRuns()->latest('id')->first();
+        $draftOutput = is_array($latestDraft?->output_json) ? $latestDraft->output_json : [];
         $businessModel = $this->normalizeBusinessModel((string) ($company->business_model ?? 'hybrid'));
         $engine = $this->resolveEngine($company, $businessModel);
         $snapshot = $snapshots->get($engine);
@@ -37,11 +40,21 @@ class PublicWebsiteService
             'engine' => $engine,
             'path' => trim((string) ($company->website_path ?? ''), '/'),
             'theme' => (string) ($summary['theme_template'] ?? ''),
-            'hero' => $this->buildHero($company, $founder?->full_name ?? '', $businessModel, $counts, $currency),
+            'hero' => $this->buildHero($company, $founder?->full_name ?? '', $businessModel, $counts, $currency, $draftOutput),
             'metrics' => $this->buildMetrics($businessModel, $counts, (float) ($summary['gross_revenue'] ?? 0), $currency),
             'offers' => $this->buildOffers($payload, $businessModel, $currency, $offerPreferences),
-            'proof' => $this->buildProof($businessModel, $counts, $summary, $currency),
+            'proof' => $this->buildProof($businessModel, $counts, $summary, $currency, $draftOutput),
             'operations' => $this->buildOperations($payload, $businessModel, $currency),
+            'generated_sections' => $this->generatedSections($draftOutput),
+            'image_queries' => collect((array) ($draftOutput['image_queries'] ?? []))
+                ->map(fn ($query) => trim((string) $query))
+                ->filter()
+                ->values()
+                ->all(),
+            'asset_slots' => collect((array) ($draftOutput['atlas_handoff']['asset_slots'] ?? []))
+                ->filter('is_array')
+                ->values()
+                ->all(),
             'checkout_context' => [
                 'shipping_zones' => collect((array) ($payload['shipping_zones'] ?? []))
                     ->filter('is_array')
@@ -59,7 +72,29 @@ class PublicWebsiteService
         ];
     }
 
-    private function buildHero(Company $company, string $founderName, string $businessModel, array $counts, string $currency): array
+    private function generatedSections(array $draftOutput): array
+    {
+        return collect((array) ($draftOutput['sections'] ?? []))
+            ->filter('is_array')
+            ->values()
+            ->map(function (array $section): array {
+                $asset = is_array($section['asset'] ?? null) ? $section['asset'] : [];
+
+                return [
+                    'title' => (string) ($section['title'] ?? ''),
+                    'body' => (string) ($section['body'] ?? ''),
+                    'bullets' => collect((array) ($section['bullets'] ?? []))
+                        ->map(fn ($bullet) => trim((string) $bullet))
+                        ->filter()
+                        ->values()
+                        ->all(),
+                    'asset' => $asset,
+                ];
+            })
+            ->all();
+    }
+
+    private function buildHero(Company $company, string $founderName, string $businessModel, array $counts, string $currency, array $draftOutput = []): array
     {
         $companyName = trim((string) ($company->company_name ?? ''));
         $brief = trim((string) ($company->company_brief ?? ''));
@@ -72,20 +107,32 @@ class PublicWebsiteService
             };
         }
 
-        $headline = $companyName !== '' ? $companyName : ($founderName !== '' ? $founderName : 'Hatchers Business');
-        $subhead = match ($businessModel) {
+        $headline = trim((string) ($draftOutput['hero']['headline'] ?? ''));
+        if ($headline === '') {
+            $headline = $companyName !== '' ? $companyName : ($founderName !== '' ? $founderName : 'Hatchers Business');
+        }
+
+        $subhead = trim((string) ($draftOutput['hero']['subhead'] ?? ''));
+        if ($subhead === '') {
+            $subhead = match ($businessModel) {
             'product' => 'Browse products, place orders, and buy directly from one operating system.',
             'service' => 'Book services, confirm time slots, and work with a business that runs from one operating system.',
             default => 'Explore products and services from one unified business operating system.',
         };
+        }
+
+        $heroBrief = trim((string) ($draftOutput['hero']['brief'] ?? ''));
+        if ($heroBrief !== '') {
+            $brief = $heroBrief;
+        }
 
         return [
             'headline' => $headline,
             'subhead' => $subhead,
             'brief' => $brief,
-            'primary_cta' => $businessModel === 'service' ? 'Book now' : 'Explore offers',
-            'secondary_cta' => $businessModel === 'service' ? 'See services' : 'See what is available',
-            'eyebrow' => strtoupper($businessModel === 'service' ? 'SERVICES WEBSITE' : ($businessModel === 'product' ? 'STOREFRONT' : 'BUSINESS WEBSITE')),
+            'primary_cta' => trim((string) ($draftOutput['hero']['primary_cta'] ?? '')) ?: ($businessModel === 'service' ? 'Book now' : 'Explore offers'),
+            'secondary_cta' => trim((string) ($draftOutput['hero']['secondary_cta'] ?? '')) ?: ($businessModel === 'service' ? 'See services' : 'See what is available'),
+            'eyebrow' => trim((string) ($draftOutput['hero']['eyebrow'] ?? '')) ?: strtoupper($businessModel === 'service' ? 'SERVICES WEBSITE' : ($businessModel === 'product' ? 'STOREFRONT' : 'BUSINESS WEBSITE')),
         ];
     }
 
@@ -229,7 +276,7 @@ class PublicWebsiteService
         return array_slice($items, 0, 6);
     }
 
-    private function buildProof(string $businessModel, array $counts, array $summary, string $currency): array
+    private function buildProof(string $businessModel, array $counts, array $summary, string $currency, array $draftOutput = []): array
     {
         $proof = [];
         $grossRevenue = (float) ($summary['gross_revenue'] ?? 0);
@@ -252,6 +299,20 @@ class PublicWebsiteService
             'title' => 'Managed from Hatchers Ai Business OS',
             'description' => 'This public site is published from app.hatchers.ai while Bazaar and Servio keep powering the backend.',
         ];
+
+        foreach (array_slice((array) ($draftOutput['sections'] ?? []), 0, 2) as $section) {
+            if (!is_array($section)) {
+                continue;
+            }
+
+            $proof[] = [
+                'title' => (string) ($section['title'] ?? 'Launch section'),
+                'description' => trim(implode(' ', array_filter(array_merge(
+                    [(string) ($section['body'] ?? '')],
+                    array_slice(array_values(array_filter(array_map('strval', (array) ($section['bullets'] ?? [])))), 0, 2)
+                )))),
+            ];
+        }
 
         return $proof;
     }

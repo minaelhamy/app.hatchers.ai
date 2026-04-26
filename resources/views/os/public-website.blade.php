@@ -189,8 +189,12 @@
         $proof = $site['proof'];
         $operations = $site['operations'];
         $contact = $site['contact'];
+        $generatedSections = $site['generated_sections'] ?? [];
+        $imageQueries = $site['image_queries'] ?? [];
+        $assetSlots = $site['asset_slots'] ?? [];
         $productOffers = collect($offers)->where('type', 'product')->values();
         $serviceOffers = collect($offers)->where('type', 'service')->values();
+        $sourceContext = $sourceContext ?? ['src' => '', 'promo' => '', 'offer' => ''];
     @endphp
 
     <div class="site-shell">
@@ -215,6 +219,22 @@
                             @foreach ($errors->all() as $error)
                                 <div>{{ $error }}</div>
                             @endforeach
+                        </div>
+                    </div>
+                @endif
+                @if (($sourceContext['src'] ?? '') !== '' || ($sourceContext['promo'] ?? '') !== '')
+                    <div class="site-panel" style="margin-bottom:16px;border-color:rgba(24,23,23,0.12);background:rgba(255,255,255,0.78);">
+                        <strong style="color:#181717;">Special link detected</strong>
+                        <div class="meta" style="margin-top:8px;">
+                            @if (($sourceContext['src'] ?? '') !== '')
+                                <div>Source: {{ ucwords(str_replace(['_', '-'], ' ', $sourceContext['src'])) }}</div>
+                            @endif
+                            @if (($sourceContext['promo'] ?? '') !== '')
+                                <div>Promo: {{ strtoupper($sourceContext['promo']) }}</div>
+                            @endif
+                            @if (($sourceContext['offer'] ?? '') !== '')
+                                <div>Offer: {{ $sourceContext['offer'] }}</div>
+                            @endif
                         </div>
                     </div>
                 @endif
@@ -258,6 +278,71 @@
             </div>
         </section>
 
+        @if (!empty($generatedSections) || !empty($imageQueries))
+            <section class="site-section" style="padding-top: 0;">
+                <div class="site-wrap site-grid">
+                    <div class="site-offers">
+                        @if (!empty($generatedSections))
+                            <div>
+                                <div class="site-eyebrow">FOUNDATION</div>
+                                <h2 style="font-size:2rem;letter-spacing:-0.03em;margin:0 0 16px;">Built from the founder brief</h2>
+                            </div>
+                            <div class="site-offer-grid">
+                                @foreach ($generatedSections as $section)
+                                    <article class="site-card">
+                                        @if (!empty($section['asset']['preview_url']))
+                                            <div style="margin:-18px -18px 14px;">
+                                                <img src="{{ $section['asset']['preview_url'] }}" alt="{{ $section['asset']['alt_text'] ?? ($section['title'] ?? 'Website section image') }}" style="width:100%;height:220px;object-fit:cover;border-radius:24px 24px 14px 14px;display:block;">
+                                            </div>
+                                        @endif
+                                        <div style="font-size:1.18rem;font-weight:700;">{{ $section['title'] ?? 'Section' }}</div>
+                                        <div class="meta" style="margin-top:10px;">{{ $section['body'] ?? '' }}</div>
+                                        @foreach (($section['bullets'] ?? []) as $bullet)
+                                            <div class="meta">{{ $bullet }}</div>
+                                        @endforeach
+                                        @if (!empty($section['asset']['credit_name']))
+                                            <div class="meta" style="margin-top:12px;">
+                                                Visual by
+                                                @if (!empty($section['asset']['credit_url']))
+                                                    <a href="{{ $section['asset']['credit_url'] }}" target="_blank" rel="noopener noreferrer">{{ $section['asset']['credit_name'] }}</a>
+                                                @else
+                                                    {{ $section['asset']['credit_name'] }}
+                                                @endif
+                                            </div>
+                                        @endif
+                                    </article>
+                                @endforeach
+                            </div>
+                        @endif
+                    </div>
+                    @if (!empty($imageQueries) || !empty($assetSlots))
+                        <aside class="site-proof">
+                            <div class="site-proof-item">
+                                <div style="font-weight:700;">Visual direction</div>
+                                <div class="meta">This site follows the image-selection brief prepared by Hatchers before founder edits begin.</div>
+                                <div class="meta" style="margin-top:10px;">
+                                    @foreach ($imageQueries as $query)
+                                        <div>{{ $query }}</div>
+                                    @endforeach
+                                </div>
+                                @foreach ($assetSlots as $slot)
+                                    <div class="meta" style="margin-top:10px;">
+                                        <strong style="display:block;color:#181717;">{{ $slot['slot_label'] ?? 'Slot' }}</strong>
+                                        <span>{{ $slot['query'] ?? '' }}</span>
+                                        @if (!empty($slot['preview_url']))
+                                            <div style="margin-top:10px;">
+                                                <img src="{{ $slot['preview_url'] }}" alt="{{ $slot['alt_text'] ?? ($slot['slot_label'] ?? 'Website asset') }}" style="width:100%;border-radius:14px;border:1px solid rgba(220,207,191,0.72);display:block;">
+                                            </div>
+                                        @endif
+                                    </div>
+                                @endforeach
+                            </div>
+                        </aside>
+                    @endif
+                </div>
+            </section>
+        @endif
+
         <section id="offers" class="site-section">
             <div class="site-wrap site-grid">
                 <div class="site-offers">
@@ -265,6 +350,29 @@
                         <div class="site-eyebrow">AVAILABLE NOW</div>
                         <h2 style="font-size:2rem;letter-spacing:-0.03em;margin:0 0 8px;">Offers running through the OS</h2>
                         <p style="color:#625848;max-width:62ch;">This public website is rendered inside `app.hatchers.ai`, while the founder keeps managing products, services, orders, and bookings from the OS workspace.</p>
+                    </div>
+
+                    <div class="site-card">
+                        <div class="site-eyebrow" style="margin-bottom:10px;">QUICK INTRO</div>
+                        <div style="font-size:1.18rem;font-weight:700;">Share your details and let the founder follow up</div>
+                        <div class="meta" style="margin-top:8px;">Perfect for QR flyers, promo cards, neighborhood referrals, or anyone who wants a fast callback before ordering or booking.</div>
+                        <form method="POST" action="{{ route('public.website.intro', ['websitePath' => $site['path']]) }}" style="margin-top:14px;display:grid;gap:12px;">
+                            @csrf
+                            <input type="hidden" name="src" value="{{ $sourceContext['src'] }}">
+                            <input type="hidden" name="promo" value="{{ $sourceContext['promo'] }}">
+                            <input type="hidden" name="offer_title" value="{{ old('offer_title', $sourceContext['offer']) }}">
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                                <input type="text" name="lead_name" placeholder="Your name" value="{{ old('lead_name') }}" style="width:100%;padding:10px 12px;border-radius:12px;border:1px solid rgba(220,207,191,0.9);background:#fff;">
+                                <input type="text" name="city" placeholder="City" value="{{ old('city') }}" style="width:100%;padding:10px 12px;border-radius:12px;border:1px solid rgba(220,207,191,0.9);background:#fff;">
+                            </div>
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                                <input type="email" name="customer_email" placeholder="Email" value="{{ old('customer_email') }}" style="width:100%;padding:10px 12px;border-radius:12px;border:1px solid rgba(220,207,191,0.9);background:#fff;">
+                                <input type="text" name="customer_mobile" placeholder="Mobile" value="{{ old('customer_mobile') }}" style="width:100%;padding:10px 12px;border-radius:12px;border:1px solid rgba(220,207,191,0.9);background:#fff;">
+                            </div>
+                            <input type="text" name="offer_title_display" value="{{ old('offer_title', $sourceContext['offer']) }}" placeholder="Interested in which offer?" oninput="this.form.offer_title.value=this.value" style="width:100%;padding:10px 12px;border-radius:12px;border:1px solid rgba(220,207,191,0.9);background:#fff;">
+                            <textarea name="notes" rows="4" placeholder="What do you need help with?" style="width:100%;padding:10px 12px;border-radius:12px;border:1px solid rgba(220,207,191,0.9);background:#fff;">{{ old('notes') }}</textarea>
+                            <button type="submit" class="site-cta primary" style="border:none;cursor:pointer;">Send my details</button>
+                        </form>
                     </div>
 
                     <div class="site-offer-grid">
@@ -313,6 +421,8 @@
                                 <form method="POST" action="{{ route('public.website.order', ['websitePath' => $site['path']]) }}" style="margin-top:14px;display:grid;gap:12px;" data-order-request data-base-price="{{ $offer['base_price'] ?? 0 }}" data-currency="{{ $offer['currency'] ?? 'USD' }}">
                                     @csrf
                                     <input type="hidden" name="offer_title" value="{{ $offer['title'] }}">
+                                    <input type="hidden" name="src" value="{{ $sourceContext['src'] }}">
+                                    <input type="hidden" name="promo" value="{{ $sourceContext['promo'] }}">
                                     @if (!empty($offer['request_options']['variants']))
                                         <select name="selected_variant" style="width:100%;padding:10px 12px;border-radius:12px;border:1px solid rgba(220,207,191,0.9);background:#fff;">
                                             <option value="">Choose a variant</option>
@@ -372,6 +482,8 @@
                                 <form method="POST" action="{{ route('public.website.booking', ['websitePath' => $site['path']]) }}" style="margin-top:14px;display:grid;gap:12px;" data-booking-request data-base-price="{{ $offer['base_price'] ?? 0 }}" data-currency="{{ $offer['currency'] ?? 'USD' }}" data-duration-minutes="{{ (($offer['request_options']['duration_unit'] ?? 'minutes') === 'hours') ? ((int) ($offer['request_options']['duration'] ?? 1) * 60) : (int) ($offer['request_options']['duration'] ?? 30) }}" data-availability-days="{{ implode('|', $offer['request_options']['availability_days'] ?? []) }}" data-open-time="{{ $offer['request_options']['open_time'] ?? '' }}" data-close-time="{{ $offer['request_options']['close_time'] ?? '' }}">
                                     @csrf
                                     <input type="hidden" name="offer_title" value="{{ $offer['title'] }}">
+                                    <input type="hidden" name="src" value="{{ $sourceContext['src'] }}">
+                                    <input type="hidden" name="promo" value="{{ $sourceContext['promo'] }}">
                                     @if (!empty($offer['request_options']['additional_services']))
                                         <div class="meta">Add-ons</div>
                                         <div style="display:grid;gap:8px;">

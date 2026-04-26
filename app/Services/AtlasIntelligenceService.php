@@ -12,6 +12,9 @@ class AtlasIntelligenceService
 {
     public function syncFounderOnboarding(Founder $founder, Company $company, array $payload): void
     {
+        $company->loadMissing(['verticalBlueprint', 'businessBrief', 'icpProfiles']);
+        $brief = $company->businessBrief;
+        $icp = $company->icpProfiles()->latest()->first();
         $body = [
             'app' => 'os',
             'role' => 'founder',
@@ -23,6 +26,9 @@ class AtlasIntelligenceService
                 'company_name' => $company->company_name,
                 'business_model' => $company->business_model,
                 'industry' => $company->industry,
+                'vertical' => (string) ($company->verticalBlueprint?->name ?? ''),
+                'primary_city' => (string) ($company->primary_city ?? ''),
+                'service_radius' => (string) ($company->service_radius ?? ''),
             ],
             'operations' => [
                 'onboarding_completed' => true,
@@ -32,6 +38,11 @@ class AtlasIntelligenceService
                 'business_model' => $company->business_model,
                 'stage' => $company->stage,
                 'website_status' => $company->website_status,
+                'launch_stage' => (string) ($company->launch_stage ?? ''),
+                'website_generation_status' => (string) ($company->website_generation_status ?? ''),
+                'business_summary' => (string) ($brief?->business_summary ?? ''),
+                'problem_solved' => (string) ($brief?->problem_solved ?? ''),
+                'primary_icp_name' => (string) ($icp?->primary_icp_name ?? ''),
             ],
             'sync_summary' => 'Founder completed OS onboarding.',
         ];
@@ -94,6 +105,10 @@ class AtlasIntelligenceService
             ],
             'sync_summary' => (string) ($payload['sync_summary'] ?? 'Founder context was updated from Hatchers OS.'),
         ];
+
+        if (!empty($payload['payload']) && is_array($payload['payload'])) {
+            $body['snapshot'] = array_merge($body['snapshot'], $payload['payload']);
+        }
 
         $this->sendIntelligenceSync($founder, $body, 'Atlas mutation sync failed');
     }

@@ -61,6 +61,7 @@
         $catalogOffers = $catalogOffers ?? [];
         $commerceConfigs = $commerceConfigs ?? ['coupon' => [], 'shipping' => [], 'booking_policy' => []];
         $commerceCatalogs = $commerceCatalogs ?? ['bazaar' => ['categories' => [], 'taxes' => []], 'servio' => ['categories' => [], 'taxes' => [], 'additional_services' => []]];
+        $pricingOptimizer = $pricingOptimizer ?? ['headline' => 'Offer & Pricing Optimizer', 'currency' => 'USD', 'price_story' => '', 'best_offer_name' => '', 'best_channel_label' => '', 'bundle_logic' => '', 'recommendations' => [], 'upsells' => [], 'conversion_notes' => []];
         $walletSummary = $walletSummary ?? ['available_balance' => 0, 'pending_balance' => 0, 'reserved_balance' => 0, 'minimum_payout_amount' => 50, 'currency' => 'USD', 'recent_entries' => []];
         $payoutAccount = $payoutAccount ?? null;
         $recentPayoutRequests = $recentPayoutRequests ?? collect();
@@ -196,6 +197,79 @@
                                 @endforelse
                                 @foreach (($commerceCatalogs['servio']['staff'] ?? []) as $staff)
                                     <div class="commerce-chip">{{ $staff['title'] }} · ID {{ $staff['id'] }}</div>
+                                @endforeach
+                            </div>
+                        @endif
+                    </div>
+                </section>
+
+                <section class="commerce-section">
+                    <h2>{{ $pricingOptimizer['headline'] }}</h2>
+                    <div class="commerce-grid">
+                        <div class="commerce-card">
+                            <div class="commerce-card-meta">Price Story</div>
+                            <div class="commerce-card-title">How the OS thinks your offer should sell</div>
+                            <div class="commerce-card-copy">{{ $pricingOptimizer['price_story'] }}</div>
+                            @if ($pricingOptimizer['best_offer_name'] !== '')
+                                <div class="commerce-chip">Best offer signal: {{ $pricingOptimizer['best_offer_name'] }}</div>
+                            @endif
+                            @if ($pricingOptimizer['best_channel_label'] !== '')
+                                <div class="commerce-chip">Best channel: {{ $pricingOptimizer['best_channel_label'] }}</div>
+                            @endif
+                            <div class="commerce-card-copy" style="margin-top:12px;">{{ $pricingOptimizer['bundle_logic'] }}</div>
+                        </div>
+                        <div class="commerce-card">
+                            <div class="commerce-card-meta">Conversion Notes</div>
+                            <div class="commerce-card-title">What to tighten first</div>
+                            @foreach ($pricingOptimizer['conversion_notes'] as $note)
+                                <div class="commerce-chip">{{ $note }}</div>
+                            @endforeach
+                        </div>
+                    </div>
+                    <div class="commerce-grid" style="margin-top:12px;">
+                        @foreach ($pricingOptimizer['recommendations'] as $recommendation)
+                            <div class="commerce-card">
+                                <div class="commerce-card-meta">{{ strtoupper($recommendation['positioning']) }}</div>
+                                <div class="commerce-card-title">{{ $recommendation['title'] }}</div>
+                                <div class="commerce-card-copy">{{ $recommendation['description'] }}</div>
+                                <div class="commerce-chip">{{ $pricingOptimizer['currency'] }} {{ number_format((float) $recommendation['price'], 2) }}</div>
+                                <div class="commerce-chip">Status: {{ ucfirst(str_replace('_', ' ', $recommendation['status'] ?? 'generated')) }}</div>
+                                <form method="POST" action="{{ route('founder.commerce.pricing.apply', $recommendation['id']) }}" style="margin-top:12px;">
+                                    @csrf
+                                    @if (!empty($catalogOffers))
+                                        <div class="commerce-field">
+                                            <label for="pricing-target-{{ $recommendation['id'] }}">Apply to offer</label>
+                                            <select id="pricing-target-{{ $recommendation['id'] }}" name="target_action_plan_id">
+                                                @foreach ($catalogOffers as $offer)
+                                                    <option value="{{ $offer['id'] }}" @selected((int) ($recommendation['target_action_plan_id'] ?? 0) === (int) $offer['id'])>
+                                                        {{ $offer['title'] }} · {{ strtoupper($offer['engine']) }}
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                    @endif
+                                    <div class="commerce-actions">
+                                        <button class="commerce-cta" type="submit">
+                                            {{ ($recommendation['status'] ?? 'generated') === 'applied' ? 'Reapply Recommendation' : 'Apply Recommendation' }}
+                                        </button>
+                                    </div>
+                                </form>
+                                @if (($recommendation['status'] ?? 'generated') !== 'applied')
+                                    <form method="POST" action="{{ route('founder.commerce.pricing.status', $recommendation['id']) }}" style="margin-top:10px;">
+                                        @csrf
+                                        <input type="hidden" name="status" value="rejected">
+                                        <button class="commerce-secondary" type="submit">Reject Recommendation</button>
+                                    </form>
+                                @endif
+                            </div>
+                        @endforeach
+                        @if (!empty($pricingOptimizer['upsells']))
+                            <div class="commerce-card">
+                                <div class="commerce-card-meta">Upsells</div>
+                                <div class="commerce-card-title">Attach simple add-ons after the yes</div>
+                                @foreach ($pricingOptimizer['upsells'] as $upsell)
+                                    <div class="commerce-chip">{{ $upsell['title'] }} · {{ $pricingOptimizer['currency'] }} {{ number_format((float) $upsell['price'], 2) }}</div>
+                                    <div class="commerce-card-copy" style="margin-top:8px;">{{ $upsell['why'] }}</div>
                                 @endforeach
                             </div>
                         @endif
@@ -598,6 +672,22 @@
                         <div class="rail-item"><strong>Bookings</strong><br><span class="muted">Commerce → Bookings</span></div>
                     @endif
                     <div class="rail-item"><strong>Theme + public URL</strong><br><span class="muted">Website workspace</span></div>
+                </div>
+
+                <h3 style="margin-top:22px;">Pricing Focus</h3>
+                <div class="rail-list">
+                    @foreach (array_slice($pricingOptimizer['recommendations'], 0, 3) as $recommendation)
+                        <div class="rail-item">
+                            <strong>{{ $recommendation['title'] }}</strong><br>
+                            <span class="muted">{{ $recommendation['positioning'] }} · {{ $pricingOptimizer['currency'] }} {{ number_format((float) $recommendation['price'], 2) }}</span>
+                        </div>
+                    @endforeach
+                    @if ($pricingOptimizer['best_channel_label'] !== '')
+                        <div class="rail-item">
+                            <strong>Best channel</strong><br>
+                            <span class="muted">{{ $pricingOptimizer['best_channel_label'] }}</span>
+                        </div>
+                    @endif
                 </div>
 
                 <h3 style="margin-top:22px;">Founder Wallet</h3>

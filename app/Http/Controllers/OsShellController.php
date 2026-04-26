@@ -7,6 +7,18 @@ use App\Models\Company;
 use App\Models\CompanyIntelligence;
 use App\Models\Founder;
 use App\Models\FounderActionPlan;
+use App\Models\FounderBusinessBrief;
+use App\Models\FounderConversationThread;
+use App\Models\FounderFirstHundredTracker;
+use App\Models\FounderIcpProfile;
+use App\Models\FounderLaunchSystem;
+use App\Models\FounderLead;
+use App\Models\FounderLeadChannel;
+use App\Models\FounderPod;
+use App\Models\FounderPodMembership;
+use App\Models\FounderPodPost;
+use App\Models\FounderPricingRecommendation;
+use App\Models\FounderPromoLink;
 use App\Models\FounderPayoutAccount;
 use App\Models\FounderPayoutRequest;
 use App\Models\FounderWeeklyState;
@@ -14,11 +26,14 @@ use App\Models\OsAutomationRule;
 use App\Models\OsOperationException;
 use App\Models\PublicCheckoutSession;
 use App\Models\Subscription;
+use App\Models\VerticalBlueprint;
+use App\Models\VerticalBlueprintVersion;
 use App\Services\AdminDashboardService;
 use App\Services\AdminOperationsService;
 use App\Services\AtlasIntelligenceService;
 use App\Services\FounderModuleSyncService;
 use App\Services\FounderDashboardService;
+use App\Services\FounderRevenueOsService;
 use App\Services\IdentitySyncService;
 use App\Services\LmsIdentityBridgeService;
 use App\Services\MentorDashboardService;
@@ -27,6 +42,7 @@ use App\Services\OsOperationsLogService;
 use App\Services\OsStripeService;
 use App\Services\OsWalletService;
 use App\Services\PublicWebsiteService;
+use App\Services\WebsiteAutopilotService;
 use App\Services\WebsiteProvisioningService;
 use App\Services\WebsiteWorkspaceService;
 use App\Services\WorkspaceLaunchService;
@@ -39,6 +55,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rule;
+use SimpleSoftwareIO\QrCode\Facades\QrCode;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Throwable;
 
@@ -68,6 +85,7 @@ class OsShellController extends Controller
             'pageTitle' => 'Founder Onboarding',
             'submitted' => session('submitted'),
             'selectedPlan' => $selectedPlan,
+            'verticalBlueprintOptions' => array_values($this->verticalBlueprintDefinitions()),
             'industryOptions' => $this->founderIndustryOptions(),
             'coreOfferOptions' => $this->founderCoreOfferOptions(),
         ]);
@@ -292,6 +310,106 @@ class OsShellController extends Controller
         ]);
     }
 
+    public function founderFirstHundred(
+        Request $request,
+        FounderDashboardService $founderDashboardService,
+        FounderRevenueOsService $revenueOsService
+    ) {
+        /** @var \App\Models\Founder $user */
+        $user = Auth::user();
+        if (!$user->isFounder()) {
+            return redirect()->route('dashboard');
+        }
+
+        $filters = $request->validate([
+            'stage' => ['nullable', 'string', Rule::in($revenueOsService->stageOptions())],
+            'channel' => ['nullable', 'string', Rule::in($revenueOsService->channelOptions($user->company?->verticalBlueprint))],
+            'q' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        return view('os.first-100', [
+            'pageTitle' => 'First 100 Customers',
+            'dashboard' => $founderDashboardService->build($user),
+            'tracker' => $revenueOsService->workspace($user, $filters),
+        ]);
+    }
+
+    public function founderPods(FounderDashboardService $founderDashboardService, FounderRevenueOsService $revenueOsService)
+    {
+        /** @var \App\Models\Founder $user */
+        $user = Auth::user();
+        if (!$user->isFounder()) {
+            return redirect()->route('dashboard');
+        }
+
+        return view('os.pods', [
+            'pageTitle' => 'Pods',
+            'dashboard' => $founderDashboardService->build($user),
+            'workspace' => $revenueOsService->podsWorkspace($user),
+        ]);
+    }
+
+    public function founderJoinPod(FounderPod $pod): RedirectResponse
+    {
+        /** @var \App\Models\Founder $user */
+        $user = Auth::user();
+        if (!$user->isFounder()) {
+            return redirect()->route('dashboard');
+        }
+
+        FounderPodMembership::query()->updateOrCreate(
+            [
+                'founder_id' => $user->id,
+                'founder_pod_id' => $pod->id,
+            ],
+            [
+                'role' => 'member',
+                'status' => 'active',
+                'joined_at' => now(),
+            ]
+        );
+
+        return redirect()->route('founder.pods')->with('success', 'You joined the pod and can now post wins and blockers there.');
+    }
+
+    public function founderStorePodPost(Request $request, FounderPod $pod): RedirectResponse
+    {
+        /** @var \App\Models\Founder $user */
+        $user = Auth::user();
+        if (!$user->isFounder()) {
+            return redirect()->route('dashboard');
+        }
+
+        $membership = FounderPodMembership::query()
+            ->where('founder_id', $user->id)
+            ->where('founder_pod_id', $pod->id)
+            ->where('status', 'active')
+            ->first();
+
+        if (!$membership) {
+            return redirect()->route('founder.pods')->with('error', 'Join the pod before posting.');
+        }
+
+        $validated = $request->validate([
+            'post_type' => ['required', Rule::in(['win', 'blocker', 'prompt'])],
+            'title' => ['required', 'string', 'max:191'],
+            'body' => ['required', 'string', 'max:3000'],
+        ]);
+
+        FounderPodPost::query()->create([
+            'founder_pod_id' => $pod->id,
+            'founder_id' => $user->id,
+            'post_type' => (string) $validated['post_type'],
+            'title' => trim((string) $validated['title']),
+            'body' => trim((string) $validated['body']),
+            'meta_json' => [
+                'company_name' => (string) ($user->company?->company_name ?? ''),
+            ],
+        ]);
+
+        return redirect()->route('founder.pods')->with('success', 'Pod post published.');
+    }
+
     public function founderLearningPlan(FounderDashboardService $founderDashboardService)
     {
         /** @var \App\Models\Founder $user */
@@ -317,6 +435,370 @@ class OsShellController extends Controller
         return view('os.tasks', [
             'pageTitle' => 'Tasks',
             'dashboard' => $founderDashboardService->build($user),
+        ]);
+    }
+
+    public function founderStoreLead(Request $request, FounderRevenueOsService $revenueOsService): RedirectResponse
+    {
+        /** @var \App\Models\Founder $user */
+        $user = Auth::user();
+        if (!$user->isFounder()) {
+            return redirect()->route('dashboard');
+        }
+
+        $validated = $request->validate([
+            'lead_name' => ['required', 'string', 'max:191'],
+            'lead_channel' => ['required', 'string', Rule::in(array_values(array_filter($revenueOsService->channelOptions($user->company?->verticalBlueprint), fn (string $value) => $value !== 'all')))],
+            'lead_stage' => ['required', 'string', Rule::in(array_values(array_filter($revenueOsService->stageOptions(), fn (string $value) => $value !== 'all')))],
+            'contact_handle' => ['nullable', 'string', 'max:191'],
+            'city' => ['nullable', 'string', 'max:191'],
+            'offer_name' => ['nullable', 'string', 'max:191'],
+            'estimated_value' => ['nullable', 'numeric', 'min:0', 'max:999999.99'],
+            'source_notes' => ['nullable', 'string', 'max:2000'],
+            'stage_notes' => ['nullable', 'string', 'max:2000'],
+            'first_contacted_at' => ['nullable', 'date'],
+            'last_followed_up_at' => ['nullable', 'date'],
+            'next_follow_up_at' => ['nullable', 'date'],
+        ]);
+
+        $stage = (string) $validated['lead_stage'];
+
+        FounderLead::query()->create([
+            'founder_id' => $user->id,
+            'company_id' => $user->company?->id,
+            'lead_name' => $validated['lead_name'],
+            'lead_channel' => $validated['lead_channel'],
+            'lead_stage' => $stage,
+            'contact_handle' => $validated['contact_handle'] ?? null,
+            'city' => $validated['city'] ?? null,
+            'offer_name' => $validated['offer_name'] ?? null,
+            'estimated_value' => $validated['estimated_value'] ?? null,
+            'source_notes' => $validated['source_notes'] ?? null,
+            'stage_notes' => $validated['stage_notes'] ?? null,
+            'first_contacted_at' => $validated['first_contacted_at'] ?? null,
+            'last_followed_up_at' => $validated['last_followed_up_at'] ?? null,
+            'next_follow_up_at' => $validated['next_follow_up_at'] ?? null,
+            'converted_at' => $stage === 'won' ? now() : null,
+            'lost_at' => $stage === 'lost' ? now() : null,
+        ]);
+
+        return redirect()->route('founder.first-100')->with('success', 'Lead added to your First 100 tracker.');
+    }
+
+    public function founderUpdateLead(Request $request, FounderLead $lead, FounderRevenueOsService $revenueOsService): RedirectResponse
+    {
+        /** @var \App\Models\Founder $user */
+        $user = Auth::user();
+        if (!$user->isFounder()) {
+            return redirect()->route('dashboard');
+        }
+
+        if ((int) $lead->founder_id !== (int) $user->id) {
+            abort(404);
+        }
+
+        $validated = $request->validate([
+            'lead_name' => ['sometimes', 'required', 'string', 'max:191'],
+            'lead_channel' => ['sometimes', 'required', 'string', Rule::in(array_values(array_filter($revenueOsService->channelOptions($user->company?->verticalBlueprint), fn (string $value) => $value !== 'all')))],
+            'lead_stage' => ['sometimes', 'required', 'string', Rule::in(array_values(array_filter($revenueOsService->stageOptions(), fn (string $value) => $value !== 'all')))],
+            'contact_handle' => ['nullable', 'string', 'max:191'],
+            'city' => ['nullable', 'string', 'max:191'],
+            'offer_name' => ['nullable', 'string', 'max:191'],
+            'estimated_value' => ['nullable', 'numeric', 'min:0', 'max:999999.99'],
+            'source_notes' => ['nullable', 'string', 'max:2000'],
+            'stage_notes' => ['nullable', 'string', 'max:2000'],
+            'first_contacted_at' => ['nullable', 'date'],
+            'last_followed_up_at' => ['nullable', 'date'],
+            'next_follow_up_at' => ['nullable', 'date'],
+        ]);
+
+        $lead->fill($validated);
+        if (array_key_exists('lead_stage', $validated)) {
+            $stage = (string) $validated['lead_stage'];
+            if ($stage === 'won' && $lead->converted_at === null) {
+                $lead->converted_at = now();
+            }
+            if ($stage !== 'won') {
+                $lead->converted_at = null;
+            }
+            if ($stage === 'lost' && $lead->lost_at === null) {
+                $lead->lost_at = now();
+            }
+            if ($stage !== 'lost') {
+                $lead->lost_at = null;
+            }
+        }
+
+        $lead->save();
+
+        return redirect()->route('founder.first-100')->with('success', 'Lead updated in your First 100 tracker.');
+    }
+
+    public function founderLogLeadTouch(Request $request, FounderLead $lead): RedirectResponse
+    {
+        /** @var \App\Models\Founder $user */
+        $user = Auth::user();
+        if (!$user->isFounder()) {
+            return redirect()->route('dashboard');
+        }
+
+        if ((int) $lead->founder_id !== (int) $user->id) {
+            abort(404);
+        }
+
+        $validated = $request->validate([
+            'touch_type' => ['required', Rule::in(['outreach_sent', 'follow_up_sent', 'reply_received', 'proposal_sent', 'won', 'lost'])],
+            'message_channel' => ['required', Rule::in(['manual', 'email', 'whatsapp', 'sms', 'instagram', 'facebook_groups', 'nextdoor', 'referral'])],
+            'touch_note' => ['nullable', 'string', 'max:2000'],
+            'next_follow_up_at' => ['nullable', 'date'],
+        ]);
+
+        $meta = is_array($lead->meta_json) ? $lead->meta_json : [];
+        $touches = is_array($meta['touches'] ?? null) ? $meta['touches'] : [];
+        $touches[] = [
+            'type' => (string) $validated['touch_type'],
+            'channel' => (string) $validated['message_channel'],
+            'note' => trim((string) ($validated['touch_note'] ?? '')),
+            'logged_at' => now()->toIso8601String(),
+        ];
+
+        $lead->last_followed_up_at = now();
+        $lead->next_follow_up_at = $validated['next_follow_up_at'] ?? null;
+        $lead->meta_json = array_merge($meta, ['touches' => array_slice($touches, -12)]);
+
+        $stage = match ((string) $validated['touch_type']) {
+            'outreach_sent' => 'contacted',
+            'follow_up_sent' => 'contacted',
+            'reply_received' => 'replied',
+            'proposal_sent' => 'proposal_sent',
+            'won' => 'won',
+            'lost' => 'lost',
+            default => (string) $lead->lead_stage,
+        };
+
+        $lead->lead_stage = $stage;
+        if ($stage === 'won') {
+            $lead->converted_at = now();
+            $lead->lost_at = null;
+            $lead->next_follow_up_at = null;
+        } elseif ($stage === 'lost') {
+            $lead->lost_at = now();
+            $lead->converted_at = null;
+            $lead->next_follow_up_at = null;
+        } else {
+            $lead->lost_at = null;
+        }
+
+        if (trim((string) ($validated['touch_note'] ?? '')) !== '') {
+            $existing = trim((string) ($lead->stage_notes ?? ''));
+            $prefix = '[' . now()->format('Y-m-d H:i') . '] ' . trim((string) $validated['touch_note']);
+            $lead->stage_notes = $existing !== '' ? $prefix . "\n" . $existing : $prefix;
+        }
+
+        $lead->save();
+
+        return redirect()->route('founder.first-100')->with('success', 'Conversation touch logged in your First 100 tracker.');
+    }
+
+    public function founderStorePromoLink(Request $request, FounderRevenueOsService $revenueOsService): RedirectResponse
+    {
+        /** @var \App\Models\Founder $user */
+        $user = Auth::user();
+        if (!$user->isFounder()) {
+            return redirect()->route('dashboard');
+        }
+
+        $validated = $request->validate([
+            'title' => ['required', 'string', 'max:191'],
+            'source_channel' => ['required', Rule::in($revenueOsService->promoSourceChannels())],
+            'promo_code' => ['required', 'string', 'max:64', 'regex:/^[A-Za-z0-9\-_]+$/'],
+            'cta_label' => ['nullable', 'string', 'max:191'],
+            'offer_title' => ['nullable', 'string', 'max:191'],
+        ]);
+
+        FounderPromoLink::query()->create([
+            'founder_id' => $user->id,
+            'company_id' => $user->company?->id,
+            'title' => $validated['title'],
+            'source_channel' => $validated['source_channel'],
+            'promo_code' => strtoupper((string) $validated['promo_code']),
+            'destination_path' => (string) ($user->company?->website_path ?? ''),
+            'cta_label' => $validated['cta_label'] ?? null,
+            'offer_title' => $validated['offer_title'] ?? null,
+            'status' => 'active',
+        ]);
+
+        return redirect()->route('founder.first-100')->with('success', 'Promo link saved for offline-to-online tracking.');
+    }
+
+    public function founderApplyAcquisitionPlaybook(FounderLeadChannel $leadChannel): RedirectResponse
+    {
+        /** @var \App\Models\Founder $user */
+        $user = Auth::user();
+        if (!$user->isFounder()) {
+            return redirect()->route('dashboard');
+        }
+
+        if ((int) $leadChannel->founder_id !== (int) $user->id) {
+            abort(404);
+        }
+
+        $leadChannel->forceFill([
+            'status' => 'adopted',
+            'adopted_at' => now(),
+            'last_used_at' => now(),
+        ])->save();
+
+        $launchSystem = FounderLaunchSystem::query()->firstOrNew([
+            'founder_id' => $user->id,
+            'status' => 'active',
+        ]);
+
+        $acquisitionSystem = is_array($launchSystem->acquisition_system_json) ? $launchSystem->acquisition_system_json : [];
+        $adopted = collect($acquisitionSystem['adopted_channels'] ?? [])
+            ->filter(fn ($channel) => is_array($channel))
+            ->reject(fn (array $channel) => (string) ($channel['channel_key'] ?? '') === (string) $leadChannel->channel_key)
+            ->values()
+            ->all();
+        $adopted[] = [
+            'lead_channel_id' => $leadChannel->id,
+            'channel_key' => (string) $leadChannel->channel_key,
+            'channel_label' => (string) $leadChannel->channel_label,
+            'daily_target' => (int) $leadChannel->daily_target,
+            'adopted_at' => now()->toDateTimeString(),
+        ];
+
+        $launchSystem->forceFill([
+            'company_id' => $user->company?->id,
+            'vertical_blueprint_id' => $user->company?->vertical_blueprint_id,
+            'selected_engine' => (string) ($user->company?->website_engine ?? ''),
+            'status' => 'active',
+            'acquisition_system_json' => array_merge($acquisitionSystem, [
+                'priority_channel' => (string) $leadChannel->channel_key,
+                'adopted_channels' => $adopted,
+            ]),
+            'last_reviewed_at' => now(),
+            'applied_at' => $launchSystem->applied_at ?: now(),
+        ])->save();
+
+        return redirect()->route('founder.first-100')->with('success', $leadChannel->channel_label . ' playbook is now part of your active launch system.');
+    }
+
+    public function founderPromoLinkKit(FounderPromoLink $promoLink, FounderRevenueOsService $revenueOsService)
+    {
+        /** @var \App\Models\Founder $user */
+        $user = Auth::user();
+        if (!$user->isFounder()) {
+            return redirect()->route('dashboard');
+        }
+
+        if ((int) $promoLink->founder_id !== (int) $user->id) {
+            abort(403);
+        }
+
+        $kit = $revenueOsService->promoKit($user, $promoLink);
+
+        return view('os.promo-kit', [
+            'pageTitle' => (string) ($promoLink->title ?: 'Promo Kit'),
+            'promoLink' => $promoLink,
+            'kit' => $kit,
+            'qrSvg' => $this->promoLinkQrSvgMarkup($kit['promo_url']),
+        ]);
+    }
+
+    public function founderPromoLinkAsset(FounderPromoLink $promoLink, string $variant, FounderRevenueOsService $revenueOsService)
+    {
+        /** @var \App\Models\Founder $user */
+        $user = Auth::user();
+        if (!$user->isFounder()) {
+            return redirect()->route('dashboard');
+        }
+
+        if ((int) $promoLink->founder_id !== (int) $user->id) {
+            abort(403);
+        }
+
+        $allowedVariants = ['poster', 'referral', 'social', 'business'];
+        if (!in_array($variant, $allowedVariants, true)) {
+            abort(404);
+        }
+
+        $kit = $revenueOsService->promoKit($user, $promoLink);
+
+        return view('os.promo-asset', [
+            'pageTitle' => $kit['title'] . ' Asset',
+            'variant' => $variant,
+            'promoLink' => $promoLink,
+            'kit' => $kit,
+            'qrSvg' => $this->promoLinkQrSvgMarkup($kit['promo_url']),
+        ]);
+    }
+
+    public function founderPromoLinkAssetSvg(FounderPromoLink $promoLink, string $variant, FounderRevenueOsService $revenueOsService)
+    {
+        /** @var \App\Models\Founder $user */
+        $user = Auth::user();
+        if (!$user->isFounder()) {
+            return redirect()->route('dashboard');
+        }
+
+        if ((int) $promoLink->founder_id !== (int) $user->id) {
+            abort(403);
+        }
+
+        $allowedVariants = ['poster', 'referral', 'social', 'business'];
+        if (!in_array($variant, $allowedVariants, true)) {
+            abort(404);
+        }
+
+        $kit = $revenueOsService->promoKit($user, $promoLink);
+        $svg = $revenueOsService->promoAssetSvg($kit, $variant);
+
+        return response($svg, 200, [
+            'Content-Type' => 'image/svg+xml',
+            'Content-Disposition' => 'attachment; filename="' . $this->promoLinkDownloadBaseName($promoLink) . '-' . $variant . '.svg"',
+        ]);
+    }
+
+    public function founderPromoLinkQrSvg(FounderPromoLink $promoLink, FounderRevenueOsService $revenueOsService)
+    {
+        /** @var \App\Models\Founder $user */
+        $user = Auth::user();
+        if (!$user->isFounder()) {
+            return redirect()->route('dashboard');
+        }
+
+        if ((int) $promoLink->founder_id !== (int) $user->id) {
+            abort(403);
+        }
+
+        $kit = $revenueOsService->promoKit($user, $promoLink);
+        $svg = $this->promoLinkQrSvgMarkup($kit['promo_url']);
+
+        return response($svg, 200, [
+            'Content-Type' => 'image/svg+xml',
+            'Content-Disposition' => 'attachment; filename="' . $this->promoLinkDownloadBaseName($promoLink) . '-qr.svg"',
+        ]);
+    }
+
+    public function founderPromoLinkQrPng(FounderPromoLink $promoLink, FounderRevenueOsService $revenueOsService)
+    {
+        /** @var \App\Models\Founder $user */
+        $user = Auth::user();
+        if (!$user->isFounder()) {
+            return redirect()->route('dashboard');
+        }
+
+        if ((int) $promoLink->founder_id !== (int) $user->id) {
+            abort(403);
+        }
+
+        $kit = $revenueOsService->promoKit($user, $promoLink);
+        $png = QrCode::format('png')->size(700)->margin(1)->generate($kit['promo_url']);
+
+        return response($png, 200, [
+            'Content-Type' => 'image/png',
+            'Content-Disposition' => 'attachment; filename="' . $this->promoLinkDownloadBaseName($promoLink) . '-qr.png"',
         ]);
     }
 
@@ -394,6 +876,127 @@ class OsShellController extends Controller
             'pageTitle' => 'Identity Workspace',
             'workspace' => $adminOperationsService->buildIdentityWorkspace($user),
         ]);
+    }
+
+    public function adminBlueprints(Request $request, AdminDashboardService $adminDashboardService)
+    {
+        /** @var \App\Models\Founder $user */
+        $user = Auth::user();
+        $this->ensureAdminPermission($user, 'commerce_control');
+
+        return view('os.admin-blueprints', [
+            'pageTitle' => 'Blueprint Control',
+            'workspace' => $adminDashboardService->buildBlueprintWorkspace($user, $request->query()),
+        ]);
+    }
+
+    public function adminStoreBlueprint(Request $request): RedirectResponse
+    {
+        /** @var \App\Models\Founder $user */
+        $user = Auth::user();
+        $this->ensureAdminPermission($user, 'commerce_control');
+
+        $validated = $request->validate([
+            'blueprint_id' => ['nullable', 'integer', 'exists:vertical_blueprints,id'],
+            'code' => ['required', 'string', 'max:64'],
+            'name' => ['required', 'string', 'max:191'],
+            'business_model' => ['required', Rule::in(['product', 'service', 'hybrid'])],
+            'engine' => ['required', Rule::in(['bazaar', 'servio'])],
+            'status' => ['required', Rule::in(['active', 'paused'])],
+            'description' => ['nullable', 'string', 'max:2000'],
+            'change_summary' => ['nullable', 'string', 'max:2000'],
+            'default_offer' => ['nullable', 'string', 'max:2000'],
+            'default_pricing' => ['nullable', 'string', 'max:2000'],
+            'default_pages' => ['nullable', 'string', 'max:2000'],
+            'default_tasks' => ['nullable', 'string', 'max:2000'],
+            'default_channels' => ['nullable', 'string', 'max:2000'],
+            'default_cta' => ['nullable', 'string', 'max:2000'],
+            'default_image_queries' => ['nullable', 'string', 'max:2000'],
+            'funnel_framework' => ['nullable', 'string', 'max:4000'],
+            'pricing_presets' => ['nullable', 'string', 'max:4000'],
+            'channel_playbooks' => ['nullable', 'string', 'max:4000'],
+            'script_library' => ['nullable', 'string', 'max:4000'],
+        ]);
+
+        $blueprint = VerticalBlueprint::query()->find((int) ($validated['blueprint_id'] ?? 0));
+        $payload = [
+            'code' => strtolower(trim((string) $validated['code'])),
+            'name' => trim((string) $validated['name']),
+            'business_model' => (string) $validated['business_model'],
+            'engine' => (string) $validated['engine'],
+            'status' => (string) $validated['status'],
+            'description' => trim((string) ($validated['description'] ?? '')),
+            'default_offer_json' => $this->adminBlueprintList((string) ($validated['default_offer'] ?? '')),
+            'default_pricing_json' => $this->adminBlueprintList((string) ($validated['default_pricing'] ?? '')),
+            'default_pages_json' => $this->adminBlueprintList((string) ($validated['default_pages'] ?? '')),
+            'default_tasks_json' => $this->adminBlueprintList((string) ($validated['default_tasks'] ?? '')),
+            'default_channels_json' => $this->adminBlueprintList((string) ($validated['default_channels'] ?? '')),
+            'default_cta_json' => $this->adminBlueprintList((string) ($validated['default_cta'] ?? '')),
+            'default_image_queries_json' => $this->adminBlueprintList((string) ($validated['default_image_queries'] ?? '')),
+            'funnel_framework_json' => $this->adminBlueprintList((string) ($validated['funnel_framework'] ?? '')),
+            'pricing_preset_json' => $this->adminBlueprintList((string) ($validated['pricing_presets'] ?? '')),
+            'channel_playbook_json' => $this->adminBlueprintList((string) ($validated['channel_playbooks'] ?? '')),
+            'script_library_json' => $this->adminBlueprintList((string) ($validated['script_library'] ?? '')),
+        ];
+
+        $blueprint = VerticalBlueprint::updateOrCreate(['id' => $blueprint?->id], array_merge($payload, [
+            'version_number' => ($blueprint?->version_number ?? 0) + 1,
+        ]));
+
+        VerticalBlueprintVersion::query()->create([
+            'vertical_blueprint_id' => $blueprint->id,
+            'version_number' => (int) $blueprint->version_number,
+            'version_label' => 'v' . $blueprint->version_number,
+            'change_summary' => trim((string) ($validated['change_summary'] ?? 'Blueprint update from OS')),
+            'snapshot_json' => $payload,
+            'created_by_founder_id' => $user->id,
+        ]);
+
+        FounderPod::query()->firstOrCreate(
+            [
+                'slug' => strtolower(trim((string) $blueprint->code)) . '-launchers',
+            ],
+            [
+                'name' => $blueprint->name . ' Launchers',
+                'vertical_blueprint_id' => $blueprint->id,
+                'stage' => 'early_launch',
+                'status' => 'active',
+                'description' => 'Founders in this vertical share wins, blockers, and scripts while building their first 100 customers.',
+                'benchmark_json' => [
+                    'weekly_lead_target' => 10,
+                    'first_customer_goal' => 1,
+                ],
+            ]
+        );
+
+        return redirect()->route('admin.blueprints')->with('success', 'Blueprint settings saved from the OS.');
+    }
+
+    public function adminReviewFounderBlueprint(Request $request): RedirectResponse
+    {
+        /** @var \App\Models\Founder $user */
+        $user = Auth::user();
+        $this->ensureAdminPermission($user, 'commerce_control');
+
+        $validated = $request->validate([
+            'founder_id' => ['required', 'integer', 'exists:founders,id'],
+            'launch_stage' => ['required', Rule::in(['brief_pending', 'brief_captured', 'generation_ready', 'website_review', 'live'])],
+            'website_generation_status' => ['required', Rule::in(['not_started', 'queued', 'in_progress', 'ready_for_review', 'published'])],
+            'vertical_blueprint_id' => ['nullable', 'integer', 'exists:vertical_blueprints,id'],
+        ]);
+
+        $founder = Founder::query()->with('company')->findOrFail((int) $validated['founder_id']);
+        if (!$founder->company) {
+            return redirect()->route('admin.blueprints')->with('error', 'This founder does not have a company record yet.');
+        }
+
+        $founder->company->forceFill([
+            'vertical_blueprint_id' => $validated['vertical_blueprint_id'] ?: $founder->company->vertical_blueprint_id,
+            'launch_stage' => (string) $validated['launch_stage'],
+            'website_generation_status' => (string) $validated['website_generation_status'],
+        ])->save();
+
+        return redirect()->route('admin.blueprints')->with('success', 'Founder launch review updated.');
     }
 
     public function adminBackfillIdentity(
@@ -1415,7 +2018,8 @@ class OsShellController extends Controller
         FounderDashboardService $founderDashboardService,
         WebsiteWorkspaceService $websiteWorkspaceService,
         WorkspaceLaunchService $workspaceLaunchService,
-        OsWalletService $walletService
+        OsWalletService $walletService,
+        FounderRevenueOsService $revenueOsService
     ) {
         /** @var \App\Models\Founder $user */
         $user = Auth::user();
@@ -1423,18 +2027,164 @@ class OsShellController extends Controller
             return redirect()->route('dashboard');
         }
 
+        $offers = $this->commerceOffers($user);
+
         return view('os.commerce', [
             'pageTitle' => 'Launch Plan',
             'dashboard' => $founderDashboardService->build($user),
             'website' => $websiteWorkspaceService->build($user),
             'launchCards' => $workspaceLaunchService->launchCards($user),
-            'catalogOffers' => $this->commerceOffers($user),
+            'catalogOffers' => $offers,
             'commerceConfigs' => $this->commerceConfigs($user),
             'commerceCatalogs' => $this->commerceCatalogs($user),
+            'pricingOptimizer' => $revenueOsService->pricingOptimizer($user, $offers),
             'walletSummary' => $walletService->summary($user),
             'payoutAccount' => $user->payoutAccount,
             'recentPayoutRequests' => $user->payoutRequests()->latest()->limit(6)->get(),
         ]);
+    }
+
+    public function founderApplyPricingRecommendation(
+        Request $request,
+        FounderPricingRecommendation $pricingRecommendation,
+        OsAssistantActionService $actionService,
+        AtlasIntelligenceService $atlas
+    ): RedirectResponse {
+        /** @var \App\Models\Founder $user */
+        $user = Auth::user();
+        if (!$user->isFounder()) {
+            return redirect()->route('dashboard');
+        }
+
+        if ((int) $pricingRecommendation->founder_id !== (int) $user->id) {
+            abort(404);
+        }
+
+        $validated = $request->validate([
+            'target_action_plan_id' => ['nullable', 'integer'],
+        ]);
+
+        $target = null;
+        if (!empty($validated['target_action_plan_id'])) {
+            $target = $user->actionPlans()
+                ->where('id', (int) $validated['target_action_plan_id'])
+                ->whereIn('platform', ['bazaar', 'servio'])
+                ->first();
+        }
+
+        if (!$target && $pricingRecommendation->founder_action_plan_id) {
+            $target = $user->actionPlans()
+                ->where('id', (int) $pricingRecommendation->founder_action_plan_id)
+                ->whereIn('platform', ['bazaar', 'servio'])
+                ->first();
+        }
+
+        if (!$target) {
+            $preferredPlatform = (string) ($pricingRecommendation->apply_target ?: (($pricingRecommendation->meta_json['business_model'] ?? 'service') === 'product' ? 'bazaar' : 'servio'));
+            $target = $user->actionPlans()
+                ->where('platform', $preferredPlatform)
+                ->where('description', 'not like', 'Config:%')
+                ->latest()
+                ->first();
+        }
+
+        if (!$target) {
+            return redirect()->route('founder.commerce')->with('error', 'Create or sync at least one offer before applying a pricing recommendation.');
+        }
+
+        $offer = $this->parseCommerceOffer($target);
+        $originalTitle = (string) $target->title;
+        $syncTitle = $originalTitle;
+        $offer['price'] = number_format((float) $pricingRecommendation->price, 2, '.', '');
+        $offer['description'] = trim((string) ($pricingRecommendation->description ?: $offer['description']));
+        $newTitle = trim((string) $pricingRecommendation->title);
+        $warnings = [];
+
+        if ($newTitle !== '' && $newTitle !== (string) $target->title) {
+            $result = $target->platform === 'bazaar'
+                ? $actionService->updateProductFieldFromOs($user, $originalTitle, 'title', $newTitle)
+                : $actionService->updateServiceFieldFromOs($user, $originalTitle, 'title', $newTitle);
+
+            if (!($result['success'] ?? false)) {
+                $warnings[] = $result['reply'] ?? 'Title sync is pending.';
+            }
+
+            $target->title = $newTitle;
+            if (($result['success'] ?? false) && $newTitle !== '') {
+                $syncTitle = $newTitle;
+            }
+        }
+
+        $result = $target->platform === 'bazaar'
+            ? $actionService->updateProductFieldFromOs($user, $syncTitle, 'price', (string) $offer['price'])
+            : $actionService->updateServiceFieldFromOs($user, $syncTitle, 'price', (string) $offer['price']);
+        if (!($result['success'] ?? false)) {
+            $warnings[] = $result['reply'] ?? 'Price sync is pending.';
+        }
+
+        $result = $target->platform === 'bazaar'
+            ? $actionService->updateProductFieldFromOs($user, $syncTitle, 'description', (string) $offer['description'])
+            : $actionService->updateServiceFieldFromOs($user, $syncTitle, 'description', (string) $offer['description']);
+        if (!($result['success'] ?? false)) {
+            $warnings[] = $result['reply'] ?? 'Description sync is pending.';
+        }
+
+        $target->description = $this->serializeCommerceOffer(array_merge($offer, [
+            'engine' => $target->platform,
+            'type' => $target->platform === 'bazaar' ? 'product' : 'service',
+        ]));
+        $target->save();
+
+        $pricingRecommendation->forceFill([
+            'founder_action_plan_id' => $target->id,
+            'apply_target' => $target->platform,
+            'status' => 'applied',
+            'applied_payload_json' => [
+                'target_action_plan_id' => $target->id,
+                'target_title' => $target->title,
+                'target_platform' => $target->platform,
+                'applied_price' => (string) $offer['price'],
+            ],
+            'applied_at' => now(),
+        ])->save();
+
+        $atlas->syncFounderMutation($user, [
+            'role' => 'founder',
+            'action' => 'pricing_recommendation_apply',
+            'field' => 'pricing_recommendation',
+            'value' => $pricingRecommendation->title,
+            'sync_summary' => 'Founder applied a pricing recommendation from Hatchers OS.',
+        ]);
+
+        return redirect()
+            ->route('founder.commerce')
+            ->with('success', $warnings === [] ? 'Pricing recommendation applied to your offer.' : 'Pricing recommendation applied. ' . implode(' ', $warnings));
+    }
+
+    public function founderUpdatePricingRecommendationStatus(Request $request, FounderPricingRecommendation $pricingRecommendation): RedirectResponse
+    {
+        /** @var \App\Models\Founder $user */
+        $user = Auth::user();
+        if (!$user->isFounder()) {
+            return redirect()->route('dashboard');
+        }
+
+        if ((int) $pricingRecommendation->founder_id !== (int) $user->id) {
+            abort(404);
+        }
+
+        $validated = $request->validate([
+            'status' => ['required', Rule::in(['rejected', 'superseded'])],
+        ]);
+
+        $pricingRecommendation->forceFill([
+            'status' => (string) $validated['status'],
+            'meta_json' => array_merge(is_array($pricingRecommendation->meta_json) ? $pricingRecommendation->meta_json : [], [
+                'status_updated_at' => now()->toDateTimeString(),
+            ]),
+        ])->save();
+
+        return redirect()->route('founder.commerce')->with('success', 'Recommendation status updated.');
     }
 
     public function founderWallet(
@@ -2645,6 +3395,96 @@ class OsShellController extends Controller
         ]);
     }
 
+    public function generateWebsiteDraft(WebsiteAutopilotService $websiteAutopilotService): RedirectResponse
+    {
+        /** @var \App\Models\Founder $founder */
+        $founder = Auth::user();
+
+        $result = $websiteAutopilotService->generate($founder);
+        if (!($result['ok'] ?? false)) {
+            return redirect()->route('website')->with('error', (string) ($result['error'] ?? 'Hatchers OS could not generate the website draft yet.'));
+        }
+
+        return redirect()->route('website')->with('success', 'Your first website draft is ready. Hatchers OS prefilled the site setup and built the first offer path for review.');
+    }
+
+    public function founderApplyLaunchSystem(WebsiteAutopilotService $websiteAutopilotService): RedirectResponse
+    {
+        /** @var \App\Models\Founder $founder */
+        $founder = Auth::user();
+        if (!$founder->isFounder()) {
+            return redirect()->route('dashboard');
+        }
+
+        $company = $founder->company;
+        $draft = $websiteAutopilotService->latestDraft($company);
+        $latestRun = $company?->websiteGenerationRuns()->latest('id')->first();
+
+        if (!$company || !$latestRun || !$draft) {
+            return redirect()->route('website')->with('error', 'Generate a website draft before locking the launch system.');
+        }
+
+        $launchSystem = FounderLaunchSystem::query()->updateOrCreate(
+            [
+                'founder_id' => $founder->id,
+                'status' => 'active',
+            ],
+            [
+                'company_id' => $company->id,
+                'vertical_blueprint_id' => $company->vertical_blueprint_id,
+                'founder_website_generation_run_id' => $latestRun->id,
+                'selected_engine' => (string) ($draft['engine'] ?? $company->website_engine ?? ''),
+                'launch_strategy_json' => [
+                    'website_title' => (string) ($draft['title'] ?? $company->company_name),
+                    'website_path' => (string) ($draft['website_path'] ?? $company->website_path ?? ''),
+                    'sell_like_crazy' => (array) ($draft['sell_like_crazy'] ?? []),
+                    'launch_checklist' => (array) ($draft['launch_checklist'] ?? []),
+                ],
+                'funnel_blocks_json' => [
+                    'hero' => (array) ($draft['hero'] ?? []),
+                    'sections' => (array) ($draft['sections'] ?? []),
+                ],
+                'offer_stack_json' => [
+                    'starter_offer' => (array) ($draft['starter_offer'] ?? []),
+                    'engine_sync' => (array) ($draft['engine_sync'] ?? []),
+                ],
+                'acquisition_system_json' => array_merge(
+                    is_array($company->launchSystems()->latest('id')->first()?->acquisition_system_json) ? $company->launchSystems()->latest('id')->first()->acquisition_system_json : [],
+                    ['source' => 'website_autopilot']
+                ),
+                'applied_at' => now(),
+                'last_reviewed_at' => now(),
+            ]
+        );
+
+        $company->forceFill([
+            'launch_stage' => 'launch_system_locked',
+            'website_generation_status' => 'approved',
+        ])->save();
+
+        return redirect()->route('website')->with('success', 'Your website funnel is now locked into the active launch system.');
+    }
+
+    public function founderRegenerateWebsiteDraftBlock(Request $request, WebsiteAutopilotService $websiteAutopilotService): RedirectResponse
+    {
+        /** @var \App\Models\Founder $founder */
+        $founder = Auth::user();
+        if (!$founder->isFounder()) {
+            return redirect()->route('dashboard');
+        }
+
+        $validated = $request->validate([
+            'block' => ['required', Rule::in(['hero', 'cta', 'offer_stack', 'faq'])],
+        ]);
+
+        $result = $websiteAutopilotService->regenerateDraftBlock($founder, (string) $validated['block']);
+        if (!($result['ok'] ?? false)) {
+            return redirect()->route('website')->with('error', (string) ($result['error'] ?? 'Hatchers OS could not regenerate that draft block.'));
+        }
+
+        return redirect()->route('website')->with('success', ucfirst(str_replace('_', ' ', (string) $validated['block'])) . ' regenerated inside your launch system draft.');
+    }
+
     public function adminControl(AdminOperationsService $adminOperationsService)
     {
         /** @var \App\Models\Founder $user */
@@ -2977,6 +3817,7 @@ class OsShellController extends Controller
             $company->website_engine = $validated['website_engine'];
             $company->business_model = $validated['website_mode'];
             $company->website_status = 'in_progress';
+            $company->website_generation_status = 'ready_for_review';
             $company->website_path = trim(strtolower((string) $validated['website_path']), '/');
             $company->website_url = $this->buildCompanyWebsiteUrl($company, $validated['website_engine']);
             $company->save();
@@ -3009,6 +3850,8 @@ class OsShellController extends Controller
         if (!empty($company)) {
             $company->website_engine = $validated['website_engine'];
             $company->website_status = 'live';
+            $company->website_generation_status = 'published';
+            $company->launch_stage = 'website_live';
             $company->website_url = $this->buildCompanyWebsiteUrl($company, $validated['website_engine']);
             $company->save();
         }
@@ -3026,7 +3869,67 @@ class OsShellController extends Controller
         return view('os.public-website', [
             'pageTitle' => (string) ($company->company_name ?: 'Business Website'),
             'site' => $publicWebsiteService->build($company),
+            'sourceContext' => [
+                'src' => trim((string) request()->query('src', '')),
+                'promo' => trim((string) request()->query('promo', '')),
+                'offer' => trim((string) request()->query('offer', '')),
+            ],
         ]);
+    }
+
+    public function publicWebsiteIntroRequest(string $websitePath, Request $request): RedirectResponse
+    {
+        $company = $this->resolvePublicWebsiteCompany($websitePath);
+        if (!$company || !$company->founder) {
+            abort(404);
+        }
+
+        $validated = $request->validate([
+            'lead_name' => ['required', 'string', 'max:191'],
+            'customer_email' => ['nullable', 'email', 'max:255'],
+            'customer_mobile' => ['nullable', 'string', 'max:255'],
+            'city' => ['nullable', 'string', 'max:191'],
+            'offer_title' => ['nullable', 'string', 'max:191'],
+            'src' => ['nullable', 'string', 'max:64'],
+            'promo' => ['nullable', 'string', 'max:64'],
+            'notes' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $channel = trim((string) ($validated['src'] ?? 'website'));
+        $channel = str_replace('-', '_', strtolower($channel));
+        if ($channel === '') {
+            $channel = 'website';
+        }
+
+        $contactParts = array_filter([
+            trim((string) ($validated['customer_email'] ?? '')),
+            trim((string) ($validated['customer_mobile'] ?? '')),
+        ]);
+
+        FounderLead::query()->create([
+            'founder_id' => $company->founder->id,
+            'company_id' => $company->id,
+            'lead_name' => $validated['lead_name'],
+            'lead_channel' => $channel,
+            'lead_stage' => 'identified',
+            'contact_handle' => implode(' / ', $contactParts),
+            'city' => $validated['city'] ?? null,
+            'offer_name' => $validated['offer_title'] ?? null,
+            'source_notes' => trim(implode(' ', array_filter([
+                'Captured from public site intro form.',
+                !empty($validated['promo']) ? 'Promo code: ' . $validated['promo'] . '.' : '',
+                !empty($validated['notes']) ? 'Visitor note: ' . $validated['notes'] : '',
+            ]))),
+            'first_contacted_at' => now(),
+            'meta_json' => [
+                'public_intro' => true,
+                'website_path' => $websitePath,
+                'source_channel' => $channel,
+                'promo_code' => trim((string) ($validated['promo'] ?? '')),
+            ],
+        ]);
+
+        return redirect()->route('public.website', ['websitePath' => $websitePath, 'src' => $validated['src'] ?? null, 'promo' => $validated['promo'] ?? null])->with('success', 'Request received. The founder now has your details inside Hatchers Ai Business OS.');
     }
 
     public function publicWebsiteOrderRequest(
@@ -3061,36 +3964,45 @@ class OsShellController extends Controller
             'postal_code' => ['required', 'string', 'max:255'],
             'delivery_area' => ['required', 'string', 'max:255'],
             'notes' => ['nullable', 'string', 'max:2000'],
+            'src' => ['nullable', 'string', 'max:64'],
+            'promo' => ['nullable', 'string', 'max:64'],
             'payment_method_choice' => ['required', Rule::in(['online', 'cash'])],
         ]);
+        $websiteRouteParams = [
+            'websitePath' => $websitePath,
+            'src' => $validated['src'] ?? null,
+            'promo' => $validated['promo'] ?? null,
+            'offer' => $validated['offer_title'] ?? null,
+        ];
 
         $founder = $company->founder;
         if (!$founder) {
-            return redirect()->route('public.website', ['websitePath' => $websitePath])->with('error', 'This public site is missing a founder account connection.');
+            return redirect()->route('public.website', $websiteRouteParams)->with('error', 'This public site is missing a founder account connection.');
         }
 
         $offer = $this->resolvePublicWebsiteOffer($site, 'product', (string) $validated['offer_title']);
         if (!$offer) {
-            return redirect()->route('public.website', ['websitePath' => $websitePath])->with('error', 'That product is no longer available on the public OS site.');
+            return redirect()->route('public.website', $websiteRouteParams)->with('error', 'That product is no longer available on the public OS site.');
         }
 
         $allowedVariants = collect($offer['request_options']['variants'] ?? [])->pluck('name')->filter()->values();
         $selectedVariant = trim((string) ($validated['selected_variant'] ?? ''));
         if ($selectedVariant !== '' && !$allowedVariants->contains($selectedVariant)) {
-            return redirect()->route('public.website', ['websitePath' => $websitePath])->with('error', 'That product variant is no longer available.');
+            return redirect()->route('public.website', $websiteRouteParams)->with('error', 'That product variant is no longer available.');
         }
 
         $allowedExtras = collect($offer['request_options']['extras'] ?? [])->pluck('name')->filter()->values();
         $selectedExtras = collect($validated['selected_extras'] ?? [])->filter()->values();
         if ($selectedExtras->diff($allowedExtras)->isNotEmpty()) {
-            return redirect()->route('public.website', ['websitePath' => $websitePath])->with('error', 'One or more selected extras are no longer available.');
+            return redirect()->route('public.website', $websiteRouteParams)->with('error', 'One or more selected extras are no longer available.');
         }
 
         $paymentCollection = (string) ($offer['request_options']['payment_collection'] ?? 'both');
         $allowedPaymentChoices = $this->allowedPublicPaymentChoices($paymentCollection);
         $paymentChoice = (string) $validated['payment_method_choice'];
+        $sourceTag = $this->publicWebsiteSourceTag($validated);
         if (!in_array($paymentChoice, $allowedPaymentChoices, true)) {
-            return redirect()->route('public.website', ['websitePath' => $websitePath])->with('error', 'That payment option is not available for this product.');
+            return redirect()->route('public.website', $websiteRouteParams)->with('error', 'That payment option is not available for this product.');
         }
 
         $attributes = [
@@ -3106,8 +4018,10 @@ class OsShellController extends Controller
             'landmark' => (string) $validated['landmark'],
             'postal_code' => (string) $validated['postal_code'],
             'delivery_area' => (string) $validated['delivery_area'],
-            'description' => (string) ($validated['notes'] ?? ''),
-            'notes' => (string) ($validated['notes'] ?? ''),
+            'description' => $this->appendPublicSourceNote((string) ($validated['notes'] ?? ''), $sourceTag),
+            'notes' => $this->appendPublicSourceNote((string) ($validated['notes'] ?? ''), $sourceTag),
+            'source_channel' => trim((string) ($validated['src'] ?? '')),
+            'promo_code' => trim((string) ($validated['promo'] ?? '')),
         ];
 
         if ($paymentChoice === 'online') {
@@ -3136,7 +4050,7 @@ class OsShellController extends Controller
             ])
         );
 
-        $redirect = redirect()->route('public.website', ['websitePath' => $websitePath]);
+        $redirect = redirect()->route('public.website', $websiteRouteParams);
         if (!($result['success'] ?? false)) {
             return $redirect->with('error', $result['reply'] ?? 'The order request could not be created right now.');
         }
@@ -3178,23 +4092,31 @@ class OsShellController extends Controller
             'state' => ['nullable', 'string', 'max:255'],
             'country' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string', 'max:2000'],
+            'src' => ['nullable', 'string', 'max:64'],
+            'promo' => ['nullable', 'string', 'max:64'],
             'payment_method_choice' => ['required', Rule::in(['online', 'cash'])],
         ]);
+        $websiteRouteParams = [
+            'websitePath' => $websitePath,
+            'src' => $validated['src'] ?? null,
+            'promo' => $validated['promo'] ?? null,
+            'offer' => $validated['offer_title'] ?? null,
+        ];
 
         $founder = $company->founder;
         if (!$founder) {
-            return redirect()->route('public.website', ['websitePath' => $websitePath])->with('error', 'This public site is missing a founder account connection.');
+            return redirect()->route('public.website', $websiteRouteParams)->with('error', 'This public site is missing a founder account connection.');
         }
 
         $offer = $this->resolvePublicWebsiteOffer($site, 'service', (string) $validated['offer_title']);
         if (!$offer) {
-            return redirect()->route('public.website', ['websitePath' => $websitePath])->with('error', 'That service is no longer available on the public OS site.');
+            return redirect()->route('public.website', $websiteRouteParams)->with('error', 'That service is no longer available on the public OS site.');
         }
 
         $allowedAddOns = collect($offer['request_options']['additional_services'] ?? [])->pluck('name')->filter()->values();
         $selectedAddOns = collect($validated['selected_additional_services'] ?? [])->filter()->values();
         if ($selectedAddOns->diff($allowedAddOns)->isNotEmpty()) {
-            return redirect()->route('public.website', ['websitePath' => $websitePath])->with('error', 'One or more selected add-ons are no longer available.');
+            return redirect()->route('public.website', $websiteRouteParams)->with('error', 'One or more selected add-ons are no longer available.');
         }
 
         $durationMinutes = $this->publicServiceDurationMinutes($offer);
@@ -3205,13 +4127,13 @@ class OsShellController extends Controller
         }
         $endTime = \Carbon\Carbon::createFromFormat('H:i', $bookingEndTime);
         if ($endTime->lessThanOrEqualTo($bookingTime)) {
-            return redirect()->route('public.website', ['websitePath' => $websitePath])->with('error', 'Booking end time must be after the start time.');
+            return redirect()->route('public.website', $websiteRouteParams)->with('error', 'Booking end time must be after the start time.');
         }
 
         $availableDays = collect($offer['request_options']['availability_days'] ?? [])->map(fn ($day) => strtolower(trim((string) $day)))->filter()->values();
         $bookingDate = \Carbon\Carbon::parse((string) $validated['booking_date']);
         if ($availableDays->isNotEmpty() && !$availableDays->contains(strtolower($bookingDate->format('l')))) {
-            return redirect()->route('public.website', ['websitePath' => $websitePath])->with('error', 'That service is not available on the selected day.');
+            return redirect()->route('public.website', $websiteRouteParams)->with('error', 'That service is not available on the selected day.');
         }
 
         $openTime = trim((string) ($offer['request_options']['open_time'] ?? ''));
@@ -3220,15 +4142,16 @@ class OsShellController extends Controller
             $open = \Carbon\Carbon::createFromFormat('H:i', substr($openTime, 0, 5));
             $close = \Carbon\Carbon::createFromFormat('H:i', substr($closeTime, 0, 5));
             if ($bookingTime->lt($open) || $endTime->gt($close)) {
-                return redirect()->route('public.website', ['websitePath' => $websitePath])->with('error', 'That booking time sits outside the service availability window.');
+                return redirect()->route('public.website', $websiteRouteParams)->with('error', 'That booking time sits outside the service availability window.');
             }
         }
 
         $paymentCollection = (string) ($offer['request_options']['payment_collection'] ?? 'both');
         $allowedPaymentChoices = $this->allowedPublicPaymentChoices($paymentCollection);
         $paymentChoice = (string) $validated['payment_method_choice'];
+        $sourceTag = $this->publicWebsiteSourceTag($validated);
         if (!in_array($paymentChoice, $allowedPaymentChoices, true)) {
-            return redirect()->route('public.website', ['websitePath' => $websitePath])->with('error', 'That payment option is not available for this service.');
+            return redirect()->route('public.website', $websiteRouteParams)->with('error', 'That payment option is not available for this service.');
         }
 
         $attributes = [
@@ -3246,8 +4169,10 @@ class OsShellController extends Controller
             'city' => (string) ($validated['city'] ?? ''),
             'state' => (string) ($validated['state'] ?? ''),
             'country' => (string) ($validated['country'] ?? ''),
-            'description' => (string) ($validated['notes'] ?? ''),
-            'notes' => (string) ($validated['notes'] ?? ''),
+            'description' => $this->appendPublicSourceNote((string) ($validated['notes'] ?? ''), $sourceTag),
+            'notes' => $this->appendPublicSourceNote((string) ($validated['notes'] ?? ''), $sourceTag),
+            'source_channel' => trim((string) ($validated['src'] ?? '')),
+            'promo_code' => trim((string) ($validated['promo'] ?? '')),
         ];
 
         if ($paymentChoice === 'online') {
@@ -3276,7 +4201,7 @@ class OsShellController extends Controller
             ])
         );
 
-        $redirect = redirect()->route('public.website', ['websitePath' => $websitePath]);
+        $redirect = redirect()->route('public.website', $websiteRouteParams);
         if (!($result['success'] ?? false)) {
             return $redirect->with('error', $result['reply'] ?? 'The booking request could not be created right now.');
         }
@@ -4587,12 +5512,21 @@ class OsShellController extends Controller
             'username' => ['required', 'string', 'max:255', 'unique:founders,username'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
             'company_name' => ['required', 'string', 'max:255'],
+            'vertical_blueprint' => ['required', Rule::in(array_keys($this->verticalBlueprintDefinitions()))],
             'business_model' => ['required', 'in:product,service,hybrid'],
+            'primary_city' => ['required', 'string', 'max:191'],
+            'service_radius' => ['required', 'string', 'max:191'],
             'industry' => ['required', Rule::in($this->founderIndustryOptions())],
             'stage' => ['required', 'in:idea,launching,operating,scaling'],
             'target_audience' => ['required', 'string', 'max:255'],
+            'primary_icp_name' => ['required', 'string', 'max:255'],
             'ideal_customer_profile' => ['required', 'string', 'max:1000'],
+            'pain_points' => ['required', 'string', 'max:1200'],
+            'desired_outcomes' => ['required', 'string', 'max:1200'],
+            'objections' => ['required', 'string', 'max:1200'],
             'brand_voice' => ['required', 'string', 'max:255'],
+            'differentiators' => ['required', 'string', 'max:1000'],
+            'problem_solved' => ['required', 'string', 'max:1000'],
             'core_offer' => ['required', Rule::in($this->founderCoreOfferOptions())],
             'primary_growth_goal' => ['required', 'string', 'max:255'],
             'known_blockers' => ['required', 'string', 'max:255'],
@@ -4610,8 +5544,10 @@ class OsShellController extends Controller
             return redirect()->route('plans')->with('error', 'Please choose a valid founder plan.');
         }
 
+        $blueprint = $this->upsertVerticalBlueprint((string) $validated['vertical_blueprint']);
+
         try {
-            DB::transaction(function () use ($validated, $atlas, $plan) {
+            DB::transaction(function () use ($validated, $atlas, $plan, $blueprint) {
                 $founder = Founder::create(
                     [
                         'username' => $validated['username'],
@@ -4632,10 +5568,52 @@ class OsShellController extends Controller
                     [
                         'company_name' => $validated['company_name'],
                         'business_model' => $validated['business_model'],
+                        'vertical_blueprint_id' => $blueprint->id,
                         'industry' => $validated['industry'],
                         'stage' => $validated['stage'],
+                        'primary_city' => $validated['primary_city'],
+                        'service_radius' => $validated['service_radius'],
+                        'primary_goal' => $validated['primary_growth_goal'],
+                        'launch_stage' => 'brief_captured',
+                        'website_generation_status' => 'queued',
                         'website_status' => 'not_started',
                         'company_brief' => $validated['company_brief'],
+                    ]
+                );
+
+                FounderBusinessBrief::updateOrCreate(
+                    ['founder_id' => $founder->id, 'company_id' => $company->id],
+                    [
+                        'vertical_blueprint_id' => $blueprint->id,
+                        'business_name' => $validated['company_name'],
+                        'business_summary' => $validated['company_brief'],
+                        'problem_solved' => $validated['problem_solved'],
+                        'core_offer' => $validated['core_offer'],
+                        'business_type_detail' => $blueprint->name,
+                        'location_city' => $validated['primary_city'],
+                        'location_country' => 'Egypt',
+                        'service_radius' => $validated['service_radius'],
+                        'delivery_scope' => $validated['service_radius'],
+                        'proof_points' => $validated['differentiators'],
+                        'founder_story' => $validated['company_brief'],
+                        'constraints_json' => [
+                            'known_blockers' => $validated['known_blockers'],
+                        ],
+                        'status' => 'captured',
+                    ]
+                );
+
+                FounderIcpProfile::updateOrCreate(
+                    ['founder_id' => $founder->id, 'company_id' => $company->id],
+                    [
+                        'primary_icp_name' => $validated['primary_icp_name'],
+                        'pain_points_json' => $this->commaSeparatedValues($validated['pain_points']),
+                        'desired_outcomes_json' => $this->commaSeparatedValues($validated['desired_outcomes']),
+                        'objections_json' => $this->commaSeparatedValues($validated['objections']),
+                        'price_sensitivity' => 'unknown',
+                        'primary_channels_json' => $blueprint->default_channels_json ?? [],
+                        'local_area_focus_json' => [$validated['primary_city']],
+                        'language_style' => $validated['brand_voice'],
                     ]
                 );
 
@@ -4644,10 +5622,16 @@ class OsShellController extends Controller
                     [
                         'target_audience' => $validated['target_audience'],
                         'ideal_customer_profile' => $validated['ideal_customer_profile'],
+                        'primary_icp_name' => $validated['primary_icp_name'],
+                        'problem_solved' => $validated['problem_solved'],
                         'brand_voice' => $validated['brand_voice'],
+                        'differentiators' => $validated['differentiators'],
                         'core_offer' => $validated['core_offer'],
                         'primary_growth_goal' => $validated['primary_growth_goal'],
                         'known_blockers' => $validated['known_blockers'],
+                        'objections' => $validated['objections'],
+                        'buying_triggers' => $validated['desired_outcomes'],
+                        'local_market_notes' => $validated['primary_city'] . ' · ' . $validated['service_radius'],
                         'intelligence_updated_at' => now(),
                     ]
                 );
@@ -4688,7 +5672,7 @@ class OsShellController extends Controller
                 $actions = [
                     [
                         'title' => 'Complete company intelligence',
-                        'description' => 'Refine your audience, offer, and positioning so Atlas can guide the rest of the OS accurately.',
+                        'description' => 'Refine your audience, offer, and positioning so Hatchers can build the right direct-response business system for you.',
                         'platform' => 'atlas',
                         'priority' => 95,
                         'cta_label' => 'Open Atlas',
@@ -4696,11 +5680,19 @@ class OsShellController extends Controller
                     ],
                     [
                         'title' => 'Choose your website path',
-                        'description' => 'Start with the right website engine based on your business model.',
-                        'platform' => $validated['business_model'] === 'service' ? 'servio' : 'bazaar',
+                        'description' => 'Review the pre-selected launch engine and get your first site ready for publishing.',
+                        'platform' => (string) $blueprint->engine,
                         'priority' => 88,
                         'cta_label' => 'Open Website Workspace',
                         'cta_url' => '/website',
+                    ],
+                    [
+                        'title' => 'Review your first revenue sprint',
+                        'description' => 'Start with the first tasks Hatchers recommends for getting your first customers fast.',
+                        'platform' => 'os',
+                        'priority' => 90,
+                        'cta_label' => 'Open Tasks',
+                        'cta_url' => '/tasks',
                     ],
                 ];
 
@@ -5431,6 +6423,46 @@ class OsShellController extends Controller
         };
     }
 
+    private function publicWebsiteSourceTag(array $validated): string
+    {
+        $parts = array_filter([
+            ($source = trim((string) ($validated['src'] ?? ''))) !== '' ? 'Source: ' . $source : null,
+            ($promo = trim((string) ($validated['promo'] ?? ''))) !== '' ? 'Promo: ' . $promo : null,
+        ]);
+
+        return implode(' | ', $parts);
+    }
+
+    private function appendPublicSourceNote(string $notes, string $sourceTag): string
+    {
+        $notes = trim($notes);
+        $sourceTag = trim($sourceTag);
+
+        if ($sourceTag === '') {
+            return $notes;
+        }
+
+        if ($notes === '') {
+            return '[' . $sourceTag . ']';
+        }
+
+        return $notes . "\n\n[" . $sourceTag . ']';
+    }
+
+    private function promoLinkQrSvgMarkup(string $url): string
+    {
+        return (string) QrCode::format('svg')->size(260)->margin(1)->generate($url);
+    }
+
+    private function promoLinkDownloadBaseName(FounderPromoLink $promoLink): string
+    {
+        $base = trim((string) ($promoLink->title ?: 'promo-link'));
+        $base = strtolower(preg_replace('/[^a-z0-9]+/i', '-', $base) ?? 'promo-link');
+        $base = trim($base, '-');
+
+        return $base !== '' ? $base : 'promo-link';
+    }
+
     private function calculatePublicCheckoutAmount(array $site, array $offer, array $attributes): float
     {
         $basePrice = (float) ($offer['base_price'] ?? 0);
@@ -5924,6 +6956,148 @@ class OsShellController extends Controller
             'Technology and software',
             'Real estate and property',
         ];
+    }
+
+    private function verticalBlueprintDefinitions(): array
+    {
+        return [
+            'dog-walking' => [
+                'code' => 'dog-walking',
+                'name' => 'Dog Walking',
+                'business_model' => 'service',
+                'engine' => 'servio',
+                'description' => 'A local dog walking launch system focused on bookings, neighborhood trust, and repeat weekly packages.',
+                'default_offer_json' => ['core_offer' => '1:1 services', 'upsells' => ['Extended walk', 'Feeding', 'Photo updates']],
+                'default_pricing_json' => ['tier_1' => 'Single walk', 'tier_2' => '3-walk weekly plan', 'tier_3' => '5-walk weekly plan'],
+                'default_pages_json' => ['hero', 'how_it_works', 'services', 'service_area', 'trust', 'faq', 'booking_cta'],
+                'default_tasks_json' => ['Join local pet groups', 'Post neighborhood intro offer', 'Follow up with leads'],
+                'default_channels_json' => ['Facebook groups', 'Nextdoor', 'Local SEO', 'Neighborhood referrals'],
+                'default_cta_json' => ['primary' => 'Book a walk', 'secondary' => 'Get a weekly plan'],
+                'default_image_queries_json' => ['dog walking', 'pet owner outdoors', 'happy dog on leash'],
+                'funnel_framework_json' => ['Lead magnet', 'Problem', 'Proof', 'Offer stack', 'Guarantee', 'Urgency', 'FAQ'],
+                'pricing_preset_json' => ['tier_1' => 'Single walk', 'tier_2' => '3-walk weekly plan', 'tier_3' => '5-walk weekly plan'],
+                'channel_playbook_json' => ['Facebook groups', 'Nextdoor', 'Neighborhood referrals'],
+                'script_library_json' => ['Helpful neighborhood intro', 'Weekly package follow-up', 'Close with recurring convenience'],
+            ],
+            'home-cleaning' => [
+                'code' => 'home-cleaning',
+                'name' => 'Home Cleaning',
+                'business_model' => 'service',
+                'engine' => 'servio',
+                'description' => 'A direct-response cleaning launch system focused on quotes, recurring plans, and local trust.',
+                'default_offer_json' => ['core_offer' => '1:1 services', 'upsells' => ['Deep clean', 'Move-in clean', 'Weekly cleaning']],
+                'default_pricing_json' => ['tier_1' => 'Standard clean', 'tier_2' => 'Deep clean', 'tier_3' => 'Weekly plan'],
+                'default_pages_json' => ['hero', 'packages', 'before_after', 'why_choose_us', 'faq', 'quote_cta'],
+                'default_tasks_json' => ['List in local groups', 'Reach out to apartment communities', 'Post before/after content'],
+                'default_channels_json' => ['Facebook groups', 'Google Business Profile', 'Apartment communities', 'Referrals'],
+                'default_cta_json' => ['primary' => 'Book a clean', 'secondary' => 'Request a quote'],
+                'default_image_queries_json' => ['home cleaning', 'clean modern apartment', 'professional cleaner'],
+                'funnel_framework_json' => ['Lead magnet', 'Mess and stress problem', 'Before / after proof', 'Offer stack', 'Guarantee', 'Urgency', 'FAQ'],
+                'pricing_preset_json' => ['tier_1' => 'Standard clean', 'tier_2' => 'Deep clean', 'tier_3' => 'Weekly plan'],
+                'channel_playbook_json' => ['Facebook groups', 'Google Business Profile', 'Apartment communities'],
+                'script_library_json' => ['Apartment community outreach', 'Before / after follow-up', 'Recurring plan close'],
+            ],
+            'barber-services' => [
+                'code' => 'barber-services',
+                'name' => 'Barber Services',
+                'business_model' => 'service',
+                'engine' => 'servio',
+                'description' => 'A barbershop booking system focused on appointment conversion, style proof, and repeat visits.',
+                'default_offer_json' => ['core_offer' => '1:1 services', 'upsells' => ['Beard trim', 'Haircut + beard combo', 'Premium grooming package']],
+                'default_pricing_json' => ['tier_1' => 'Haircut', 'tier_2' => 'Haircut + beard', 'tier_3' => 'Premium package'],
+                'default_pages_json' => ['hero', 'service_menu', 'gallery', 'reviews', 'location_hours', 'booking_cta'],
+                'default_tasks_json' => ['Post haircut examples', 'Follow up with prior clients', 'Launch referral offer'],
+                'default_channels_json' => ['Instagram', 'Local community groups', 'Referrals', 'Google Business Profile'],
+                'default_cta_json' => ['primary' => 'Book your cut', 'secondary' => 'See service menu'],
+                'default_image_queries_json' => ['barbershop', 'barber haircut', 'modern grooming'],
+                'funnel_framework_json' => ['Style proof', 'Problem', 'Gallery proof', 'Offer stack', 'Guarantee', 'Urgency', 'FAQ'],
+                'pricing_preset_json' => ['tier_1' => 'Haircut', 'tier_2' => 'Haircut + beard', 'tier_3' => 'Premium package'],
+                'channel_playbook_json' => ['Instagram', 'Referrals', 'Google Business Profile'],
+                'script_library_json' => ['Fresh cut outreach', 'Referral ask', 'Premium package close'],
+            ],
+            'tutoring-coaching' => [
+                'code' => 'tutoring-coaching',
+                'name' => 'Tutoring / Coaching',
+                'business_model' => 'service',
+                'engine' => 'servio',
+                'description' => 'A session-based authority funnel for tutoring or coaching with consultation and package conversion.',
+                'default_offer_json' => ['core_offer' => 'Courses or workshops', 'upsells' => ['Weekly package', 'Monthly package', 'Premium guidance']],
+                'default_pricing_json' => ['tier_1' => 'Intro session', 'tier_2' => 'Single session', 'tier_3' => 'Monthly package'],
+                'default_pages_json' => ['hero', 'outcomes', 'who_its_for', 'plans', 'credibility', 'faq', 'consult_cta'],
+                'default_tasks_json' => ['Post expertise content', 'Contact parent/student groups', 'Follow up with inquiries'],
+                'default_channels_json' => ['Facebook groups', 'WhatsApp referrals', 'Local SEO', 'Community groups'],
+                'default_cta_json' => ['primary' => 'Book a consultation', 'secondary' => 'See session plans'],
+                'default_image_queries_json' => ['tutoring session', 'online coaching', 'teacher with student'],
+                'funnel_framework_json' => ['Lead magnet', 'Problem', 'Authority proof', 'Offer stack', 'Guarantee', 'Urgency', 'FAQ'],
+                'pricing_preset_json' => ['tier_1' => 'Intro session', 'tier_2' => 'Single session', 'tier_3' => 'Monthly package'],
+                'channel_playbook_json' => ['Facebook groups', 'WhatsApp referrals', 'Community groups'],
+                'script_library_json' => ['Consultation opener', 'Parent reassurance follow-up', 'Package close'],
+            ],
+            'handmade-products' => [
+                'code' => 'handmade-products',
+                'name' => 'Handmade Products',
+                'business_model' => 'product',
+                'engine' => 'bazaar',
+                'description' => 'A small product brand launch system focused on offer clarity, bundles, and direct-response product pages.',
+                'default_offer_json' => ['core_offer' => 'Physical products', 'upsells' => ['Bundle', 'Gift wrap', 'Limited edition']],
+                'default_pricing_json' => ['tier_1' => 'Single item', 'tier_2' => 'Bundle', 'tier_3' => 'Limited edition'],
+                'default_pages_json' => ['hero', 'featured_collection', 'product_grid', 'about_maker', 'trust_shipping', 'offer_cta'],
+                'default_tasks_json' => ['Post product photos', 'Launch a bundle offer', 'Reach niche communities'],
+                'default_channels_json' => ['Instagram', 'Facebook groups', 'Pinterest', 'Niche communities'],
+                'default_cta_json' => ['primary' => 'Shop now', 'secondary' => 'See featured collection'],
+                'default_image_queries_json' => ['handmade products', 'artisan workshop', 'product flatlay'],
+                'funnel_framework_json' => ['Lead magnet', 'Product problem', 'Maker proof', 'Offer stack', 'Guarantee', 'Urgency', 'FAQ'],
+                'pricing_preset_json' => ['tier_1' => 'Single item', 'tier_2' => 'Bundle', 'tier_3' => 'Limited edition'],
+                'channel_playbook_json' => ['Instagram', 'Pinterest', 'Niche communities'],
+                'script_library_json' => ['Product story caption', 'Bundle follow-up', 'Limited edition close'],
+            ],
+        ];
+    }
+
+    private function upsertVerticalBlueprint(string $code): VerticalBlueprint
+    {
+        $definition = $this->verticalBlueprintDefinitions()[$code] ?? null;
+        if ($definition === null) {
+            abort(422, 'The selected business blueprint is invalid.');
+        }
+
+        return VerticalBlueprint::updateOrCreate(
+            ['code' => $definition['code']],
+            [
+                'name' => $definition['name'],
+                'business_model' => $definition['business_model'],
+                'engine' => $definition['engine'],
+                'description' => $definition['description'],
+                'default_offer_json' => $definition['default_offer_json'],
+                'default_pricing_json' => $definition['default_pricing_json'],
+                'default_pages_json' => $definition['default_pages_json'],
+                'default_tasks_json' => $definition['default_tasks_json'],
+                'default_channels_json' => $definition['default_channels_json'],
+                'default_cta_json' => $definition['default_cta_json'],
+                'default_image_queries_json' => $definition['default_image_queries_json'],
+                'funnel_framework_json' => $definition['funnel_framework_json'] ?? [],
+                'pricing_preset_json' => $definition['pricing_preset_json'] ?? [],
+                'channel_playbook_json' => $definition['channel_playbook_json'] ?? [],
+                'script_library_json' => $definition['script_library_json'] ?? [],
+                'status' => 'active',
+            ]
+        );
+    }
+
+    private function commaSeparatedValues(string $value): array
+    {
+        return array_values(array_filter(array_map(
+            static fn (string $item): string => trim($item),
+            explode(',', $value)
+        )));
+    }
+
+    private function adminBlueprintList(string $value): array
+    {
+        return array_values(array_filter(array_map(
+            static fn (string $item): string => trim($item),
+            preg_split('/[\r\n,]+/', $value) ?: []
+        )));
     }
 
     private function founderCoreOfferOptions(): array
@@ -6476,6 +7650,8 @@ class OsShellController extends Controller
     {
         return [
             'new_lead' => 'When a new lead appears',
+            'public_intro_lead' => 'When a public intro lead appears',
+            'lead_follow_up_due' => 'When a lead follow-up becomes due',
             'task_blocked' => 'When a task stays blocked',
             'new_order' => 'When a new order arrives',
             'new_booking' => 'When a new booking arrives',
@@ -6500,6 +7676,22 @@ class OsShellController extends Controller
     private function automationTemplates(): array
     {
         return [
+            'new-public-intro-lead-reminder' => [
+                'name' => 'New public intro follow-up',
+                'trigger_type' => 'public_intro_lead',
+                'module_scope' => 'os',
+                'condition_summary' => 'If a visitor leaves their details on a promo, flyer, QR, or referral landing flow and the founder has not reached out yet.',
+                'action_summary' => 'Flag the lead in First 100, recommend the first reply script, and prompt the founder to make contact the same day.',
+                'delivery' => 'os_prompt',
+            ],
+            'lead-follow-up-due-reminder' => [
+                'name' => 'Lead follow-up due',
+                'trigger_type' => 'lead_follow_up_due',
+                'module_scope' => 'os',
+                'condition_summary' => 'If a lead has a scheduled follow-up time that is now due and the conversation is still active.',
+                'action_summary' => 'Push the lead into the founder daily queue and prepare the right follow-up script for the current stage.',
+                'delivery' => 'os_prompt',
+            ],
             'unpaid-order-reminder' => [
                 'name' => 'Unpaid order reminder',
                 'trigger_type' => 'order_unpaid',

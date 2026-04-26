@@ -527,6 +527,7 @@
         $commerceAlerts = $dashboard['commerce_alerts'] ?? [];
         $commerceOperations = $dashboard['commerce_operations'] ?? [];
         $automationSummary = $dashboard['automation_summary'] ?? ['active_count' => 0, 'items' => []];
+        $revenueOs = $dashboard['revenue_os'] ?? ['metrics' => [], 'daily_plan' => ['tasks' => []], 'best_channel' => null];
         $nextBestActions = $workspace['next_best_actions'];
     @endphp
 
@@ -545,6 +546,10 @@
                     <a class="founder-nav-item" href="{{ route('founder.activity') }}">
                         <span class="founder-nav-icon">◫</span>
                         <span>Activity</span>
+                    </a>
+                    <a class="founder-nav-item" href="{{ route('founder.first-100') }}">
+                        <span class="founder-nav-icon">◎</span>
+                        <span>First 100</span>
                     </a>
                     <a class="founder-nav-item" href="{{ route('founder.commerce') }}">
                         <span class="founder-nav-icon">⌁</span>
@@ -643,6 +648,40 @@
                             </div>
                         </article>
                     @endforeach
+                </section>
+
+                @if (!empty($workspace['daily_revenue_plan']['tasks']))
+                    <section class="founder-section">
+                        <h2>Daily Revenue Plan</h2>
+                        @foreach ($workspace['daily_revenue_plan']['tasks'] as $task)
+                            <article class="founder-block">
+                                <div class="founder-row" style="align-items:flex-start;">
+                                    <div>
+                                        <div style="font-size: 1.04rem; font-weight: 600;">{{ $task['title'] }}</div>
+                                        <div class="founder-subtle" style="margin-top: 4px;">{{ $task['description'] }}</div>
+                                    </div>
+                                    <a class="founder-badge" href="{{ $task['href'] }}" style="text-decoration:none;">{{ $task['label'] }}</a>
+                                </div>
+                            </article>
+                        @endforeach
+                    </section>
+                @endif
+
+                <section class="founder-section">
+                    <h2>First 100 Progress</h2>
+                    <article class="founder-block">
+                        <div class="founder-row" style="align-items:flex-start;">
+                            <div>
+                                <div style="font-size: 1.04rem; font-weight: 600;">{{ $revenueOs['metrics']['customers_won'] ?? 0 }} / 100 customers won</div>
+                                <div class="founder-subtle" style="margin-top: 4px;">
+                                    {{ $revenueOs['metrics']['identified_leads'] ?? 0 }} leads tracked ·
+                                    {{ $revenueOs['metrics']['active_conversations'] ?? 0 }} active conversations ·
+                                    {{ $revenueOs['metrics']['follow_up_due'] ?? 0 }} follow-up due
+                                </div>
+                            </div>
+                            <a class="founder-badge" href="{{ route('founder.first-100') }}" style="text-decoration:none;">Open First 100</a>
+                        </div>
+                    </article>
                 </section>
 
                 <section class="founder-section">
@@ -775,6 +814,34 @@
                             <div class="founder-subtle" style="margin-top:4px;">{{ $item['message'] }}</div>
                         </div>
                     @endforeach
+                </div>
+
+                <h3 style="margin-top: 22px;"><a href="{{ route('founder.first-100') }}" style="text-decoration:none;color:inherit;">First 100</a></h3>
+                <div class="tool-list">
+                    <div class="tool-item" style="display:block;">
+                        <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
+                            <div>Customers won</div>
+                            <span class="notification-badge">{{ $revenueOs['metrics']['customers_won'] ?? 0 }}</span>
+                        </div>
+                    </div>
+                    <div class="tool-item" style="display:block;">
+                        <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
+                            <div>Follow-up due</div>
+                            <span class="notification-badge" style="background:rgba(154,107,27,0.12);color:#9a6b1b;">{{ $revenueOs['metrics']['follow_up_due'] ?? 0 }}</span>
+                        </div>
+                    </div>
+                    <div class="tool-item" style="display:block;">
+                        <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
+                            <div>Best channel</div>
+                            <span class="founder-subtle">{{ $revenueOs['best_channel']['channel_label'] ?? 'No signal yet' }}</span>
+                        </div>
+                    </div>
+                    <div class="tool-item" style="display:block;">
+                        <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
+                            <div>Priority channel today</div>
+                            <span class="founder-subtle">{{ $revenueOs['acquisition_engine']['priority_channel'] ?? 'No plan yet' }}</span>
+                        </div>
+                    </div>
                 </div>
 
                 <h3 style="margin-top: 22px;">Module Sync</h3>

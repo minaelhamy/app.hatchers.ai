@@ -5,6 +5,7 @@
         $mentor = $workspace['mentor'];
         $founder = $workspace['founder'];
         $actionPlans = $workspace['action_plans'];
+        $pricingRecommendations = $workspace['pricing_recommendations'];
         $activity = $workspace['activity'];
         $meetingPrep = $workspace['meeting_prep'];
     @endphp
@@ -48,6 +49,10 @@
                     <div class="muted">Revenue</div>
                     <strong>USD {{ number_format($founder['gross_revenue'], 0) }}</strong>
                 </div>
+                <div class="card metric">
+                    <div class="muted">First 100</div>
+                    <strong>{{ $founder['first_hundred_progress'] }}%</strong>
+                </div>
             </section>
 
             <section class="grid-2" style="margin-top: 22px;">
@@ -66,11 +71,16 @@
                             <strong>Founder brief</strong><br>
                             {{ $founder['company_brief'] ?: 'No company brief saved yet.' }}
                         </div>
+                        <div class="stack-item">
+                            <strong>Problem / ICP / market</strong><br>
+                            {{ $founder['brief_problem'] ?: 'Problem pending' }}<br>
+                            <span class="muted">{{ $founder['icp_name'] ?: 'ICP pending' }} · {{ $founder['brief_city'] ?: 'City pending' }}</span>
+                        </div>
                     </div>
                 </div>
 
                 <div class="card">
-                    <h2>Atlas Context</h2>
+                    <h2>Revenue OS Context</h2>
                     <div class="stack" style="margin-top: 14px;">
                         <div class="stack-item">
                             <strong>Primary growth goal</strong><br>
@@ -83,6 +93,11 @@
                         <div class="stack-item">
                             <strong>Known blockers</strong><br>
                             {{ $founder['known_blockers'] ?: 'Not synced yet' }}
+                        </div>
+                        <div class="stack-item">
+                            <strong>Launch system</strong><br>
+                            {{ ucfirst(str_replace('_', ' ', $founder['launch_system_status'])) }} · {{ strtoupper($founder['launch_system_engine'] ?: 'n/a') }}<br>
+                            <span class="muted">Pricing recs and channel adoptions should be reviewed in context, not in isolation.</span>
                         </div>
                     </div>
                 </div>
@@ -189,6 +204,26 @@
                             <strong>Bookings</strong><br>
                             {{ $founder['booking_count'] }}
                         </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>Pricing And Channels</h2>
+                    <div class="stack" style="margin-top: 14px;">
+                        <div class="stack-item">
+                            <strong>Adopted channels</strong><br>
+                            {{ $founder['lead_channel_adoptions'] }}
+                        </div>
+                        @forelse ($pricingRecommendations as $recommendation)
+                            <div class="stack-item">
+                                <strong>{{ $recommendation['title'] }}</strong><br>
+                                {{ $recommendation['currency'] }} {{ number_format($recommendation['price'], 2) }} · {{ ucfirst(str_replace('_', ' ', $recommendation['status'])) }}
+                            </div>
+                        @empty
+                            <div class="stack-item">
+                                No pricing recommendations stored yet.
+                            </div>
+                        @endforelse
                     </div>
                 </div>
             </section>

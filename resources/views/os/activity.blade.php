@@ -62,6 +62,7 @@
                 <a class="activity-brand" href="/dashboard/founder"><img src="/brand/hatchers-ai-logo.png" alt="Hatchers AI"></a>
                 <nav class="activity-nav">
                     <a class="activity-nav-item" href="/dashboard/founder"><span class="activity-nav-icon">⌂</span><span>Home</span></a>
+                    <a class="activity-nav-item" href="{{ route('founder.first-100') }}"><span class="activity-nav-icon">◎</span><span>First 100</span></a>
                     <a class="activity-nav-item active" href="{{ route('founder.activity') }}"><span class="activity-nav-icon">◫</span><span>Activity</span></a>
                     <a class="activity-nav-item" href="{{ route('founder.commerce') }}"><span class="activity-nav-icon">⌁</span><span>Commerce</span></a>
                     <a class="activity-nav-item" href="{{ route('founder.ai-tools') }}"><span class="activity-nav-icon">✦</span><span>AI Tools</span></a>

@@ -29,7 +29,8 @@ class FounderDashboardService
         $commerceAlerts = $this->buildCommerceAlerts($snapshots);
         $commerceOperations = $this->buildCommerceOperations($snapshots);
         $automationSummary = $this->buildAutomationSummary($founder, $commerceOperations);
-        $workspace = $this->buildWorkspace($founder, $company, $weeklyState, $actions, $activityFeed, $execution, $atlas, $growth, $syncStatus, $commerceAlerts, $commerceOperations, $automationSummary);
+        $revenueOs = app(FounderRevenueOsService::class)->dashboard($founder);
+        $workspace = $this->buildWorkspace($founder, $company, $weeklyState, $actions, $activityFeed, $execution, $atlas, $growth, $syncStatus, $commerceAlerts, $commerceOperations, $automationSummary, $revenueOs);
 
         return [
             'founder' => $founder,
@@ -50,6 +51,7 @@ class FounderDashboardService
             'commerce_alerts' => $commerceAlerts,
             'commerce_operations' => $commerceOperations,
             'automation_summary' => $automationSummary,
+            'revenue_os' => $revenueOs,
             'metrics' => [
                 'weekly_progress_percent' => (int) ($weeklyState->weekly_progress_percent ?? 0),
                 'open_tasks' => (int) ($weeklyState->open_tasks ?? 0),
@@ -72,7 +74,8 @@ class FounderDashboardService
         array $syncStatus,
         array $commerceAlerts,
         array $commerceOperations,
-        array $automationSummary
+        array $automationSummary,
+        array $revenueOs
     ): array {
         $today = now();
         $firstName = trim((string) preg_replace('/\s+.*/', '', (string) $founder->full_name));
@@ -198,11 +201,14 @@ class FounderDashboardService
                 $actions,
                 $commerceAlerts,
                 $commerceOperations,
-                $automationSummary
+                $automationSummary,
+                $revenueOs
             ),
             'activity_feed_groups' => $this->buildActivityFeedGroups($activityFeed),
             'commerce_operations' => $commerceOperations,
             'automation_summary' => $automationSummary,
+            'daily_revenue_plan' => $revenueOs['daily_plan'] ?? ['tasks' => []],
+            'first_hundred_summary' => $revenueOs,
         ];
     }
 
@@ -573,9 +579,42 @@ class FounderDashboardService
         $actions,
         array $commerceAlerts,
         array $commerceOperations,
-        array $automationSummary
+        array $automationSummary,
+        array $revenueOs
     ): array {
         $items = [];
+        $revenueMetrics = $revenueOs['metrics'] ?? [];
+        $bestChannel = $revenueOs['best_channel']['channel_label'] ?? 'your best-fit local channel';
+
+        if ((int) ($revenueMetrics['identified_leads'] ?? 0) < 10) {
+            $items[] = [
+                'title' => 'Build your first 10-target list',
+                'description' => 'Capture named prospects in your First 100 tracker so the OS can start driving real outreach and follow-up.',
+                'label' => 'Open First 100',
+                'href' => route('founder.first-100'),
+            ];
+        }
+
+        if ((int) ($revenueMetrics['follow_up_due'] ?? 0) > 0) {
+            $items[] = [
+                'title' => 'Follow up with due leads',
+                'description' => 'You have ' . (int) $revenueMetrics['follow_up_due'] . ' leads waiting for a follow-up. This is one of the fastest paths to revenue today.',
+                'label' => 'Open First 100',
+                'href' => route('founder.first-100'),
+            ];
+        }
+
+        if (
+            (int) ($revenueMetrics['identified_leads'] ?? 0) >= 10
+            && (int) ($revenueMetrics['customers_won'] ?? 0) === 0
+        ) {
+            $items[] = [
+                'title' => 'Lean into one acquisition channel',
+                'description' => 'Work ' . $bestChannel . ' harder until you turn your current pipeline into the first paying customer.',
+                'label' => 'Open Marketing',
+                'href' => route('founder.marketing'),
+            ];
+        }
 
         if (!empty($syncStatus['issues'])) {
             $items[] = [

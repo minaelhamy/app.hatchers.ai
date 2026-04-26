@@ -102,6 +102,66 @@ class Founder extends Authenticatable
         return $this->hasMany(PublicCheckoutSession::class);
     }
 
+    public function businessBrief(): HasOne
+    {
+        return $this->hasOne(FounderBusinessBrief::class);
+    }
+
+    public function icpProfiles(): HasMany
+    {
+        return $this->hasMany(FounderIcpProfile::class);
+    }
+
+    public function websiteGenerationRuns(): HasMany
+    {
+        return $this->hasMany(FounderWebsiteGenerationRun::class);
+    }
+
+    public function leads(): HasMany
+    {
+        return $this->hasMany(FounderLead::class);
+    }
+
+    public function promoLinks(): HasMany
+    {
+        return $this->hasMany(FounderPromoLink::class);
+    }
+
+    public function launchSystems(): HasMany
+    {
+        return $this->hasMany(FounderLaunchSystem::class);
+    }
+
+    public function leadChannels(): HasMany
+    {
+        return $this->hasMany(FounderLeadChannel::class);
+    }
+
+    public function conversationThreads(): HasMany
+    {
+        return $this->hasMany(FounderConversationThread::class);
+    }
+
+    public function pricingRecommendations(): HasMany
+    {
+        return $this->hasMany(FounderPricingRecommendation::class);
+    }
+
+    public function firstHundredTrackers(): HasMany
+    {
+        return $this->hasMany(FounderFirstHundredTracker::class);
+    }
+
+    public function podMemberships(): HasMany
+    {
+        return $this->hasMany(FounderPodMembership::class);
+    }
+
+    public function podPosts(): HasMany
+    {
+        return $this->hasMany(FounderPodPost::class);
+    }
+
     public function mentorAssignments(): HasMany
     {
         return $this->hasMany(MentorAssignment::class, 'founder_id');

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Founder;
+use App\Models\FounderLaunchSystem;
 use App\Models\MentorAssignment;
 use Illuminate\Support\Collection;
 
@@ -89,10 +90,16 @@ class MentorDashboardService
 
         $founder->loadMissing([
             'company',
+            'businessBrief',
+            'icpProfiles',
             'subscription',
             'weeklyState',
             'commercialSummary',
             'moduleSnapshots',
+            'launchSystems',
+            'pricingRecommendations',
+            'firstHundredTrackers',
+            'leadChannels',
             'actionPlans' => fn ($query) => $query->latest('priority')->limit(6),
         ]);
 
@@ -115,6 +122,17 @@ class MentorDashboardService
                 'completed' => $action->completed_at !== null || in_array((string) $action->status, ['completed', 'complete', 'done'], true),
             ];
         })->values();
+        $brief = $founder->businessBrief;
+        $icp = $founder->icpProfiles()->latest()->first();
+        /** @var FounderLaunchSystem|null $launchSystem */
+        $launchSystem = $founder->launchSystems()->latest('id')->first();
+        $pricingRecommendations = $founder->pricingRecommendations()->latest('generated_at')->take(4)->get()->map(fn ($recommendation): array => [
+            'title' => (string) $recommendation->title,
+            'status' => (string) $recommendation->status,
+            'price' => (float) $recommendation->price,
+            'currency' => (string) $recommendation->currency,
+        ])->all();
+        $tracker = $founder->firstHundredTrackers()->where('status', 'active')->latest('id')->first();
 
         return [
             'mentor' => $mentor,
@@ -133,6 +151,13 @@ class MentorDashboardService
                 'open_milestones' => (int) ($founder->weeklyState?->open_milestones ?? 0),
                 'next_meeting_at' => optional($founder->weeklyState?->next_meeting_at)->toDayDateTimeString(),
                 'gross_revenue' => (float) ($founder->commercialSummary?->gross_revenue ?? 0),
+                'brief_problem' => (string) ($brief?->problem_solved ?? ''),
+                'brief_city' => (string) ($brief?->location_city ?? $founder->company?->primary_city ?? ''),
+                'icp_name' => (string) ($icp?->primary_icp_name ?? ''),
+                'launch_system_status' => (string) ($launchSystem?->status ?? 'not_set'),
+                'launch_system_engine' => (string) ($launchSystem?->selected_engine ?? ''),
+                'first_hundred_progress' => (int) ($tracker?->progress_percent ?? 0),
+                'lead_channel_adoptions' => (int) $founder->leadChannels()->where('status', 'adopted')->count(),
                 'product_count' => (int) ($founder->commercialSummary?->product_count ?? 0),
                 'service_count' => (int) ($founder->commercialSummary?->service_count ?? 0),
                 'order_count' => (int) ($founder->commercialSummary?->order_count ?? 0),
@@ -144,6 +169,7 @@ class MentorDashboardService
                 'notes' => (string) ($assignment->notes ?? ''),
             ],
             'action_plans' => $actionPlans->all(),
+            'pricing_recommendations' => $pricingRecommendations,
             'meeting_prep' => $this->buildMeetingPrep($founder, $atlasSummary, $actionPlans),
             'activity' => [
                 'atlas' => $this->normalizeActivity($recentAtlasActivity),

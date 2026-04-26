@@ -68,6 +68,16 @@
                 </div>
                 <div class="grid-2">
                     <label>
+                        <div class="muted" style="margin-bottom: 6px;">Business Blueprint</div>
+                        <select required name="vertical_blueprint" style="width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); background: #fff;">
+                            <option value="">Select the closest blueprint</option>
+                            @foreach ($verticalBlueprintOptions as $verticalBlueprint)
+                                <option value="{{ $verticalBlueprint['code'] }}" @selected(old('vertical_blueprint') === $verticalBlueprint['code'])>{{ $verticalBlueprint['name'] }} · {{ ucfirst($verticalBlueprint['business_model']) }}</option>
+                            @endforeach
+                        </select>
+                        @error('vertical_blueprint')<div style="color: var(--rose); margin-top: 6px;">{{ $message }}</div>@enderror
+                    </label>
+                    <label>
                         <div class="muted" style="margin-bottom: 6px;">Business Model</div>
                         <select required name="business_model" style="width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); background: #fff;">
                             <option value="">Select a business model</option>
@@ -89,6 +99,18 @@
                         @error('stage')<div style="color: var(--rose); margin-top: 6px;">{{ $message }}</div>@enderror
                     </label>
                 </div>
+                <div class="grid-2">
+                    <label>
+                        <div class="muted" style="margin-bottom: 6px;">Primary City / Market</div>
+                        <input required type="text" name="primary_city" value="{{ old('primary_city') }}" placeholder="Austin, Cairo, London..." style="width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); background: #fff;">
+                        @error('primary_city')<div style="color: var(--rose); margin-top: 6px;">{{ $message }}</div>@enderror
+                    </label>
+                    <label>
+                        <div class="muted" style="margin-bottom: 6px;">Service Radius / Delivery Scope</div>
+                        <input required type="text" name="service_radius" value="{{ old('service_radius') }}" placeholder="10 miles, nationwide shipping, city center..." style="width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); background: #fff;">
+                        @error('service_radius')<div style="color: var(--rose); margin-top: 6px;">{{ $message }}</div>@enderror
+                    </label>
+                </div>
                 <label>
                     <div class="muted" style="margin-bottom: 6px;">Industry</div>
                     <select required name="industry" style="width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); background: #fff;">
@@ -106,6 +128,18 @@
                 </label>
                 <div class="grid-2">
                     <label>
+                        <div class="muted" style="margin-bottom: 6px;">Problem You Solve</div>
+                        <textarea required name="problem_solved" rows="3" style="width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); background: #fff;">{{ old('problem_solved') }}</textarea>
+                        @error('problem_solved')<div style="color: var(--rose); margin-top: 6px;">{{ $message }}</div>@enderror
+                    </label>
+                    <label>
+                        <div class="muted" style="margin-bottom: 6px;">What Makes You Different?</div>
+                        <textarea required name="differentiators" rows="3" style="width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); background: #fff;">{{ old('differentiators') }}</textarea>
+                        @error('differentiators')<div style="color: var(--rose); margin-top: 6px;">{{ $message }}</div>@enderror
+                    </label>
+                </div>
+                <div class="grid-2">
+                    <label>
                         <div class="muted" style="margin-bottom: 6px;">Target Audience</div>
                         <select required name="target_audience" style="width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); background: #fff;">
                             <option value="">Select your audience</option>
@@ -118,9 +152,33 @@
                         @error('target_audience')<div style="color: var(--rose); margin-top: 6px;">{{ $message }}</div>@enderror
                     </label>
                     <label>
+                        <div class="muted" style="margin-bottom: 6px;">Primary ICP Name</div>
+                        <input required type="text" name="primary_icp_name" value="{{ old('primary_icp_name') }}" placeholder="Busy dog owners, first-time homebuyers..." style="width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); background: #fff;">
+                        @error('primary_icp_name')<div style="color: var(--rose); margin-top: 6px;">{{ $message }}</div>@enderror
+                    </label>
+                </div>
+                <div class="grid-2">
+                    <label>
                         <div class="muted" style="margin-bottom: 6px;">Ideal Customer Profile</div>
                         <textarea required name="ideal_customer_profile" rows="3" style="width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); background: #fff;">{{ old('ideal_customer_profile') }}</textarea>
                         @error('ideal_customer_profile')<div style="color: var(--rose); margin-top: 6px;">{{ $message }}</div>@enderror
+                    </label>
+                    <label>
+                        <div class="muted" style="margin-bottom: 6px;">Top Pain Points</div>
+                        <textarea required name="pain_points" rows="3" placeholder="Separate with commas" style="width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); background: #fff;">{{ old('pain_points') }}</textarea>
+                        @error('pain_points')<div style="color: var(--rose); margin-top: 6px;">{{ $message }}</div>@enderror
+                    </label>
+                </div>
+                <div class="grid-2">
+                    <label>
+                        <div class="muted" style="margin-bottom: 6px;">Desired Outcomes</div>
+                        <textarea required name="desired_outcomes" rows="3" placeholder="Separate with commas" style="width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); background: #fff;">{{ old('desired_outcomes') }}</textarea>
+                        @error('desired_outcomes')<div style="color: var(--rose); margin-top: 6px;">{{ $message }}</div>@enderror
+                    </label>
+                    <label>
+                        <div class="muted" style="margin-bottom: 6px;">Common Objections</div>
+                        <textarea required name="objections" rows="3" placeholder="Separate with commas" style="width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); background: #fff;">{{ old('objections') }}</textarea>
+                        @error('objections')<div style="color: var(--rose); margin-top: 6px;">{{ $message }}</div>@enderror
                     </label>
                 </div>
                 <div class="grid-2">

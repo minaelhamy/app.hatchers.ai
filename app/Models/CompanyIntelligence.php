@@ -16,6 +16,8 @@ class CompanyIntelligence extends Model
         'company_id',
         'target_audience',
         'ideal_customer_profile',
+        'primary_icp_name',
+        'problem_solved',
         'brand_voice',
         'differentiators',
         'content_goals',
@@ -24,6 +26,9 @@ class CompanyIntelligence extends Model
         'pricing_notes',
         'primary_growth_goal',
         'known_blockers',
+        'objections',
+        'buying_triggers',
+        'local_market_notes',
         'last_summary',
         'intelligence_updated_at',
     ];

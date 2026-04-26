@@ -33,6 +33,20 @@ Route::middleware('auth')->group(function () {
     Route::post('/mentor/founders/{founder}/notes', [OsShellController::class, 'mentorSaveFounderNotes'])->name('mentor.founders.notes');
     Route::post('/mentor/founders/{founder}/actions/{actionPlan}/status', [OsShellController::class, 'mentorUpdateFounderActionStatus'])->name('mentor.founders.actions.status');
     Route::get('/activity', [OsShellController::class, 'founderActivity'])->name('founder.activity');
+    Route::get('/first-100', [OsShellController::class, 'founderFirstHundred'])->name('founder.first-100');
+    Route::get('/pods', [OsShellController::class, 'founderPods'])->name('founder.pods');
+    Route::post('/pods/{pod}/join', [OsShellController::class, 'founderJoinPod'])->name('founder.pods.join');
+    Route::post('/pods/{pod}/posts', [OsShellController::class, 'founderStorePodPost'])->name('founder.pods.posts.store');
+    Route::post('/first-100/leads', [OsShellController::class, 'founderStoreLead'])->name('founder.first-100.leads.store');
+    Route::post('/first-100/leads/{lead}', [OsShellController::class, 'founderUpdateLead'])->name('founder.first-100.leads.update');
+    Route::post('/first-100/leads/{lead}/touch', [OsShellController::class, 'founderLogLeadTouch'])->name('founder.first-100.leads.touch');
+    Route::post('/first-100/acquisition/{leadChannel}/apply', [OsShellController::class, 'founderApplyAcquisitionPlaybook'])->name('founder.first-100.acquisition.apply');
+    Route::post('/first-100/promo-links', [OsShellController::class, 'founderStorePromoLink'])->name('founder.first-100.promo-links.store');
+    Route::get('/first-100/promo-links/{promoLink}/kit', [OsShellController::class, 'founderPromoLinkKit'])->name('founder.first-100.promo-links.kit');
+    Route::get('/first-100/promo-links/{promoLink}/asset/{variant}', [OsShellController::class, 'founderPromoLinkAsset'])->name('founder.first-100.promo-links.asset');
+    Route::get('/first-100/promo-links/{promoLink}/asset/{variant}.svg', [OsShellController::class, 'founderPromoLinkAssetSvg'])->name('founder.first-100.promo-links.asset.svg');
+    Route::get('/first-100/promo-links/{promoLink}/qr.svg', [OsShellController::class, 'founderPromoLinkQrSvg'])->name('founder.first-100.promo-links.qr-svg');
+    Route::get('/first-100/promo-links/{promoLink}/qr.png', [OsShellController::class, 'founderPromoLinkQrPng'])->name('founder.first-100.promo-links.qr-png');
     Route::get('/inbox', [OsShellController::class, 'founderInbox'])->name('founder.inbox');
     Route::get('/notifications', [OsShellController::class, 'founderNotifications'])->name('founder.notifications');
     Route::get('/learning-plan', [OsShellController::class, 'founderLearningPlan'])->name('founder.learning-plan');
@@ -45,6 +59,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/commerce/wallet/export', [OsShellController::class, 'founderWalletExport'])->name('founder.commerce.wallet.export');
     Route::get('/commerce/orders', [OsShellController::class, 'founderOrders'])->name('founder.commerce.orders');
     Route::get('/commerce/bookings', [OsShellController::class, 'founderBookings'])->name('founder.commerce.bookings');
+    Route::post('/commerce/pricing-recommendations/{pricingRecommendation}/apply', [OsShellController::class, 'founderApplyPricingRecommendation'])->name('founder.commerce.pricing.apply');
+    Route::post('/commerce/pricing-recommendations/{pricingRecommendation}/status', [OsShellController::class, 'founderUpdatePricingRecommendationStatus'])->name('founder.commerce.pricing.status');
     Route::post('/commerce/offers/{actionPlan}', [OsShellController::class, 'founderUpdateCommerceOffer'])->name('founder.commerce.offer.update');
     Route::post('/commerce/configs/{actionPlan}', [OsShellController::class, 'founderUpdateCommerceConfig'])->name('founder.commerce.config.update');
     Route::post('/commerce/settings', [OsShellController::class, 'founderSaveCommerceConfig'])->name('founder.commerce.settings.store');
@@ -84,6 +100,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/admin/control', [OsShellController::class, 'adminControl'])->name('admin.control');
     Route::get('/admin/system-access', [OsShellController::class, 'adminSystemAccess'])->name('admin.system-access');
     Route::get('/admin/identity', [OsShellController::class, 'adminIdentity'])->name('admin.identity');
+    Route::get('/admin/blueprints', [OsShellController::class, 'adminBlueprints'])->name('admin.blueprints');
+    Route::post('/admin/blueprints', [OsShellController::class, 'adminStoreBlueprint'])->name('admin.blueprints.store');
+    Route::post('/admin/blueprints/founder-review', [OsShellController::class, 'adminReviewFounderBlueprint'])->name('admin.blueprints.founder-review');
     Route::get('/admin/commerce', [OsShellController::class, 'adminCommerce'])->name('admin.commerce');
     Route::get('/admin/finance', [OsShellController::class, 'adminFinance'])->name('admin.finance');
     Route::get('/admin/finance/export', [OsShellController::class, 'adminFinanceExport'])->name('admin.finance.export');
@@ -110,6 +129,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/admin/control/exceptions/{exception}/resolve', [OsShellController::class, 'adminResolveException'])->name('admin.control.exceptions.resolve');
     Route::get('/mentor/legacy-tools', [OsShellController::class, 'mentorLegacyTools'])->name('mentor.legacy-tools');
     Route::get('/website', [OsShellController::class, 'website'])->name('website');
+    Route::post('/website/generate', [OsShellController::class, 'generateWebsiteDraft'])->name('website.generate');
+    Route::post('/website/launch-system/apply', [OsShellController::class, 'founderApplyLaunchSystem'])->name('website.launch-system.apply');
+    Route::post('/website/draft/regenerate-block', [OsShellController::class, 'founderRegenerateWebsiteDraftBlock'])->name('website.draft.regenerate-block');
     Route::post('/website/setup', [OsShellController::class, 'updateWebsite'])->name('website.setup');
     Route::post('/website/publish', [OsShellController::class, 'publishWebsite'])->name('website.publish');
     Route::post('/website/starter', [OsShellController::class, 'createWebsiteStarter'])->name('website.starter');
@@ -121,6 +143,9 @@ Route::middleware('auth')->group(function () {
 Route::post('/{websitePath}/request-order', [OsShellController::class, 'publicWebsiteOrderRequest'])
     ->where('websitePath', '[A-Za-z0-9\-/]+')
     ->name('public.website.order');
+Route::post('/{websitePath}/request-intro', [OsShellController::class, 'publicWebsiteIntroRequest'])
+    ->where('websitePath', '[A-Za-z0-9\-/]+')
+    ->name('public.website.intro');
 Route::post('/{websitePath}/request-booking', [OsShellController::class, 'publicWebsiteBookingRequest'])
     ->where('websitePath', '[A-Za-z0-9\-/]+')
     ->name('public.website.booking');

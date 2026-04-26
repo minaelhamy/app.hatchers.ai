@@ -3,9 +3,17 @@
 namespace App\Services;
 
 use App\Models\Founder;
+use App\Models\FounderBusinessBrief;
+use App\Models\FounderIcpProfile;
+use App\Models\FounderLaunchSystem;
+use App\Models\FounderLeadChannel;
+use App\Models\FounderPod;
+use App\Models\FounderPricingRecommendation;
 use App\Models\MentorAssignment;
 use App\Models\ModuleSnapshot;
 use App\Models\Subscription;
+use App\Models\VerticalBlueprint;
+use App\Models\VerticalBlueprintVersion;
 use Illuminate\Database\Eloquent\Builder;
 
 class AdminDashboardService
@@ -780,6 +788,189 @@ class AdminDashboardService
             'reliability_queue' => $reliabilityQueue,
             'recent_operations' => $recentOperations,
         ];
+    }
+
+    public function buildBlueprintWorkspace(Founder $admin, array $filters = []): array
+    {
+        $search = trim((string) ($filters['search'] ?? ''));
+        $status = trim((string) ($filters['status'] ?? ''));
+        $businessModel = trim((string) ($filters['business_model'] ?? ''));
+
+        $blueprints = VerticalBlueprint::query()
+            ->orderBy('name')
+            ->get()
+            ->filter(function (VerticalBlueprint $blueprint) use ($search, $status, $businessModel): bool {
+                if ($status !== '' && (string) $blueprint->status !== $status) {
+                    return false;
+                }
+
+                if ($businessModel !== '' && (string) $blueprint->business_model !== $businessModel) {
+                    return false;
+                }
+
+                if ($search === '') {
+                    return true;
+                }
+
+                $haystack = strtolower(implode(' ', array_filter([
+                    (string) $blueprint->name,
+                    (string) $blueprint->code,
+                    (string) $blueprint->description,
+                ])));
+
+                return str_contains($haystack, strtolower($search));
+            })
+            ->map(function (VerticalBlueprint $blueprint): array {
+                $versions = $blueprint->versions()->latest('version_number')->take(4)->get();
+                $recommendations = FounderPricingRecommendation::query()->where('vertical_blueprint_id', $blueprint->id)->get();
+                $launchSystems = FounderLaunchSystem::query()->where('vertical_blueprint_id', $blueprint->id)->get();
+
+                return [
+                    'id' => $blueprint->id,
+                    'code' => (string) $blueprint->code,
+                    'name' => (string) $blueprint->name,
+                    'business_model' => (string) $blueprint->business_model,
+                    'engine' => (string) $blueprint->engine,
+                    'description' => (string) ($blueprint->description ?? ''),
+                    'status' => (string) $blueprint->status,
+                    'default_offer' => $this->implodeFlexibleList($blueprint->default_offer_json),
+                    'default_pricing' => $this->implodeFlexibleList($blueprint->default_pricing_json),
+                    'default_pages' => $this->implodeFlexibleList($blueprint->default_pages_json),
+                    'default_tasks' => $this->implodeFlexibleList($blueprint->default_tasks_json),
+                    'default_channels' => $this->implodeFlexibleList($blueprint->default_channels_json),
+                    'default_cta' => $this->implodeFlexibleList($blueprint->default_cta_json),
+                    'default_image_queries' => $this->implodeFlexibleList($blueprint->default_image_queries_json),
+                    'funnel_framework' => $this->implodeFlexibleList($blueprint->funnel_framework_json),
+                    'pricing_presets' => $this->implodeFlexibleList($blueprint->pricing_preset_json),
+                    'channel_playbooks' => $this->implodeFlexibleList($blueprint->channel_playbook_json),
+                    'script_library' => $this->implodeFlexibleList($blueprint->script_library_json),
+                    'version_number' => (int) ($blueprint->version_number ?? 1),
+                    'versions' => $versions->map(fn (VerticalBlueprintVersion $version): array => [
+                        'label' => (string) ($version->version_label ?? 'v' . $version->version_number),
+                        'summary' => (string) ($version->change_summary ?? ''),
+                        'created_at' => optional($version->created_at)->toDayDateTimeString(),
+                    ])->all(),
+                    'applied_launch_systems' => $launchSystems->where('status', 'active')->count(),
+                    'pricing_applied_count' => $recommendations->where('status', 'applied')->count(),
+                    'pricing_rejected_count' => $recommendations->where('status', 'rejected')->count(),
+                ];
+            })
+            ->values();
+
+        $founderReviews = Founder::query()
+            ->where('role', 'founder')
+            ->with(['company.verticalBlueprint', 'businessBrief', 'icpProfiles'])
+            ->orderByDesc('created_at')
+            ->get()
+            ->filter(function (Founder $founder) use ($search, $businessModel): bool {
+                if ($businessModel !== '' && (string) ($founder->company?->business_model ?? '') !== $businessModel) {
+                    return false;
+                }
+
+                if ($search === '') {
+                    return true;
+                }
+
+                $brief = $founder->businessBrief;
+                $haystack = strtolower(implode(' ', array_filter([
+                    (string) $founder->full_name,
+                    (string) $founder->email,
+                    (string) ($founder->company?->company_name ?? ''),
+                    (string) ($founder->company?->verticalBlueprint?->name ?? ''),
+                    (string) ($brief?->business_summary ?? ''),
+                ])));
+
+                return str_contains($haystack, strtolower($search));
+            })
+            ->map(function (Founder $founder): array {
+                $company = $founder->company;
+                $brief = $founder->businessBrief;
+                $icp = $founder->icpProfiles()->latest()->first();
+
+                return [
+                    'founder_id' => $founder->id,
+                    'founder_name' => $founder->full_name,
+                    'email' => $founder->email,
+                    'company_name' => (string) ($company?->company_name ?? 'Company not set yet'),
+                    'business_model' => (string) ($company?->business_model ?? 'hybrid'),
+                    'vertical_name' => (string) ($company?->verticalBlueprint?->name ?? 'No blueprint'),
+                    'vertical_code' => (string) ($company?->verticalBlueprint?->code ?? ''),
+                    'launch_stage' => (string) ($company?->launch_stage ?? 'brief_pending'),
+                    'website_generation_status' => (string) ($company?->website_generation_status ?? 'not_started'),
+                    'primary_city' => (string) ($company?->primary_city ?? ''),
+                    'service_radius' => (string) ($company?->service_radius ?? ''),
+                    'company_brief' => (string) ($company?->company_brief ?? ''),
+                    'problem_solved' => (string) ($brief?->problem_solved ?? ''),
+                    'differentiators' => (string) ($company?->intelligence?->differentiators ?? ''),
+                    'primary_icp_name' => (string) ($icp?->primary_icp_name ?? ''),
+                    'pain_points' => implode(', ', is_array($icp?->pain_points_json) ? $icp->pain_points_json : []),
+                    'desired_outcomes' => implode(', ', is_array($icp?->desired_outcomes_json) ? $icp->desired_outcomes_json : []),
+                    'objections' => implode(', ', is_array($icp?->objections_json) ? $icp->objections_json : []),
+                    'launch_system_status' => (string) ($founder->launchSystems()->latest('id')->first()?->status ?? 'not_set'),
+                    'pricing_applied_count' => $founder->pricingRecommendations()->where('status', 'applied')->count(),
+                    'pricing_rejected_count' => $founder->pricingRecommendations()->where('status', 'rejected')->count(),
+                    'created_at' => optional($founder->created_at)->toDateTimeString(),
+                ];
+            })
+            ->values();
+
+        $pods = FounderPod::query()
+            ->withCount(['memberships', 'posts'])
+            ->orderBy('name')
+            ->get()
+            ->map(fn (FounderPod $pod): array => [
+                'name' => (string) $pod->name,
+                'stage' => (string) ($pod->stage ?? ''),
+                'member_count' => (int) $pod->memberships_count,
+                'post_count' => (int) $pod->posts_count,
+            ])->values();
+
+        return [
+            'admin' => $admin,
+            'filters' => [
+                'search' => $search,
+                'status' => $status,
+                'business_model' => $businessModel,
+            ],
+            'filter_options' => [
+                'statuses' => ['active', 'paused'],
+                'business_models' => ['product', 'service', 'hybrid'],
+                'engines' => ['bazaar', 'servio'],
+            ],
+            'metrics' => [
+                'blueprint_count' => $blueprints->count(),
+                'active_blueprints' => $blueprints->where('status', 'active')->count(),
+                'founder_briefs' => $founderReviews->count(),
+                'launch_ready_founders' => $founderReviews->where('launch_stage', 'brief_captured')->count(),
+                'applied_launch_systems' => FounderLaunchSystem::query()->where('status', 'active')->count(),
+                'applied_pricing_recommendations' => FounderPricingRecommendation::query()->where('status', 'applied')->count(),
+                'lead_channel_adoptions' => FounderLeadChannel::query()->where('status', 'adopted')->count(),
+                'active_pods' => $pods->count(),
+            ],
+            'blueprints' => $blueprints->all(),
+            'founder_reviews' => $founderReviews->all(),
+            'pods' => $pods->all(),
+        ];
+    }
+
+    private function implodeFlexibleList($value): string
+    {
+        if (!is_array($value)) {
+            return '';
+        }
+
+        $parts = [];
+        foreach ($value as $key => $item) {
+            if (is_array($item)) {
+                $parts[] = is_string($key)
+                    ? ($key . ': ' . implode(', ', array_map('strval', array_filter($item, fn ($entry) => is_scalar($entry)))))
+                    : implode(', ', array_map('strval', array_filter($item, fn ($entry) => is_scalar($entry))));
+            } elseif (is_scalar($item)) {
+                $parts[] = is_string($key) && !is_int($key) ? ($key . ': ' . (string) $item) : (string) $item;
+            }
+        }
+
+        return implode(' | ', array_filter($parts, fn ($item) => trim((string) $item) !== ''));
     }
 
     private function resolveModuleStatus(int $syncedFounders, ?int $hoursSinceSync): array

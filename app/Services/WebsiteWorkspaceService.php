@@ -7,13 +7,19 @@ use App\Models\ModuleSnapshot;
 
 class WebsiteWorkspaceService
 {
-    public function __construct(private WebsiteProvisioningService $websiteProvisioningService)
+    public function __construct(
+        private WebsiteProvisioningService $websiteProvisioningService,
+        private WebsiteAutopilotService $websiteAutopilotService
+    )
     {
     }
 
     public function build(Founder $founder): array
     {
         $company = $founder->company;
+        $autopilotDraft = $this->websiteAutopilotService->latestDraft($company);
+        $latestLaunchSystem = $company?->launchSystems()->latest('id')->first();
+        $latestIcp = $company ? $company->icpProfiles()->latest()->first() : null;
         $businessModel = $this->normalizeBusinessModel((string) ($company?->business_model ?? 'hybrid'));
         $companyName = (string) ($company?->company_name ?? $founder->full_name);
         $slug = $this->slugify($companyName);
@@ -22,11 +28,11 @@ class WebsiteWorkspaceService
         $servio = $snapshots->get('servio');
         $supportedEngines = $this->supportedEngines($businessModel);
 
-        $recommendedEngine = (string) ($company?->website_engine ?: $this->determineRecommendedEngine($businessModel));
+        $recommendedEngine = (string) ($autopilotDraft['engine'] ?? $company?->website_engine ?: $this->determineRecommendedEngine($businessModel));
         if (!in_array($recommendedEngine, $supportedEngines, true)) {
             $recommendedEngine = $supportedEngines[0] ?? 'servio';
         }
-        $websitePath = $this->normalizeWebsitePath((string) ($company?->website_path ?? ''));
+        $websitePath = $this->normalizeWebsitePath((string) ($autopilotDraft['website_path'] ?? $company?->website_path ?? ''));
         if ($websitePath === '') {
             $websitePath = $slug;
         }
@@ -60,6 +66,7 @@ class WebsiteWorkspaceService
             'company_name' => $companyName,
             'business_model' => $businessModel,
             'website_status' => (string) ($company?->website_status ?? 'not_started'),
+            'website_generation_status' => (string) ($company?->website_generation_status ?? 'not_started'),
             'recommended_engine' => $recommendedEngine,
             'website_path' => $websitePath,
             'current_website_url' => $currentWebsiteUrl,
@@ -70,6 +77,19 @@ class WebsiteWorkspaceService
             'engines' => $engines,
             'theme_options' => $themeOptions,
             'supported_engines' => $supportedEngines,
+            'autopilot' => [
+                'blueprint_name' => (string) ($company?->verticalBlueprint?->name ?? ''),
+                'primary_city' => (string) ($company?->primary_city ?? ''),
+                'problem_solved' => (string) ($company?->businessBrief?->problem_solved ?? ''),
+                'primary_icp_name' => (string) ($latestIcp?->primary_icp_name ?? ''),
+                'draft' => $autopilotDraft,
+                'launch_system' => $latestLaunchSystem ? [
+                    'id' => $latestLaunchSystem->id,
+                    'status' => (string) $latestLaunchSystem->status,
+                    'selected_engine' => (string) ($latestLaunchSystem->selected_engine ?? ''),
+                    'applied_at' => optional($latestLaunchSystem->applied_at)->toDateTimeString(),
+                ] : null,
+            ],
             'domain_model' => [
                 [
                     'title' => 'Founder workspace',
