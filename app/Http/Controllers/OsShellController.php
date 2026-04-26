@@ -7,9 +7,12 @@ use App\Models\Company;
 use App\Models\CompanyIntelligence;
 use App\Models\Founder;
 use App\Models\FounderActionPlan;
+use App\Models\FounderPayoutAccount;
+use App\Models\FounderPayoutRequest;
 use App\Models\FounderWeeklyState;
 use App\Models\OsAutomationRule;
 use App\Models\OsOperationException;
+use App\Models\PublicCheckoutSession;
 use App\Models\Subscription;
 use App\Services\AdminDashboardService;
 use App\Services\AdminOperationsService;
@@ -21,6 +24,8 @@ use App\Services\LmsIdentityBridgeService;
 use App\Services\MentorDashboardService;
 use App\Services\OsAssistantActionService;
 use App\Services\OsOperationsLogService;
+use App\Services\OsStripeService;
+use App\Services\OsWalletService;
 use App\Services\PublicWebsiteService;
 use App\Services\WebsiteProvisioningService;
 use App\Services\WebsiteWorkspaceService;
@@ -34,6 +39,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rule;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use Throwable;
 
 class OsShellController extends Controller
@@ -439,6 +445,234 @@ class OsShellController extends Controller
         ]);
     }
 
+    public function adminFinance(Request $request, AdminDashboardService $adminDashboardService)
+    {
+        /** @var \App\Models\Founder $user */
+        $user = Auth::user();
+        $this->ensureAdminPermission($user, 'commerce_control');
+
+        return view('os.admin-finance', [
+            'pageTitle' => 'Finance Control',
+            'workspace' => $adminDashboardService->buildFinanceWorkspace($user, $request->query()),
+        ]);
+    }
+
+    public function adminFinanceExport(Request $request, AdminDashboardService $adminDashboardService): StreamedResponse
+    {
+        /** @var \App\Models\Founder $user */
+        $user = Auth::user();
+        $this->ensureAdminPermission($user, 'commerce_control');
+
+        $validated = $request->validate([
+            'dataset' => ['required', Rule::in(['wallets', 'payouts', 'ledger', 'checkouts'])],
+            'search' => ['nullable', 'string', 'max:255'],
+            'payout_status' => ['nullable', 'string', 'max:32'],
+            'checkout_status' => ['nullable', 'string', 'max:32'],
+        ]);
+
+        $workspace = $adminDashboardService->buildFinanceWorkspace($user, $request->only(['search', 'payout_status', 'checkout_status']));
+        $dataset = (string) $validated['dataset'];
+        $filename = 'hatchers-os-' . $dataset . '-' . now()->format('Ymd-His') . '.csv';
+
+        return response()->streamDownload(function () use ($workspace, $dataset): void {
+            $handle = fopen('php://output', 'w');
+
+            if ($dataset === 'wallets') {
+                fputcsv($handle, ['Founder', 'Company', 'Email', 'Business Model', 'Currency', 'Available', 'Reserved', 'Pending', 'Gross Sales', 'Refunded Sales', 'Platform Fees', 'Net Earnings', 'Stripe Status', 'Payout Rail']);
+                foreach ($workspace['wallet_rows'] as $row) {
+                    fputcsv($handle, [
+                        $row['founder_name'],
+                        $row['company_name'],
+                        $row['email'],
+                        $row['business_model'],
+                        $row['currency'],
+                        $row['available_balance'],
+                        $row['reserved_balance'],
+                        $row['pending_balance'],
+                        $row['gross_sales_total'],
+                        $row['refunded_sales_total'],
+                        $row['platform_fees_total'],
+                        $row['net_earnings_total'],
+                        $row['stripe_status'],
+                        $row['bank_summary'],
+                    ]);
+                }
+            } elseif ($dataset === 'payouts') {
+                fputcsv($handle, ['Founder', 'Company', 'Amount', 'Currency', 'Status', 'Requested At', 'Processed At', 'Destination', 'Reference', 'Rejection Reason', 'Notes']);
+                foreach ($workspace['payout_requests'] as $row) {
+                    fputcsv($handle, [
+                        $row['founder_name'],
+                        $row['company_name'],
+                        $row['amount'],
+                        $row['currency'],
+                        $row['status'],
+                        $row['requested_at'],
+                        $row['processed_at'],
+                        $row['destination_summary'],
+                        $row['reference'],
+                        $row['rejection_reason'],
+                        $row['notes'],
+                    ]);
+                }
+            } elseif ($dataset === 'ledger') {
+                fputcsv($handle, ['Founder', 'Company', 'Platform', 'Category', 'Reference', 'Entry Type', 'Amount', 'Currency', 'Status', 'Created At']);
+                foreach ($workspace['recent_ledger_entries'] as $row) {
+                    fputcsv($handle, [
+                        $row['founder_name'],
+                        $row['company_name'],
+                        $row['source_platform'],
+                        $row['source_category'],
+                        $row['source_reference'],
+                        $row['entry_type'],
+                        $row['amount'],
+                        $row['currency'],
+                        $row['status'],
+                        $row['created_at'],
+                    ]);
+                }
+            } else {
+                fputcsv($handle, ['Founder', 'Company', 'Offer', 'Platform', 'Category', 'Amount', 'Currency', 'Checkout Status', 'Stripe Session', 'Payment Intent', 'Commerce Reference', 'Customer Name', 'Customer Email', 'Created At', 'Completed At', 'Reviewed', 'Reviewed At', 'Reviewed By', 'Review Note']);
+                foreach ($workspace['checkout_rows'] as $row) {
+                    fputcsv($handle, [
+                        $row['founder_name'],
+                        $row['company_name'],
+                        $row['offer_title'],
+                        $row['platform'],
+                        $row['category'],
+                        $row['amount'],
+                        $row['currency'],
+                        $row['checkout_status'],
+                        $row['stripe_session_id'],
+                        $row['stripe_payment_intent_id'],
+                        $row['commerce_reference'],
+                        $row['customer_name'],
+                        $row['customer_email'],
+                        $row['created_at'],
+                        $row['completed_at'],
+                        $row['reviewed'] ? 'yes' : 'no',
+                        $row['reviewed_at'],
+                        $row['reviewed_by'],
+                        $row['review_note'],
+                    ]);
+                }
+            }
+
+            fclose($handle);
+        }, $filename, [
+            'Content-Type' => 'text/csv',
+        ]);
+    }
+
+    public function adminFinanceReviewCheckout(
+        Request $request,
+        PublicCheckoutSession $checkoutSession,
+        OsOperationsLogService $logService
+    ): RedirectResponse {
+        /** @var \App\Models\Founder $user */
+        $user = Auth::user();
+        $this->ensureAdminPermission($user, 'commerce_control');
+
+        $validated = $request->validate([
+            'review_action' => ['required', Rule::in(['reviewed', 'reopen'])],
+            'note' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $payload = is_array($checkoutSession->payload_json) ? $checkoutSession->payload_json : [];
+        $reviewAction = (string) $validated['review_action'];
+        $payload['finance_review'] = [
+            'reviewed' => $reviewAction === 'reviewed',
+            'reviewed_at' => $reviewAction === 'reviewed' ? now()->toDateTimeString() : null,
+            'reviewed_by' => $reviewAction === 'reviewed' ? $user->full_name : null,
+            'reviewed_by_id' => $reviewAction === 'reviewed' ? $user->id : null,
+            'note' => trim((string) ($validated['note'] ?? '')),
+        ];
+
+        $checkoutSession->forceFill([
+            'payload_json' => $payload,
+        ])->save();
+
+        $logService->recordAudit(
+            $user,
+            'admin_finance_checkout_review',
+            'stripe',
+            $checkoutSession->founder_id,
+            'Admin marked checkout session #' . $checkoutSession->id . ' as ' . ($reviewAction === 'reviewed' ? 'reviewed' : 'open') . '.',
+            [
+                'checkout_session_id' => $checkoutSession->id,
+                'checkout_status' => (string) $checkoutSession->checkout_status,
+                'review_action' => $reviewAction,
+                'note' => trim((string) ($validated['note'] ?? '')),
+            ]
+        );
+
+        return redirect()->route('admin.finance', $request->only(['search', 'payout_status', 'checkout_status']))->with('success', 'Checkout finance review updated.');
+    }
+
+    public function adminFinanceAdjustment(
+        Request $request,
+        OsWalletService $walletService,
+        OsOperationsLogService $logService
+    ): RedirectResponse {
+        /** @var \App\Models\Founder $user */
+        $user = Auth::user();
+        $this->ensureAdminPermission($user, 'commerce_control');
+
+        $validated = $request->validate([
+            'founder_id' => ['required', 'integer', 'exists:founders,id'],
+            'entry_type' => ['required', Rule::in(['credit', 'debit'])],
+            'amount' => ['required', 'numeric', 'min:0.01'],
+            'currency' => ['nullable', 'string', 'max:8'],
+            'reason' => ['required', 'string', 'max:500'],
+        ]);
+
+        $founder = Founder::query()->where('role', 'founder')->findOrFail((int) $validated['founder_id']);
+        $amount = round((float) $validated['amount'], 2);
+        $currency = strtoupper(trim((string) ($validated['currency'] ?: $walletService->summary($founder)['currency'])));
+        $entryType = (string) $validated['entry_type'];
+        $signedAmount = $entryType === 'debit' ? -1 * $amount : $amount;
+
+        if ($entryType === 'debit') {
+            $available = (float) $walletService->summary($founder)['available_balance'];
+            if ($amount > $available) {
+                return redirect()->route('admin.finance')->with('error', 'This debit exceeds the founder available wallet balance.');
+            }
+        }
+
+        \App\Models\FounderWalletLedger::create([
+            'founder_id' => $founder->id,
+            'company_id' => $founder->company?->id,
+            'source_platform' => 'os',
+            'source_category' => 'manual_adjustment',
+            'source_reference' => 'admin:' . $user->id . ':' . now()->format('YmdHis'),
+            'entry_type' => $entryType,
+            'amount' => round($signedAmount, 2),
+            'currency' => $currency !== '' ? $currency : 'USD',
+            'status' => 'available',
+            'available_at' => now(),
+            'meta_json' => [
+                'reason' => (string) $validated['reason'],
+                'admin_id' => $user->id,
+                'admin_name' => $user->full_name,
+            ],
+        ]);
+
+        $logService->recordAudit(
+            $user,
+            'admin_finance_adjustment',
+            'os',
+            $founder->id,
+            'Admin posted a manual wallet ' . $entryType . ' for ' . $founder->full_name . '.',
+            [
+                'amount' => $amount,
+                'currency' => $currency,
+                'entry_type' => $entryType,
+                'reason' => (string) $validated['reason'],
+            ]
+        );
+
+        return redirect()->route('admin.finance')->with('success', 'Manual wallet adjustment posted for ' . $founder->full_name . '.');
+    }
+
     public function adminSupport(AdminDashboardService $adminDashboardService)
     {
         /** @var \App\Models\Founder $user */
@@ -731,6 +965,80 @@ class OsShellController extends Controller
         }
 
         return redirect()->route('admin.support')->with('success', 'Test mail sent to ' . $validated['email'] . '.');
+    }
+
+    public function adminApprovePayoutRequest(
+        Request $request,
+        FounderPayoutRequest $payoutRequest,
+        OsWalletService $walletService,
+        OsOperationsLogService $logService
+    ): RedirectResponse {
+        /** @var \App\Models\Founder $user */
+        $user = Auth::user();
+        $this->ensureAdminPermission($user, 'exception_resolution');
+
+        if (!in_array((string) $payoutRequest->status, ['pending', 'processing'], true)) {
+            return redirect()->route('admin.support')->with('error', 'That payout request is no longer waiting for action.');
+        }
+
+        $validated = $request->validate([
+            'reference' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $walletService->markPayoutPaid($payoutRequest, (string) ($validated['reference'] ?? ''));
+
+        $logService->recordAudit(
+            $user,
+            'admin_payout_paid',
+            'os',
+            $payoutRequest->founder_id,
+            'Admin marked payout request #' . $payoutRequest->id . ' as paid.',
+            [
+                'payout_request_id' => $payoutRequest->id,
+                'amount' => (float) $payoutRequest->amount,
+                'currency' => (string) $payoutRequest->currency,
+                'reference' => (string) ($validated['reference'] ?? ''),
+            ]
+        );
+
+        return redirect()->route('admin.support')->with('success', 'Payout request #' . $payoutRequest->id . ' marked as paid.');
+    }
+
+    public function adminRejectPayoutRequest(
+        Request $request,
+        FounderPayoutRequest $payoutRequest,
+        OsWalletService $walletService,
+        OsOperationsLogService $logService
+    ): RedirectResponse {
+        /** @var \App\Models\Founder $user */
+        $user = Auth::user();
+        $this->ensureAdminPermission($user, 'exception_resolution');
+
+        if (!in_array((string) $payoutRequest->status, ['pending', 'processing'], true)) {
+            return redirect()->route('admin.support')->with('error', 'That payout request is no longer waiting for action.');
+        }
+
+        $validated = $request->validate([
+            'reason' => ['required', 'string', 'max:500'],
+        ]);
+
+        $walletService->rejectPayout($payoutRequest, (string) $validated['reason']);
+
+        $logService->recordAudit(
+            $user,
+            'admin_payout_rejected',
+            'os',
+            $payoutRequest->founder_id,
+            'Admin rejected payout request #' . $payoutRequest->id . '.',
+            [
+                'payout_request_id' => $payoutRequest->id,
+                'amount' => (float) $payoutRequest->amount,
+                'currency' => (string) $payoutRequest->currency,
+                'reason' => (string) $validated['reason'],
+            ]
+        );
+
+        return redirect()->route('admin.support')->with('success', 'Payout request #' . $payoutRequest->id . ' was rejected and the founder wallet was restored.');
     }
 
     public function founderUpdateTaskStatus(
@@ -1106,7 +1414,8 @@ class OsShellController extends Controller
     public function founderCommerce(
         FounderDashboardService $founderDashboardService,
         WebsiteWorkspaceService $websiteWorkspaceService,
-        WorkspaceLaunchService $workspaceLaunchService
+        WorkspaceLaunchService $workspaceLaunchService,
+        OsWalletService $walletService
     ) {
         /** @var \App\Models\Founder $user */
         $user = Auth::user();
@@ -1122,7 +1431,97 @@ class OsShellController extends Controller
             'catalogOffers' => $this->commerceOffers($user),
             'commerceConfigs' => $this->commerceConfigs($user),
             'commerceCatalogs' => $this->commerceCatalogs($user),
+            'walletSummary' => $walletService->summary($user),
+            'payoutAccount' => $user->payoutAccount,
+            'recentPayoutRequests' => $user->payoutRequests()->latest()->limit(6)->get(),
         ]);
+    }
+
+    public function founderWallet(
+        Request $request,
+        FounderDashboardService $founderDashboardService,
+        OsWalletService $walletService
+    ) {
+        /** @var \App\Models\Founder $user */
+        $user = Auth::user();
+        if (!$user->isFounder()) {
+            return redirect()->route('dashboard');
+        }
+
+        $filters = $request->validate([
+            'entry_type' => ['nullable', 'string', Rule::in(['all', 'credit', 'debit'])],
+            'entry_status' => ['nullable', 'string', Rule::in(['all', 'available', 'pending', 'reserved', 'settled', 'released'])],
+            'payout_status' => ['nullable', 'string', Rule::in(['all', 'pending', 'processing', 'paid', 'rejected'])],
+            'q' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        return view('os.wallet', [
+            'pageTitle' => 'Wallet',
+            'dashboard' => $founderDashboardService->build($user),
+            'walletWorkspace' => $walletService->workspace($user, $filters),
+            'payoutAccount' => $user->payoutAccount,
+        ]);
+    }
+
+    public function founderWalletExport(Request $request, OsWalletService $walletService): StreamedResponse|RedirectResponse
+    {
+        /** @var \App\Models\Founder $user */
+        $user = Auth::user();
+        if (!$user->isFounder()) {
+            return redirect()->route('dashboard');
+        }
+
+        $validated = $request->validate([
+            'dataset' => ['required', Rule::in(['ledger', 'payouts'])],
+            'entry_type' => ['nullable', 'string', Rule::in(['all', 'credit', 'debit'])],
+            'entry_status' => ['nullable', 'string', Rule::in(['all', 'available', 'pending', 'reserved', 'settled', 'released'])],
+            'payout_status' => ['nullable', 'string', Rule::in(['all', 'pending', 'processing', 'paid', 'rejected'])],
+            'q' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $workspace = $walletService->workspace($user, $request->only(['entry_type', 'entry_status', 'payout_status', 'q']));
+        $dataset = (string) $validated['dataset'];
+        $filename = 'founder-wallet-' . $dataset . '-' . now()->format('Ymd-His') . '.csv';
+
+        return response()->streamDownload(function () use ($workspace, $dataset): void {
+            $handle = fopen('php://output', 'w');
+
+            if ($dataset === 'ledger') {
+                fputcsv($handle, ['headline', 'entry_type', 'amount', 'currency', 'status', 'source_platform', 'source_category', 'reference', 'created_at', 'available_at', 'note']);
+                foreach ($workspace['ledger_entries'] as $entry) {
+                    fputcsv($handle, [
+                        $entry['headline'],
+                        $entry['entry_type'],
+                        $entry['amount'],
+                        $entry['currency'],
+                        $entry['status'],
+                        $entry['source_platform'],
+                        $entry['source_category'],
+                        $entry['source_reference'],
+                        $entry['created_at'],
+                        $entry['available_at'],
+                        $entry['note'],
+                    ]);
+                }
+            } else {
+                fputcsv($handle, ['amount', 'currency', 'status', 'destination_summary', 'requested_at', 'processed_at', 'reference', 'notes', 'rejection_reason']);
+                foreach ($workspace['payout_requests'] as $entry) {
+                    fputcsv($handle, [
+                        $entry['amount'],
+                        $entry['currency'],
+                        $entry['status'],
+                        $entry['destination_summary'],
+                        $entry['requested_at'],
+                        $entry['processed_at'],
+                        $entry['reference'],
+                        $entry['notes'],
+                        $entry['rejection_reason'],
+                    ]);
+                }
+            }
+
+            fclose($handle);
+        }, $filename, ['Content-Type' => 'text/csv']);
     }
 
     public function founderOrders(
@@ -1230,6 +1629,7 @@ class OsShellController extends Controller
             'additional_services_text' => ['nullable', 'string', 'max:4000'],
             'variants_text' => ['nullable', 'string', 'max:4000'],
             'extras_text' => ['nullable', 'string', 'max:4000'],
+            'payment_collection' => ['nullable', Rule::in(['online_only', 'cash_only', 'both'])],
         ]);
 
         $offer = $this->parseCommerceOffer($actionPlan);
@@ -1465,6 +1865,7 @@ class OsShellController extends Controller
                 'additional_services' => $additionalServices ?? ($offer['additional_services'] ?? []),
                 'variants' => $variants,
                 'extras' => $extras,
+                'payment_collection' => (string) ($validated['payment_collection'] ?? ($offer['payment_collection'] ?? 'both')),
             ]),
             'status' => $availability === 'inactive' ? 'paused' : 'created',
         ])->save();
@@ -1486,6 +1887,205 @@ class OsShellController extends Controller
         }
 
         return $redirect;
+    }
+
+    public function founderSavePayoutAccount(Request $request): RedirectResponse
+    {
+        /** @var \App\Models\Founder $user */
+        $user = Auth::user();
+        if (!$user->isFounder()) {
+            return redirect()->route('dashboard');
+        }
+
+        $validated = $request->validate([
+            'account_holder_name' => ['required', 'string', 'max:191'],
+            'bank_name' => ['required', 'string', 'max:191'],
+            'account_number' => ['nullable', 'string', 'max:191'],
+            'iban' => ['nullable', 'string', 'max:191'],
+            'swift_code' => ['nullable', 'string', 'max:64'],
+            'routing_number' => ['nullable', 'string', 'max:64'],
+            'bank_country' => ['nullable', 'string', 'max:64'],
+            'bank_currency' => ['nullable', 'string', 'max:8'],
+            'notes' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        FounderPayoutAccount::updateOrCreate(
+            ['founder_id' => $user->id],
+            [
+                'account_holder_name' => (string) $validated['account_holder_name'],
+                'bank_name' => (string) $validated['bank_name'],
+                'account_number' => (string) ($validated['account_number'] ?? ''),
+                'iban' => (string) ($validated['iban'] ?? ''),
+                'swift_code' => (string) ($validated['swift_code'] ?? ''),
+                'routing_number' => (string) ($validated['routing_number'] ?? ''),
+                'bank_country' => (string) ($validated['bank_country'] ?? ''),
+                'bank_currency' => strtoupper((string) ($validated['bank_currency'] ?? 'USD')),
+                'notes' => (string) ($validated['notes'] ?? ''),
+                'status' => 'active',
+            ]
+        );
+
+        return redirect()->route('founder.commerce')->with('success', 'Payout account saved in Hatchers Ai Business OS.');
+    }
+
+    public function founderStartStripePayoutOnboarding(OsStripeService $stripeService): RedirectResponse
+    {
+        /** @var \App\Models\Founder $user */
+        $user = Auth::user();
+        if (!$user->isFounder()) {
+            return redirect()->route('dashboard');
+        }
+
+        if (!$stripeService->configured()) {
+            return redirect()->route('founder.commerce')->with('error', 'Stripe is not configured in Hatchers Ai Business OS yet.');
+        }
+
+        $account = FounderPayoutAccount::query()->firstOrCreate(
+            ['founder_id' => $user->id],
+            [
+                'account_holder_name' => (string) $user->full_name,
+                'bank_name' => 'Stripe Express',
+                'bank_currency' => 'USD',
+                'bank_country' => 'US',
+                'status' => 'pending',
+                'stripe_onboarding_status' => 'not_started',
+            ]
+        );
+
+        if (trim((string) $account->stripe_account_id) === '') {
+            $create = $stripeService->createConnectedAccount([
+                'email' => (string) $user->email,
+                'business_name' => (string) ($user->company?->company_name ?: $user->full_name),
+                'country' => (string) ($account->bank_country ?: 'US'),
+                'currency' => (string) ($account->bank_currency ?: 'USD'),
+                'metadata' => [
+                    'founder_id' => $user->id,
+                    'company_id' => (string) ($user->company?->id ?? ''),
+                ],
+            ]);
+
+            if (!($create['success'] ?? false)) {
+                return redirect()->route('founder.commerce')->with('error', $create['message'] ?? 'The OS could not create a Stripe Connect account.');
+            }
+
+            $account->forceFill([
+                'stripe_account_id' => (string) $create['id'],
+                'stripe_onboarding_status' => 'pending',
+                'stripe_charges_enabled' => (bool) ($create['charges_enabled'] ?? false),
+                'stripe_payouts_enabled' => (bool) ($create['payouts_enabled'] ?? false),
+                'stripe_details_submitted_at' => !empty($create['details_submitted']) ? now() : null,
+            ])->save();
+        }
+
+        $link = $stripeService->createAccountOnboardingLink(
+            (string) $account->stripe_account_id,
+            route('founder.commerce.payout-account.connect'),
+            route('founder.commerce.payout-account.return')
+        );
+
+        if (!($link['success'] ?? false) || trim((string) ($link['url'] ?? '')) === '') {
+            return redirect()->route('founder.commerce')->with('error', $link['message'] ?? 'The OS could not create the Stripe onboarding link.');
+        }
+
+        $account->forceFill([
+            'stripe_onboarding_status' => 'pending',
+            'status' => 'pending',
+        ])->save();
+
+        return redirect()->away((string) $link['url']);
+    }
+
+    public function founderHandleStripePayoutReturn(OsStripeService $stripeService): RedirectResponse
+    {
+        /** @var \App\Models\Founder $user */
+        $user = Auth::user();
+        if (!$user->isFounder()) {
+            return redirect()->route('dashboard');
+        }
+
+        $account = $user->payoutAccount;
+        if (!$account || trim((string) $account->stripe_account_id) === '') {
+            return redirect()->route('founder.commerce')->with('error', 'No Stripe payout account was found for this founder.');
+        }
+
+        $sync = $this->syncStripePayoutAccountStatus($account, $stripeService);
+        if (!($sync['success'] ?? false)) {
+            return redirect()->route('founder.commerce')->with('error', $sync['message'] ?? 'The OS could not verify the Stripe payout account.');
+        }
+
+        if ($account->stripe_payouts_enabled) {
+            return redirect()->route('founder.commerce')->with('success', 'Stripe payout onboarding is complete. Founder withdrawals can now flow through Stripe.');
+        }
+
+        return redirect()->route('founder.commerce')->with('error', 'Stripe onboarding is not complete yet. Please finish the required Stripe steps and try again.');
+    }
+
+    public function founderRequestPayout(Request $request, OsWalletService $walletService, OsStripeService $stripeService): RedirectResponse
+    {
+        /** @var \App\Models\Founder $user */
+        $user = Auth::user();
+        if (!$user->isFounder()) {
+            return redirect()->route('dashboard');
+        }
+
+        $validated = $request->validate([
+            'amount' => ['required', 'numeric', 'min:50'],
+            'notes' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $account = $user->payoutAccount;
+        if (!$account) {
+            return redirect()->route('founder.commerce')->with('error', 'Please save your bank payout account before requesting a withdrawal.');
+        }
+
+        $amount = round((float) $validated['amount'], 2);
+        if (!$walletService->canRequestPayout($user, $amount)) {
+            return redirect()->route('founder.commerce')->with('error', 'Payout requests must be at least USD 50 and cannot exceed the available wallet balance.');
+        }
+
+        $summary = trim($account->bank_name . ' · ' . ($account->iban ?: $account->account_number ?: 'Bank account'));
+        $payoutRequest = $walletService->requestPayout(
+            $user,
+            $amount,
+            (string) ($account->bank_currency ?: 'USD'),
+            $summary,
+            (string) ($validated['notes'] ?? '')
+        );
+
+        $walletService->reserveForPayout($user, $user->company, $payoutRequest);
+
+        if (trim((string) $account->stripe_account_id) !== '' && $stripeService->configured()) {
+            $sync = $this->syncStripePayoutAccountStatus($account, $stripeService);
+
+            if (($sync['success'] ?? false) && $account->stripe_payouts_enabled) {
+                $transfer = $stripeService->createTransfer(
+                    (string) $account->stripe_account_id,
+                    $amount,
+                    (string) ($account->bank_currency ?: 'USD'),
+                    [
+                        'founder_id' => $user->id,
+                        'payout_request_id' => $payoutRequest->id,
+                    ]
+                );
+
+                if ($transfer['success'] ?? false) {
+                    $walletService->markPayoutPaid($payoutRequest, (string) ($transfer['id'] ?? ''));
+
+                    return redirect()->route('founder.commerce')->with('success', 'Payout request submitted and sent to Stripe for transfer to the founder bank account.');
+                }
+
+                $payoutRequest->forceFill([
+                    'status' => 'processing',
+                    'meta_json' => array_merge((array) ($payoutRequest->meta_json ?? []), [
+                        'stripe_transfer_error' => (string) ($transfer['message'] ?? 'Stripe transfer could not be created.'),
+                    ]),
+                ])->save();
+
+                return redirect()->route('founder.commerce')->with('error', ($transfer['message'] ?? 'Stripe transfer could not be created.') . ' The payout request is still recorded for support follow-up.');
+            }
+        }
+
+        return redirect()->route('founder.commerce')->with('success', 'Payout request submitted from Hatchers Ai Business OS.');
     }
 
     public function founderUpdateCommerceConfig(
@@ -2433,7 +3033,8 @@ class OsShellController extends Controller
         string $websitePath,
         Request $request,
         OsAssistantActionService $assistantActionService,
-        PublicWebsiteService $publicWebsiteService
+        PublicWebsiteService $publicWebsiteService,
+        OsStripeService $stripeService
     ): RedirectResponse {
         $company = $this->resolvePublicWebsiteCompany($websitePath);
         if (!$company) {
@@ -2460,6 +3061,7 @@ class OsShellController extends Controller
             'postal_code' => ['required', 'string', 'max:255'],
             'delivery_area' => ['required', 'string', 'max:255'],
             'notes' => ['nullable', 'string', 'max:2000'],
+            'payment_method_choice' => ['required', Rule::in(['online', 'cash'])],
         ]);
 
         $founder = $company->founder;
@@ -2467,27 +3069,71 @@ class OsShellController extends Controller
             return redirect()->route('public.website', ['websitePath' => $websitePath])->with('error', 'This public site is missing a founder account connection.');
         }
 
+        $offer = $this->resolvePublicWebsiteOffer($site, 'product', (string) $validated['offer_title']);
+        if (!$offer) {
+            return redirect()->route('public.website', ['websitePath' => $websitePath])->with('error', 'That product is no longer available on the public OS site.');
+        }
+
+        $allowedVariants = collect($offer['request_options']['variants'] ?? [])->pluck('name')->filter()->values();
+        $selectedVariant = trim((string) ($validated['selected_variant'] ?? ''));
+        if ($selectedVariant !== '' && !$allowedVariants->contains($selectedVariant)) {
+            return redirect()->route('public.website', ['websitePath' => $websitePath])->with('error', 'That product variant is no longer available.');
+        }
+
+        $allowedExtras = collect($offer['request_options']['extras'] ?? [])->pluck('name')->filter()->values();
+        $selectedExtras = collect($validated['selected_extras'] ?? [])->filter()->values();
+        if ($selectedExtras->diff($allowedExtras)->isNotEmpty()) {
+            return redirect()->route('public.website', ['websitePath' => $websitePath])->with('error', 'One or more selected extras are no longer available.');
+        }
+
+        $paymentCollection = (string) ($offer['request_options']['payment_collection'] ?? 'both');
+        $allowedPaymentChoices = $this->allowedPublicPaymentChoices($paymentCollection);
+        $paymentChoice = (string) $validated['payment_method_choice'];
+        if (!in_array($paymentChoice, $allowedPaymentChoices, true)) {
+            return redirect()->route('public.website', ['websitePath' => $websitePath])->with('error', 'That payment option is not available for this product.');
+        }
+
+        $attributes = [
+            'target_name' => (string) $validated['offer_title'],
+            'customer_name' => (string) $validated['customer_name'],
+            'customer_email' => (string) $validated['customer_email'],
+            'customer_mobile' => (string) $validated['customer_mobile'],
+            'quantity' => (string) ((int) ($validated['quantity'] ?? 1)),
+            'selected_variant' => $selectedVariant,
+            'selected_extras' => $selectedExtras->all(),
+            'address' => (string) $validated['address'],
+            'building' => (string) $validated['building'],
+            'landmark' => (string) $validated['landmark'],
+            'postal_code' => (string) $validated['postal_code'],
+            'delivery_area' => (string) $validated['delivery_area'],
+            'description' => (string) ($validated['notes'] ?? ''),
+            'notes' => (string) ($validated['notes'] ?? ''),
+        ];
+
+        if ($paymentChoice === 'online') {
+            return $this->startPublicCheckout(
+                $websitePath,
+                $company,
+                $site,
+                $offer,
+                $founder,
+                'bazaar',
+                'order',
+                $attributes,
+                $stripeService
+            );
+        }
+
         $result = $assistantActionService->createPublicCommerceRequest(
             $founder,
             'bazaar',
             'order',
             (string) $validated['offer_title'],
-            [
-                'target_name' => (string) $validated['offer_title'],
-                'customer_name' => (string) $validated['customer_name'],
-                'customer_email' => (string) $validated['customer_email'],
-                'customer_mobile' => (string) $validated['customer_mobile'],
-                'quantity' => (string) ((int) ($validated['quantity'] ?? 1)),
-                'selected_variant' => (string) ($validated['selected_variant'] ?? ''),
-                'selected_extras' => $validated['selected_extras'] ?? [],
-                'address' => (string) $validated['address'],
-                'building' => (string) $validated['building'],
-                'landmark' => (string) $validated['landmark'],
-                'postal_code' => (string) $validated['postal_code'],
-                'delivery_area' => (string) $validated['delivery_area'],
-                'description' => (string) ($validated['notes'] ?? ''),
-                'notes' => (string) ($validated['notes'] ?? ''),
-            ]
+            array_merge($attributes, [
+                'payment_type' => '1',
+                'payment_status' => 'unpaid',
+                'payment_method_choice' => 'cash',
+            ])
         );
 
         $redirect = redirect()->route('public.website', ['websitePath' => $websitePath]);
@@ -2502,7 +3148,8 @@ class OsShellController extends Controller
         string $websitePath,
         Request $request,
         OsAssistantActionService $assistantActionService,
-        PublicWebsiteService $publicWebsiteService
+        PublicWebsiteService $publicWebsiteService,
+        OsStripeService $stripeService
     ): RedirectResponse {
         $company = $this->resolvePublicWebsiteCompany($websitePath);
         if (!$company) {
@@ -2521,7 +3168,7 @@ class OsShellController extends Controller
             'customer_mobile' => ['required', 'string', 'max:255'],
             'booking_date' => ['required', 'date'],
             'booking_time' => ['required', 'date_format:H:i'],
-            'booking_endtime' => ['required', 'date_format:H:i'],
+            'booking_endtime' => ['nullable', 'date_format:H:i'],
             'selected_additional_services' => ['nullable', 'array'],
             'selected_additional_services.*' => ['string', 'max:255'],
             'address' => ['nullable', 'string', 'max:255'],
@@ -2531,6 +3178,7 @@ class OsShellController extends Controller
             'state' => ['nullable', 'string', 'max:255'],
             'country' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string', 'max:2000'],
+            'payment_method_choice' => ['required', Rule::in(['online', 'cash'])],
         ]);
 
         $founder = $company->founder;
@@ -2538,29 +3186,94 @@ class OsShellController extends Controller
             return redirect()->route('public.website', ['websitePath' => $websitePath])->with('error', 'This public site is missing a founder account connection.');
         }
 
+        $offer = $this->resolvePublicWebsiteOffer($site, 'service', (string) $validated['offer_title']);
+        if (!$offer) {
+            return redirect()->route('public.website', ['websitePath' => $websitePath])->with('error', 'That service is no longer available on the public OS site.');
+        }
+
+        $allowedAddOns = collect($offer['request_options']['additional_services'] ?? [])->pluck('name')->filter()->values();
+        $selectedAddOns = collect($validated['selected_additional_services'] ?? [])->filter()->values();
+        if ($selectedAddOns->diff($allowedAddOns)->isNotEmpty()) {
+            return redirect()->route('public.website', ['websitePath' => $websitePath])->with('error', 'One or more selected add-ons are no longer available.');
+        }
+
+        $durationMinutes = $this->publicServiceDurationMinutes($offer);
+        $bookingTime = \Carbon\Carbon::createFromFormat('H:i', (string) $validated['booking_time']);
+        $bookingEndTime = trim((string) ($validated['booking_endtime'] ?? ''));
+        if ($bookingEndTime === '') {
+            $bookingEndTime = $bookingTime->copy()->addMinutes($durationMinutes)->format('H:i');
+        }
+        $endTime = \Carbon\Carbon::createFromFormat('H:i', $bookingEndTime);
+        if ($endTime->lessThanOrEqualTo($bookingTime)) {
+            return redirect()->route('public.website', ['websitePath' => $websitePath])->with('error', 'Booking end time must be after the start time.');
+        }
+
+        $availableDays = collect($offer['request_options']['availability_days'] ?? [])->map(fn ($day) => strtolower(trim((string) $day)))->filter()->values();
+        $bookingDate = \Carbon\Carbon::parse((string) $validated['booking_date']);
+        if ($availableDays->isNotEmpty() && !$availableDays->contains(strtolower($bookingDate->format('l')))) {
+            return redirect()->route('public.website', ['websitePath' => $websitePath])->with('error', 'That service is not available on the selected day.');
+        }
+
+        $openTime = trim((string) ($offer['request_options']['open_time'] ?? ''));
+        $closeTime = trim((string) ($offer['request_options']['close_time'] ?? ''));
+        if ($openTime !== '' && $closeTime !== '') {
+            $open = \Carbon\Carbon::createFromFormat('H:i', substr($openTime, 0, 5));
+            $close = \Carbon\Carbon::createFromFormat('H:i', substr($closeTime, 0, 5));
+            if ($bookingTime->lt($open) || $endTime->gt($close)) {
+                return redirect()->route('public.website', ['websitePath' => $websitePath])->with('error', 'That booking time sits outside the service availability window.');
+            }
+        }
+
+        $paymentCollection = (string) ($offer['request_options']['payment_collection'] ?? 'both');
+        $allowedPaymentChoices = $this->allowedPublicPaymentChoices($paymentCollection);
+        $paymentChoice = (string) $validated['payment_method_choice'];
+        if (!in_array($paymentChoice, $allowedPaymentChoices, true)) {
+            return redirect()->route('public.website', ['websitePath' => $websitePath])->with('error', 'That payment option is not available for this service.');
+        }
+
+        $attributes = [
+            'target_name' => (string) $validated['offer_title'],
+            'customer_name' => (string) $validated['customer_name'],
+            'customer_email' => (string) $validated['customer_email'],
+            'customer_mobile' => (string) $validated['customer_mobile'],
+            'booking_date' => (string) $validated['booking_date'],
+            'booking_time' => (string) $validated['booking_time'],
+            'booking_endtime' => $bookingEndTime,
+            'selected_additional_services' => $selectedAddOns->all(),
+            'address' => (string) ($validated['address'] ?? ''),
+            'landmark' => (string) ($validated['landmark'] ?? ''),
+            'postal_code' => (string) ($validated['postal_code'] ?? ''),
+            'city' => (string) ($validated['city'] ?? ''),
+            'state' => (string) ($validated['state'] ?? ''),
+            'country' => (string) ($validated['country'] ?? ''),
+            'description' => (string) ($validated['notes'] ?? ''),
+            'notes' => (string) ($validated['notes'] ?? ''),
+        ];
+
+        if ($paymentChoice === 'online') {
+            return $this->startPublicCheckout(
+                $websitePath,
+                $company,
+                $site,
+                $offer,
+                $founder,
+                'servio',
+                'booking',
+                $attributes,
+                $stripeService
+            );
+        }
+
         $result = $assistantActionService->createPublicCommerceRequest(
             $founder,
             'servio',
             'booking',
             (string) $validated['offer_title'],
-            [
-                'target_name' => (string) $validated['offer_title'],
-                'customer_name' => (string) $validated['customer_name'],
-                'customer_email' => (string) $validated['customer_email'],
-                'customer_mobile' => (string) $validated['customer_mobile'],
-                'booking_date' => (string) $validated['booking_date'],
-                'booking_time' => (string) $validated['booking_time'],
-                'booking_endtime' => (string) $validated['booking_endtime'],
-                'selected_additional_services' => $validated['selected_additional_services'] ?? [],
-                'address' => (string) ($validated['address'] ?? ''),
-                'landmark' => (string) ($validated['landmark'] ?? ''),
-                'postal_code' => (string) ($validated['postal_code'] ?? ''),
-                'city' => (string) ($validated['city'] ?? ''),
-                'state' => (string) ($validated['state'] ?? ''),
-                'country' => (string) ($validated['country'] ?? ''),
-                'description' => (string) ($validated['notes'] ?? ''),
-                'notes' => (string) ($validated['notes'] ?? ''),
-            ]
+            array_merge($attributes, [
+                'payment_type' => '1',
+                'payment_status' => 'unpaid',
+                'payment_method_choice' => 'cash',
+            ])
         );
 
         $redirect = redirect()->route('public.website', ['websitePath' => $websitePath]);
@@ -2569,6 +3282,432 @@ class OsShellController extends Controller
         }
 
         return $redirect->with('success', 'Booking request sent. The founder can now manage it from Hatchers Ai Business OS.');
+    }
+
+    public function publicCheckoutSuccess(
+        string $websitePath,
+        Request $request,
+        OsStripeService $stripeService,
+        OsAssistantActionService $assistantActionService,
+        OsWalletService $walletService,
+        PublicWebsiteService $publicWebsiteService
+    ): RedirectResponse {
+        $company = $this->resolvePublicWebsiteCompany($websitePath);
+        if (!$company) {
+            abort(404);
+        }
+
+        $sessionId = trim((string) $request->query('session_id', ''));
+        $checkoutSession = PublicCheckoutSession::query()->where('stripe_session_id', $sessionId)->first();
+        if (!$checkoutSession) {
+            return redirect()->route('public.website', ['websitePath' => $websitePath])->with('error', 'That payment session could not be found in Hatchers Ai Business OS.');
+        }
+
+        if ($checkoutSession->checkout_status === 'completed') {
+            return redirect()->route('public.website', ['websitePath' => $websitePath])->with('success', 'Payment completed and the founder has the sale in their wallet.');
+        }
+
+        $stripeResult = $stripeService->retrieveCheckoutSession($sessionId);
+        if (!($stripeResult['success'] ?? false)) {
+            return redirect()->route('public.website', ['websitePath' => $websitePath])->with('error', $stripeResult['message'] ?? 'Stripe payment verification failed.');
+        }
+
+        if (($stripeResult['payment_status'] ?? '') !== 'paid') {
+            return redirect()->route('public.website', ['websitePath' => $websitePath])->with('error', 'Payment has not completed yet. Please finish checkout first.');
+        }
+
+        $finalize = $this->finalizePublicCheckoutSession(
+            $checkoutSession,
+            $stripeResult,
+            $assistantActionService,
+            $walletService,
+            $publicWebsiteService
+        );
+
+        if (!($finalize['success'] ?? false)) {
+            return redirect()->route('public.website', ['websitePath' => $websitePath])->with('error', $finalize['message'] ?? 'The paid order or booking could not be created right now.');
+        }
+
+        return redirect()->route('public.website', ['websitePath' => $websitePath])->with('success', 'Payment completed successfully. The founder can now see the sale in their OS wallet.');
+    }
+
+    public function publicCheckoutCancel(string $websitePath): RedirectResponse
+    {
+        return redirect()->route('public.website', ['websitePath' => $websitePath])->with('error', 'Checkout was canceled before payment completed.');
+    }
+
+    public function stripeWebhook(
+        Request $request,
+        OsStripeService $stripeService,
+        OsAssistantActionService $assistantActionService,
+        OsWalletService $walletService,
+        PublicWebsiteService $publicWebsiteService
+    ): JsonResponse {
+        $payload = (string) $request->getContent();
+        $signature = (string) $request->header('Stripe-Signature', '');
+        $verified = $stripeService->verifyWebhookSignature($payload, $signature);
+
+        if (!($verified['success'] ?? false)) {
+            Log::warning('Stripe webhook verification failed.', [
+                'message' => $verified['message'] ?? 'Verification failed.',
+            ]);
+
+            return response()->json(['ok' => false, 'message' => $verified['message'] ?? 'Invalid signature.'], 400);
+        }
+
+        $event = is_array($verified['event'] ?? null) ? $verified['event'] : [];
+        $type = (string) ($event['type'] ?? '');
+        $object = is_array($event['data']['object'] ?? null) ? $event['data']['object'] : [];
+
+        if ($type === 'checkout.session.completed' || $type === 'checkout.session.async_payment_succeeded') {
+            $sessionId = (string) ($object['id'] ?? '');
+            $checkoutSession = PublicCheckoutSession::query()->where('stripe_session_id', $sessionId)->first();
+
+            if ($checkoutSession && (string) ($object['payment_status'] ?? '') === 'paid') {
+                $this->finalizePublicCheckoutSession(
+                    $checkoutSession,
+                    [
+                        'payment_intent' => (string) ($object['payment_intent'] ?? ''),
+                        'payment_status' => (string) ($object['payment_status'] ?? ''),
+                        'status' => (string) ($object['status'] ?? ''),
+                        'amount_total' => ((float) ($object['amount_total'] ?? 0)) / 100,
+                        'currency' => strtoupper((string) ($object['currency'] ?? 'USD')),
+                    ],
+                    $assistantActionService,
+                    $walletService,
+                    $publicWebsiteService
+                );
+            }
+        }
+
+        if ($type === 'checkout.session.expired') {
+            $sessionId = (string) ($object['id'] ?? '');
+            PublicCheckoutSession::query()
+                ->where('stripe_session_id', $sessionId)
+                ->where('checkout_status', 'pending')
+                ->update([
+                    'checkout_status' => 'expired',
+                ]);
+        }
+
+        if ($type === 'account.updated') {
+            $accountId = (string) ($object['id'] ?? '');
+            $payoutAccount = FounderPayoutAccount::query()->where('stripe_account_id', $accountId)->first();
+
+            if ($payoutAccount) {
+                $payoutAccount->forceFill([
+                    'stripe_onboarding_status' => !empty($object['payouts_enabled']) ? 'complete' : (!empty($object['details_submitted']) ? 'review' : 'pending'),
+                    'stripe_charges_enabled' => (bool) ($object['charges_enabled'] ?? false),
+                    'stripe_payouts_enabled' => (bool) ($object['payouts_enabled'] ?? false),
+                    'stripe_details_submitted_at' => !empty($object['details_submitted']) && !$payoutAccount->stripe_details_submitted_at ? now() : $payoutAccount->stripe_details_submitted_at,
+                    'stripe_payouts_enabled_at' => !empty($object['payouts_enabled']) && !$payoutAccount->stripe_payouts_enabled_at ? now() : $payoutAccount->stripe_payouts_enabled_at,
+                    'bank_currency' => strtoupper((string) ($object['default_currency'] ?? ($payoutAccount->bank_currency ?: 'USD'))),
+                    'bank_country' => strtoupper((string) ($object['country'] ?? ($payoutAccount->bank_country ?: 'US'))),
+                    'status' => !empty($object['payouts_enabled']) ? 'active' : 'pending',
+                    'meta_json' => array_merge((array) ($payoutAccount->meta_json ?? []), [
+                        'stripe_webhook_synced_at' => now()->toDateTimeString(),
+                    ]),
+                ])->save();
+            }
+        }
+
+        if ($type === 'charge.refunded') {
+            $paymentIntentId = (string) ($object['payment_intent'] ?? '');
+            $amountRefunded = ((float) ($object['amount_refunded'] ?? 0)) / 100;
+
+            if ($paymentIntentId !== '' && $amountRefunded > 0) {
+                $checkoutSession = PublicCheckoutSession::query()
+                    ->where('stripe_payment_intent_id', $paymentIntentId)
+                    ->first();
+
+                if ($checkoutSession) {
+                    $this->applyStripeRevenueReversal(
+                        $checkoutSession,
+                        'refund',
+                        $amountRefunded,
+                        (string) ($object['id'] ?? ''),
+                        $assistantActionService,
+                        $walletService
+                    );
+                }
+            }
+        }
+
+        if ($type === 'charge.dispute.created') {
+            $paymentIntentId = (string) ($object['payment_intent'] ?? '');
+            $amount = ((float) ($object['amount'] ?? 0)) / 100;
+
+            if ($paymentIntentId !== '' && $amount > 0) {
+                $checkoutSession = PublicCheckoutSession::query()
+                    ->where('stripe_payment_intent_id', $paymentIntentId)
+                    ->first();
+
+                if ($checkoutSession) {
+                    $this->applyStripeRevenueReversal(
+                        $checkoutSession,
+                        'dispute',
+                        $amount,
+                        (string) ($object['id'] ?? ''),
+                        $assistantActionService,
+                        $walletService
+                    );
+                }
+            }
+        }
+
+        return response()->json(['ok' => true]);
+    }
+
+    private function startPublicCheckout(
+        string $websitePath,
+        Company $company,
+        array $site,
+        array $offer,
+        Founder $founder,
+        string $platform,
+        string $category,
+        array $attributes,
+        OsStripeService $stripeService
+    ): RedirectResponse {
+        $amount = $this->calculatePublicCheckoutAmount($site, $offer, $attributes);
+        if ($amount <= 0) {
+            return redirect()->route('public.website', ['websitePath' => $websitePath])->with('error', 'This checkout cannot start because the offer total is invalid.');
+        }
+
+        $currency = strtoupper(trim((string) ($offer['currency'] ?? $site['metrics'][0]['currency'] ?? 'USD')));
+        $session = $stripeService->createCheckoutSession([
+            'amount' => $amount,
+            'currency' => strtolower($currency),
+            'product_name' => (string) ($offer['title'] ?? 'Hatchers purchase'),
+            'customer_email' => (string) ($attributes['customer_email'] ?? ''),
+            'success_url' => route('public.checkout.success', ['websitePath' => $websitePath]),
+            'cancel_url' => route('public.checkout.cancel', ['websitePath' => $websitePath]),
+            'metadata' => [
+                'website_path' => $websitePath,
+                'platform' => $platform,
+                'category' => $category,
+                'offer_title' => (string) ($offer['title'] ?? ''),
+                'founder_id' => $founder->id,
+                'company_id' => $company->id,
+            ],
+        ]);
+
+        if (!($session['success'] ?? false)) {
+            return redirect()->route('public.website', ['websitePath' => $websitePath])->with('error', $session['message'] ?? 'Stripe checkout could not be created right now.');
+        }
+
+        PublicCheckoutSession::updateOrCreate(
+            ['stripe_session_id' => (string) $session['id']],
+            [
+                'founder_id' => $founder->id,
+                'company_id' => $company->id,
+                'website_path' => $websitePath,
+                'platform' => $platform,
+                'category' => $category,
+                'offer_title' => (string) ($offer['title'] ?? ''),
+                'stripe_payment_intent_id' => (string) ($session['payment_intent'] ?? ''),
+                'amount' => $amount,
+                'currency' => $currency,
+                'payment_method_choice' => 'online',
+                'checkout_status' => 'pending',
+                'payload_json' => $attributes,
+                'expires_at' => $session['expires_at'] ?? null,
+            ]
+        );
+
+        return redirect()->away((string) $session['url']);
+    }
+
+    private function finalizePublicCheckoutSession(
+        PublicCheckoutSession $checkoutSession,
+        array $stripeResult,
+        OsAssistantActionService $assistantActionService,
+        OsWalletService $walletService,
+        PublicWebsiteService $publicWebsiteService
+    ): array {
+        return DB::transaction(function () use (
+            $checkoutSession,
+            $stripeResult,
+            $assistantActionService,
+            $walletService,
+            $publicWebsiteService
+        ): array {
+            $checkoutSession = PublicCheckoutSession::query()
+                ->whereKey($checkoutSession->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ((string) $checkoutSession->checkout_status === 'completed') {
+                return [
+                    'success' => true,
+                    'message' => 'Checkout was already completed.',
+                ];
+            }
+
+            $company = $checkoutSession->company;
+            $founder = $checkoutSession->founder;
+            if (!$company || !$founder) {
+                return [
+                    'success' => false,
+                    'message' => 'This payment session is missing the founder or company connection.',
+                ];
+            }
+
+            $payload = is_array($checkoutSession->payload_json) ? $checkoutSession->payload_json : [];
+            $site = $publicWebsiteService->build($company);
+            $offer = $this->resolvePublicWebsiteOffer(
+                $site,
+                (string) $checkoutSession->category === 'booking' ? 'service' : 'product',
+                (string) $checkoutSession->offer_title
+            );
+
+            if (!$offer) {
+                return [
+                    'success' => false,
+                    'message' => 'That offer is no longer available on the public OS site.',
+                ];
+            }
+
+            $result = $assistantActionService->createPublicCommerceRequest(
+                $founder,
+                (string) $checkoutSession->platform,
+                (string) $checkoutSession->category,
+                (string) $checkoutSession->offer_title,
+                array_merge($payload, [
+                    'payment_type' => '3',
+                    'payment_status' => 'paid',
+                    'payment_id' => (string) ($stripeResult['payment_intent'] ?? $checkoutSession->stripe_payment_intent_id ?? $checkoutSession->stripe_session_id),
+                    'payment_method_choice' => 'online',
+                ])
+            );
+
+            if (!($result['success'] ?? false)) {
+                $checkoutSession->forceFill([
+                    'checkout_status' => 'processing',
+                    'stripe_payment_intent_id' => (string) ($stripeResult['payment_intent'] ?? $checkoutSession->stripe_payment_intent_id),
+                    'payload_json' => array_merge($payload, [
+                        'processing_error' => (string) ($result['reply'] ?? 'The paid record could not be created.'),
+                    ]),
+                ])->save();
+
+                return [
+                    'success' => false,
+                    'message' => (string) ($result['reply'] ?? 'The paid order or booking could not be created right now.'),
+                ];
+            }
+
+            $walletService->creditCommerceSale(
+                $founder,
+                $company,
+                (string) $checkoutSession->platform,
+                (string) $checkoutSession->category,
+                (string) ($result['title'] ?? $checkoutSession->offer_title),
+                (float) $checkoutSession->amount,
+                (string) $checkoutSession->currency,
+                [
+                    'checkout_session_id' => $checkoutSession->stripe_session_id,
+                    'payment_intent_id' => (string) ($stripeResult['payment_intent'] ?? ''),
+                    'offer_title' => (string) $checkoutSession->offer_title,
+                ]
+            );
+
+            $checkoutSession->forceFill([
+                'checkout_status' => 'completed',
+                'stripe_payment_intent_id' => (string) ($stripeResult['payment_intent'] ?? $checkoutSession->stripe_payment_intent_id),
+                'completed_at' => now(),
+                'payload_json' => array_merge($payload, [
+                    'finalized_at' => now()->toDateTimeString(),
+                    'commerce_reference' => (string) ($result['title'] ?? $checkoutSession->offer_title),
+                    'commerce_edit_url' => (string) ($result['edit_url'] ?? ''),
+                ]),
+            ])->save();
+
+            return [
+                'success' => true,
+                'message' => 'Checkout completed successfully.',
+            ];
+        });
+    }
+
+    private function applyStripeRevenueReversal(
+        PublicCheckoutSession $checkoutSession,
+        string $reasonType,
+        float $grossAmount,
+        string $referenceId,
+        OsAssistantActionService $assistantActionService,
+        OsWalletService $walletService
+    ): void {
+        DB::transaction(function () use (
+            $checkoutSession,
+            $reasonType,
+            $grossAmount,
+            $referenceId,
+            $assistantActionService,
+            $walletService
+        ): void {
+            $checkoutSession = PublicCheckoutSession::query()
+                ->whereKey($checkoutSession->id)
+                ->lockForUpdate()
+                ->first();
+
+            if (!$checkoutSession || !in_array((string) $checkoutSession->checkout_status, ['completed', 'processing'], true)) {
+                return;
+            }
+
+            $founder = $checkoutSession->founder;
+            $company = $checkoutSession->company;
+            if (!$founder || !$company) {
+                return;
+            }
+
+            $payload = is_array($checkoutSession->payload_json) ? $checkoutSession->payload_json : [];
+            $commerceReference = trim((string) ($payload['commerce_reference'] ?? ''));
+            if ($commerceReference === '') {
+                return;
+            }
+
+            $walletService->refundCommerceSale(
+                $founder,
+                $company,
+                (string) $checkoutSession->platform,
+                (string) $checkoutSession->category,
+                $commerceReference,
+                $grossAmount,
+                (string) $checkoutSession->currency,
+                [
+                    'source' => 'stripe_' . $reasonType . '_webhook',
+                    'stripe_reference' => $referenceId,
+                    'payment_intent_id' => (string) ($checkoutSession->stripe_payment_intent_id ?? ''),
+                ]
+            );
+
+            $recordCategory = (string) $checkoutSession->category === 'booking' ? 'booking' : 'order';
+            $platform = (string) $checkoutSession->platform;
+
+            foreach ([
+                ['field' => 'status', 'value' => 'cancelled'],
+                ['field' => 'payment_status', 'value' => 'unpaid'],
+                ['field' => 'vendor_note', 'value' => ucfirst($reasonType) . ' recorded from Stripe webhook in Hatchers OS.'],
+            ] as $operation) {
+                $assistantActionService->updateCommerceOperationFromOs(
+                    $founder,
+                    $platform,
+                    $recordCategory,
+                    $commerceReference,
+                    (string) $operation['field'],
+                    (string) $operation['value']
+                );
+            }
+
+            $checkoutSession->forceFill([
+                'checkout_status' => $reasonType === 'dispute' ? 'disputed' : 'refunded',
+                'payload_json' => array_merge($payload, [
+                    'reversal_type' => $reasonType,
+                    'reversal_reference' => $referenceId,
+                    'reversed_at' => now()->toDateTimeString(),
+                ]),
+            ])->save();
+        });
     }
 
     public function createWebsiteStarter(
@@ -2729,7 +3868,8 @@ class OsShellController extends Controller
     public function founderUpdateOrderOperation(
         Request $request,
         OsAssistantActionService $actionService,
-        AtlasIntelligenceService $atlas
+        AtlasIntelligenceService $atlas,
+        OsWalletService $walletService
     ): RedirectResponse {
         /** @var \App\Models\Founder $user */
         $user = Auth::user();
@@ -2782,7 +3922,114 @@ class OsShellController extends Controller
             $redirect->with('error', implode(' ', $errors));
         }
 
+        if ((string) $validated['payment_status'] === 'paid') {
+            $order = collect($this->commerceOperationsWorkspace($user, 'bazaar', ['status' => 'all', 'queue' => 'all'])['recent_orders'] ?? [])
+                ->firstWhere('order_number', (string) $validated['order_number']);
+            if (is_array($order)) {
+                $walletService->creditCommerceSale(
+                    $user,
+                    $user->company,
+                    'bazaar',
+                    'order',
+                    (string) $validated['order_number'],
+                    (float) ($order['grand_total'] ?? 0),
+                    (string) ($this->commerceOperationsWorkspace($user, 'bazaar', ['status' => 'all', 'queue' => 'all'])['currency'] ?? 'USD'),
+                    ['source' => 'manual_payment_status_update']
+                );
+            }
+        }
+
         return $redirect;
+    }
+
+    public function founderRefundOrder(
+        Request $request,
+        OsAssistantActionService $actionService,
+        OsStripeService $stripeService,
+        OsWalletService $walletService,
+        AtlasIntelligenceService $atlas
+    ): RedirectResponse {
+        /** @var \App\Models\Founder $user */
+        $user = Auth::user();
+        if (!$user->isFounder()) {
+            return redirect()->route('dashboard');
+        }
+
+        $validated = $request->validate([
+            'order_number' => ['required', 'string', 'max:255'],
+            'reason' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $workspace = $this->commerceOperationsWorkspace($user, 'bazaar', ['status' => 'all', 'queue' => 'all']);
+        $order = collect($workspace['recent_orders'] ?? [])->firstWhere('order_number', (string) $validated['order_number']);
+        if (!is_array($order)) {
+            return redirect()->route('founder.commerce.orders')->with('error', 'That Bazaar order is not available in the OS snapshot yet.');
+        }
+
+        if ((string) ($order['payment_status'] ?? 'unpaid') !== 'paid') {
+            return redirect()->route('founder.commerce.orders')->with('error', 'Only paid orders can be refunded from Hatchers Ai Business OS.');
+        }
+
+        $transactionId = trim((string) ($order['transaction_id'] ?? ''));
+        $grossAmount = (float) ($order['grand_total'] ?? 0);
+        $currency = (string) ($workspace['currency'] ?? 'USD');
+        $reason = trim((string) ($validated['reason'] ?? ''));
+
+        if ($transactionId !== '' && str_starts_with($transactionId, 'pi_')) {
+            $refund = $stripeService->createRefund($transactionId, $grossAmount, $currency, [
+                'order_number' => (string) $validated['order_number'],
+                'founder_id' => $user->id,
+            ]);
+
+            if (!($refund['success'] ?? false)) {
+                return redirect()->route('founder.commerce.orders')->with('error', $refund['message'] ?? 'Stripe refund could not be created for this order.');
+            }
+        }
+
+        $walletService->refundCommerceSale(
+            $user,
+            $user->company,
+            'bazaar',
+            'order',
+            (string) $validated['order_number'],
+            $grossAmount,
+            $currency,
+            [
+                'source' => 'founder_refund',
+                'reason' => $reason,
+                'transaction_id' => $transactionId,
+            ]
+        );
+
+        $note = trim(implode(' | ', array_filter([
+            (string) ($order['vendor_note'] ?? ''),
+            'Refunded in Hatchers OS' . ($reason !== '' ? ': ' . $reason : ''),
+        ])));
+
+        foreach ([
+            ['field' => 'status', 'value' => 'cancelled'],
+            ['field' => 'payment_status', 'value' => 'unpaid'],
+            ['field' => 'vendor_note', 'value' => $note],
+        ] as $operation) {
+            $actionService->updateCommerceOperationFromOs(
+                $user,
+                'bazaar',
+                'order',
+                (string) $validated['order_number'],
+                (string) $operation['field'],
+                (string) $operation['value']
+            );
+        }
+
+        $atlas->syncFounderMutation($user, [
+            'role' => 'founder',
+            'action' => 'commerce_order_refund',
+            'field' => 'order',
+            'value' => (string) $validated['order_number'],
+            'sync_summary' => 'Founder refunded a Bazaar order from Hatchers OS.',
+        ]);
+
+        return redirect()->route('founder.commerce.orders')->with('success', 'Order refunded from Hatchers Ai Business OS and the founder wallet was reversed.');
     }
 
     public function founderUpdateOrderCustomer(
@@ -2930,7 +4177,8 @@ class OsShellController extends Controller
     public function founderUpdateBookingOperation(
         Request $request,
         OsAssistantActionService $actionService,
-        AtlasIntelligenceService $atlas
+        AtlasIntelligenceService $atlas,
+        OsWalletService $walletService
     ): RedirectResponse {
         /** @var \App\Models\Founder $user */
         $user = Auth::user();
@@ -2988,7 +4236,114 @@ class OsShellController extends Controller
             $redirect->with('error', implode(' ', $errors));
         }
 
+        if ((string) $validated['payment_status'] === 'paid') {
+            $booking = collect($this->commerceOperationsWorkspace($user, 'servio', ['status' => 'all', 'queue' => 'all'])['recent_bookings'] ?? [])
+                ->firstWhere('booking_number', (string) $validated['booking_number']);
+            if (is_array($booking)) {
+                $walletService->creditCommerceSale(
+                    $user,
+                    $user->company,
+                    'servio',
+                    'booking',
+                    (string) $validated['booking_number'],
+                    (float) ($booking['grand_total'] ?? 0),
+                    (string) ($this->commerceOperationsWorkspace($user, 'servio', ['status' => 'all', 'queue' => 'all'])['currency'] ?? 'USD'),
+                    ['source' => 'manual_payment_status_update']
+                );
+            }
+        }
+
         return $redirect;
+    }
+
+    public function founderRefundBooking(
+        Request $request,
+        OsAssistantActionService $actionService,
+        OsStripeService $stripeService,
+        OsWalletService $walletService,
+        AtlasIntelligenceService $atlas
+    ): RedirectResponse {
+        /** @var \App\Models\Founder $user */
+        $user = Auth::user();
+        if (!$user->isFounder()) {
+            return redirect()->route('dashboard');
+        }
+
+        $validated = $request->validate([
+            'booking_number' => ['required', 'string', 'max:255'],
+            'reason' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $workspace = $this->commerceOperationsWorkspace($user, 'servio', ['status' => 'all', 'queue' => 'all']);
+        $booking = collect($workspace['recent_bookings'] ?? [])->firstWhere('booking_number', (string) $validated['booking_number']);
+        if (!is_array($booking)) {
+            return redirect()->route('founder.commerce.bookings')->with('error', 'That Servio booking is not available in the OS snapshot yet.');
+        }
+
+        if ((string) ($booking['payment_status'] ?? 'unpaid') !== 'paid') {
+            return redirect()->route('founder.commerce.bookings')->with('error', 'Only paid bookings can be refunded from Hatchers Ai Business OS.');
+        }
+
+        $transactionId = trim((string) ($booking['transaction_id'] ?? ''));
+        $grossAmount = (float) ($booking['grand_total'] ?? 0);
+        $currency = (string) ($workspace['currency'] ?? 'USD');
+        $reason = trim((string) ($validated['reason'] ?? ''));
+
+        if ($transactionId !== '' && str_starts_with($transactionId, 'pi_')) {
+            $refund = $stripeService->createRefund($transactionId, $grossAmount, $currency, [
+                'booking_number' => (string) $validated['booking_number'],
+                'founder_id' => $user->id,
+            ]);
+
+            if (!($refund['success'] ?? false)) {
+                return redirect()->route('founder.commerce.bookings')->with('error', $refund['message'] ?? 'Stripe refund could not be created for this booking.');
+            }
+        }
+
+        $walletService->refundCommerceSale(
+            $user,
+            $user->company,
+            'servio',
+            'booking',
+            (string) $validated['booking_number'],
+            $grossAmount,
+            $currency,
+            [
+                'source' => 'founder_refund',
+                'reason' => $reason,
+                'transaction_id' => $transactionId,
+            ]
+        );
+
+        $note = trim(implode(' | ', array_filter([
+            (string) ($booking['vendor_note'] ?? ''),
+            'Refunded in Hatchers OS' . ($reason !== '' ? ': ' . $reason : ''),
+        ])));
+
+        foreach ([
+            ['field' => 'status', 'value' => 'cancelled'],
+            ['field' => 'payment_status', 'value' => 'unpaid'],
+            ['field' => 'vendor_note', 'value' => $note],
+        ] as $operation) {
+            $actionService->updateCommerceOperationFromOs(
+                $user,
+                'servio',
+                'booking',
+                (string) $validated['booking_number'],
+                (string) $operation['field'],
+                (string) $operation['value']
+            );
+        }
+
+        $atlas->syncFounderMutation($user, [
+            'role' => 'founder',
+            'action' => 'commerce_booking_refund',
+            'field' => 'booking',
+            'value' => (string) $validated['booking_number'],
+            'sync_summary' => 'Founder refunded a Servio booking from Hatchers OS.',
+        ]);
+
+        return redirect()->route('founder.commerce.bookings')->with('success', 'Booking refunded from Hatchers Ai Business OS and the founder wallet was reversed.');
     }
 
     public function founderUpdateBookingCustomer(
@@ -3658,6 +5013,7 @@ class OsShellController extends Controller
                     'variants_text' => $this->formatVariantsText($offer['variants']),
                     'extras' => $offer['extras'],
                     'extras_text' => $this->formatExtrasText($offer['extras']),
+                    'payment_collection' => $offer['payment_collection'],
                     'status' => $actionPlan->status === 'paused' ? 'inactive' : 'active',
                     'updated_at' => optional($actionPlan->updated_at)?->diffForHumans(),
                 ];
@@ -3872,6 +5228,7 @@ class OsShellController extends Controller
         $additionalServices = [];
         $variants = [];
         $extras = [];
+        $paymentCollection = 'both';
         $body = [];
 
         foreach ($lines as $line) {
@@ -3947,6 +5304,10 @@ class OsShellController extends Controller
                 $extras = $this->decodeCommerceJsonList(substr($line, strlen('ExtrasJson:')), ['name', 'price']);
                 continue;
             }
+            if (str_starts_with($line, 'PaymentCollection:')) {
+                $paymentCollection = trim((string) substr($line, strlen('PaymentCollection:')));
+                continue;
+            }
 
             if (str_starts_with($line, 'Engine:')) {
                 continue;
@@ -3981,6 +5342,7 @@ class OsShellController extends Controller
             'additional_services' => $additionalServices,
             'variants' => $variants,
             'extras' => $extras,
+            'payment_collection' => in_array($paymentCollection, ['online_only', 'cash_only', 'both'], true) ? $paymentCollection : 'both',
         ];
     }
 
@@ -4054,9 +5416,65 @@ class OsShellController extends Controller
             'AdditionalServicesJson: ' . json_encode($this->normalizeAdditionalServices($payload['additional_services'] ?? []), JSON_UNESCAPED_UNICODE),
             'VariantsJson: ' . json_encode($this->normalizeVariants($payload['variants'] ?? []), JSON_UNESCAPED_UNICODE),
             'ExtrasJson: ' . json_encode($this->normalizeExtras($payload['extras'] ?? []), JSON_UNESCAPED_UNICODE),
+            'PaymentCollection: ' . trim((string) ($payload['payment_collection'] ?? 'both')),
             '',
             trim((string) ($payload['description'] ?? '')),
         ], static fn ($value) => $value !== '')));
+    }
+
+    private function allowedPublicPaymentChoices(string $paymentCollection): array
+    {
+        return match ($paymentCollection) {
+            'online_only' => ['online'],
+            'cash_only' => ['cash'],
+            default => ['online', 'cash'],
+        };
+    }
+
+    private function calculatePublicCheckoutAmount(array $site, array $offer, array $attributes): float
+    {
+        $basePrice = (float) ($offer['base_price'] ?? 0);
+
+        if (($offer['type'] ?? '') === 'product') {
+            $quantity = max(1, (int) ($attributes['quantity'] ?? 1));
+            $variantName = trim((string) ($attributes['selected_variant'] ?? ''));
+            $variantPrice = $basePrice;
+            foreach ((array) ($offer['request_options']['variants'] ?? []) as $variant) {
+                if (is_array($variant) && trim((string) ($variant['name'] ?? '')) === $variantName) {
+                    $variantPrice = (float) ($variant['price'] ?? $basePrice);
+                    break;
+                }
+            }
+
+            $selectedExtras = collect((array) ($attributes['selected_extras'] ?? []))
+                ->map(fn ($value) => trim((string) $value))
+                ->filter()
+                ->values();
+            $extrasPrice = collect((array) ($offer['request_options']['extras'] ?? []))
+                ->filter(fn ($extra) => is_array($extra) && $selectedExtras->contains(trim((string) ($extra['name'] ?? ''))))
+                ->sum(fn ($extra) => (float) ($extra['price'] ?? 0));
+
+            $shippingCharge = 0.0;
+            $deliveryArea = strtolower(trim((string) ($attributes['delivery_area'] ?? '')));
+            foreach ((array) ($site['checkout_context']['shipping_zones'] ?? []) as $zone) {
+                if (is_array($zone) && strtolower(trim((string) ($zone['area_name'] ?? ''))) === $deliveryArea) {
+                    $shippingCharge = (float) ($zone['delivery_charge'] ?? 0);
+                    break;
+                }
+            }
+
+            return round((($variantPrice + $extrasPrice) * $quantity) + $shippingCharge, 2);
+        }
+
+        $selectedAddOns = collect((array) ($attributes['selected_additional_services'] ?? []))
+            ->map(fn ($value) => trim((string) $value))
+            ->filter()
+            ->values();
+        $addOnsPrice = collect((array) ($offer['request_options']['additional_services'] ?? []))
+            ->filter(fn ($extra) => is_array($extra) && $selectedAddOns->contains(trim((string) ($extra['name'] ?? ''))))
+            ->sum(fn ($extra) => (float) ($extra['price'] ?? 0));
+
+        return round($basePrice + $addOnsPrice, 2);
     }
 
     private function serializeCommerceConfig(array $payload): string
@@ -4472,6 +5890,24 @@ class OsShellController extends Controller
 
                 return $path === $normalizedPath;
             });
+    }
+
+    private function resolvePublicWebsiteOffer(array $site, string $type, string $title): ?array
+    {
+        return collect($site['offers'] ?? [])
+            ->first(function ($offer) use ($type, $title): bool {
+                return is_array($offer)
+                    && (string) ($offer['type'] ?? '') === $type
+                    && trim((string) ($offer['title'] ?? '')) === trim($title);
+            });
+    }
+
+    private function publicServiceDurationMinutes(array $offer): int
+    {
+        $duration = max(1, (int) ($offer['request_options']['duration'] ?? 30));
+        $unit = strtolower(trim((string) ($offer['request_options']['duration_unit'] ?? 'minutes')));
+
+        return $unit === 'hours' ? $duration * 60 : $duration;
     }
 
     private function founderIndustryOptions(): array
@@ -5088,6 +6524,40 @@ class OsShellController extends Controller
                 'action_summary' => 'Surface the booking in the OS queue and draft a customer message once a provider is assigned.',
                 'delivery' => 'email',
             ],
+        ];
+    }
+
+    private function syncStripePayoutAccountStatus(FounderPayoutAccount $account, OsStripeService $stripeService): array
+    {
+        if (trim((string) $account->stripe_account_id) === '') {
+            return [
+                'success' => false,
+                'message' => 'No Stripe Connect account is linked yet.',
+            ];
+        }
+
+        $remote = $stripeService->retrieveConnectedAccount((string) $account->stripe_account_id);
+        if (!($remote['success'] ?? false)) {
+            return $remote;
+        }
+
+        $account->forceFill([
+            'stripe_onboarding_status' => !empty($remote['payouts_enabled']) ? 'complete' : (!empty($remote['details_submitted']) ? 'review' : 'pending'),
+            'stripe_charges_enabled' => (bool) ($remote['charges_enabled'] ?? false),
+            'stripe_payouts_enabled' => (bool) ($remote['payouts_enabled'] ?? false),
+            'stripe_details_submitted_at' => !empty($remote['details_submitted']) && !$account->stripe_details_submitted_at ? now() : $account->stripe_details_submitted_at,
+            'stripe_payouts_enabled_at' => !empty($remote['payouts_enabled']) && !$account->stripe_payouts_enabled_at ? now() : $account->stripe_payouts_enabled_at,
+            'bank_currency' => (string) ($remote['default_currency'] ?? ($account->bank_currency ?: 'USD')),
+            'bank_country' => (string) ($remote['country'] ?? ($account->bank_country ?: 'US')),
+            'status' => !empty($remote['payouts_enabled']) ? 'active' : 'pending',
+            'meta_json' => array_merge((array) ($account->meta_json ?? []), [
+                'stripe_synced_at' => now()->toDateTimeString(),
+            ]),
+        ])->save();
+
+        return [
+            'success' => true,
+            'message' => 'Stripe Connect account synced.',
         ];
     }
 

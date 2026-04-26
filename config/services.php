@@ -18,4 +18,11 @@ return [
     'servio' => [
         'base_url' => env('SERVIO_BASE_URL', 'https://servio.hatchers.ai'),
     ],
+    'stripe' => [
+        'secret' => env('STRIPE_SECRET', ''),
+        'publishable_key' => env('STRIPE_PUBLISHABLE_KEY', ''),
+        'webhook_secret' => env('STRIPE_WEBHOOK_SECRET', ''),
+        'platform_fee_percent' => env('STRIPE_PLATFORM_FEE_PERCENT', 0),
+        'platform_fee_fixed' => env('STRIPE_PLATFORM_FEE_FIXED', 0),
+    ],
 ];

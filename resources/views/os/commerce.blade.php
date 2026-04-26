@@ -61,6 +61,9 @@
         $catalogOffers = $catalogOffers ?? [];
         $commerceConfigs = $commerceConfigs ?? ['coupon' => [], 'shipping' => [], 'booking_policy' => []];
         $commerceCatalogs = $commerceCatalogs ?? ['bazaar' => ['categories' => [], 'taxes' => []], 'servio' => ['categories' => [], 'taxes' => [], 'additional_services' => []]];
+        $walletSummary = $walletSummary ?? ['available_balance' => 0, 'pending_balance' => 0, 'reserved_balance' => 0, 'minimum_payout_amount' => 50, 'currency' => 'USD', 'recent_entries' => []];
+        $payoutAccount = $payoutAccount ?? null;
+        $recentPayoutRequests = $recentPayoutRequests ?? collect();
         $supportsProducts = in_array($businessModel, ['product', 'hybrid'], true);
         $supportsServices = in_array($businessModel, ['service', 'hybrid'], true);
         $automationSummary = $dashboard['automation_summary'] ?? ['active_count' => 0, 'items' => [], 'has_unpaid_order_rule' => false, 'has_unscheduled_booking_rule' => false, 'has_provider_assignment_rule' => false];
@@ -78,6 +81,7 @@
                 <nav class="commerce-nav">
                     <a class="commerce-nav-item" href="/dashboard/founder"><span class="commerce-nav-icon">⌂</span><span>Home</span></a>
                     <a class="commerce-nav-item active" href="{{ route('founder.commerce') }}"><span class="commerce-nav-icon">⌁</span><span>Commerce</span></a>
+                    <a class="commerce-nav-item" href="{{ route('founder.commerce.wallet') }}"><span class="commerce-nav-icon">$</span><span>Wallet</span></a>
                     <a class="commerce-nav-item" href="{{ route('website') }}"><span class="commerce-nav-icon">◫</span><span>Website</span></a>
                     <a class="commerce-nav-item" href="{{ route('founder.ai-tools') }}"><span class="commerce-nav-icon">✦</span><span>AI Tools</span></a>
                     <a class="commerce-nav-item" href="{{ route('founder.tasks') }}"><span class="commerce-nav-icon">◌</span><span>Tasks</span></a>
@@ -268,6 +272,12 @@
                                     <input id="offer-category-{{ $offer['id'] }}" name="category_name" type="text" value="{{ $offer['category_name'] ?? '' }}" placeholder="{{ $offer['engine'] === 'bazaar' ? 'Treats, Accessories, Grooming' : 'Walking, Training, Home visits' }}">
                                     <label for="offer-tax-rules-{{ $offer['id'] }}">Tax rules</label>
                                     <textarea id="offer-tax-rules-{{ $offer['id'] }}" name="tax_rules_text" placeholder="VAT | 15 | percent&#10;Service fee | 5 | fixed">{{ $offer['tax_rules_text'] ?? '' }}</textarea>
+                                    <label for="offer-payment-collection-{{ $offer['id'] }}">Payment options</label>
+                                    <select id="offer-payment-collection-{{ $offer['id'] }}" name="payment_collection">
+                                        <option value="both" @selected(($offer['payment_collection'] ?? 'both') === 'both')>Pay online or cash</option>
+                                        <option value="online_only" @selected(($offer['payment_collection'] ?? 'both') === 'online_only')>Pay online only</option>
+                                        <option value="cash_only" @selected(($offer['payment_collection'] ?? 'both') === 'cash_only')>{{ $offer['engine'] === 'bazaar' ? 'Cash on delivery only' : 'Cash on booking only' }}</option>
+                                    </select>
                                     @if ($offer['engine'] === 'bazaar')
                                         <label for="offer-sku-{{ $offer['id'] }}">SKU</label>
                                         <input id="offer-sku-{{ $offer['id'] }}" name="sku" type="text" value="{{ $offer['sku'] }}">
@@ -588,6 +598,77 @@
                         <div class="rail-item"><strong>Bookings</strong><br><span class="muted">Commerce → Bookings</span></div>
                     @endif
                     <div class="rail-item"><strong>Theme + public URL</strong><br><span class="muted">Website workspace</span></div>
+                </div>
+
+                <h3 style="margin-top:22px;">Founder Wallet</h3>
+                <div class="rail-list">
+                    <div class="rail-item">
+                        <strong>{{ $walletSummary['currency'] }} {{ number_format((float) $walletSummary['available_balance'], 2) }}</strong><br>
+                        <span class="muted">Available balance</span>
+                        <div style="margin-top:8px;color:var(--muted);">Pending: {{ $walletSummary['currency'] }} {{ number_format((float) $walletSummary['pending_balance'], 2) }}</div>
+                        <div style="color:var(--muted);">Reserved: {{ $walletSummary['currency'] }} {{ number_format((float) $walletSummary['reserved_balance'], 2) }}</div>
+                        <div style="margin-top:8px;color:var(--muted);">Gross sales: {{ $walletSummary['currency'] }} {{ number_format((float) ($walletSummary['gross_sales_total'] ?? 0), 2) }}</div>
+                        <div style="color:var(--muted);">Refunded sales: {{ $walletSummary['currency'] }} {{ number_format((float) ($walletSummary['refunded_sales_total'] ?? 0), 2) }}</div>
+                        <div style="color:var(--muted);">Platform fees: {{ $walletSummary['currency'] }} {{ number_format((float) ($walletSummary['platform_fees_total'] ?? 0), 2) }}</div>
+                        <div style="color:var(--muted);">Net earnings: {{ $walletSummary['currency'] }} {{ number_format((float) ($walletSummary['net_earnings_total'] ?? 0), 2) }}</div>
+                        <div class="commerce-actions"><a class="commerce-secondary" href="{{ route('founder.commerce.wallet') }}" style="text-decoration:none;">Open wallet history</a></div>
+                    </div>
+                    <div class="rail-item">
+                        <strong>Payout account</strong><br>
+                        <span class="muted">{{ $payoutAccount ? (($payoutAccount->bank_name ?? 'Bank') . ' · ' . ($payoutAccount->iban ?: $payoutAccount->account_number ?: 'Saved')) : 'No bank account saved yet' }}</span>
+                        <div style="margin-top:8px;color:var(--muted);">
+                            Stripe Connect:
+                            @if ($payoutAccount && $payoutAccount->stripe_payouts_enabled)
+                                Connected
+                            @elseif ($payoutAccount && $payoutAccount->stripe_account_id)
+                                {{ ucfirst((string) ($payoutAccount->stripe_onboarding_status ?: 'pending')) }}
+                            @else
+                                Not connected
+                            @endif
+                        </div>
+                        <div class="commerce-actions" style="margin-top:12px;">
+                            <a class="commerce-cta" href="{{ route('founder.commerce.payout-account.connect') }}">
+                                @if ($payoutAccount && $payoutAccount->stripe_account_id)
+                                    Continue Stripe onboarding
+                                @else
+                                    Connect Stripe payouts
+                                @endif
+                            </a>
+                        </div>
+                        <form method="POST" action="{{ route('founder.commerce.payout-account.store') }}" class="commerce-field" style="margin-top:12px;">
+                            @csrf
+                            <input name="account_holder_name" type="text" placeholder="Account holder" value="{{ old('account_holder_name', $payoutAccount->account_holder_name ?? $founder->full_name) }}">
+                            <input name="bank_name" type="text" placeholder="Bank name" value="{{ old('bank_name', $payoutAccount->bank_name ?? '') }}">
+                            <input name="account_number" type="text" placeholder="Account number" value="{{ old('account_number', $payoutAccount->account_number ?? '') }}">
+                            <input name="iban" type="text" placeholder="IBAN" value="{{ old('iban', $payoutAccount->iban ?? '') }}">
+                            <input name="swift_code" type="text" placeholder="SWIFT code" value="{{ old('swift_code', $payoutAccount->swift_code ?? '') }}">
+                            <input name="routing_number" type="text" placeholder="Routing number" value="{{ old('routing_number', $payoutAccount->routing_number ?? '') }}">
+                            <input name="bank_country" type="text" placeholder="Bank country" value="{{ old('bank_country', $payoutAccount->bank_country ?? '') }}">
+                            <input name="bank_currency" type="text" placeholder="Currency" value="{{ old('bank_currency', $payoutAccount->bank_currency ?? $walletSummary['currency']) }}">
+                            <button class="commerce-secondary" type="submit">Save payout account</button>
+                        </form>
+                    </div>
+                    <div class="rail-item">
+                        <strong>Withdraw to bank</strong><br>
+                        <span class="muted">Minimum payout: USD {{ number_format((float) $walletSummary['minimum_payout_amount'], 2) }}</span>
+                        @if ($payoutAccount && $payoutAccount->stripe_payouts_enabled)
+                            <div style="margin-top:8px;color:var(--muted);">Stripe Express is connected, so the OS will attempt automatic Stripe transfer when you request a payout.</div>
+                        @else
+                            <div style="margin-top:8px;color:var(--muted);">Without Stripe Connect, payout requests stay in the OS queue for manual bank transfer processing.</div>
+                        @endif
+                        <form method="POST" action="{{ route('founder.commerce.payout-request.store') }}" class="commerce-field" style="margin-top:12px;">
+                            @csrf
+                            <input name="amount" type="number" step="0.01" min="50" placeholder="50.00">
+                            <textarea name="notes" placeholder="Optional payout note"></textarea>
+                            <button class="commerce-cta" type="submit">Request withdrawal</button>
+                        </form>
+                    </div>
+                    @foreach ($recentPayoutRequests as $payoutRequest)
+                        <div class="rail-item">
+                            <strong>{{ strtoupper($payoutRequest->currency) }} {{ number_format((float) $payoutRequest->amount, 2) }}</strong><br>
+                            <span class="muted">{{ ucfirst($payoutRequest->status) }} · {{ optional($payoutRequest->requested_at)->toDateString() }}</span>
+                        </div>
+                    @endforeach
                 </div>
 
                 <h3 style="margin-top:22px;">Reminder Rules</h3>

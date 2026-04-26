@@ -273,6 +273,37 @@ class AdminDashboardService
             ->values()
             ->all();
 
+        $payoutRequests = \App\Models\FounderPayoutRequest::query()
+            ->with(['founder.company'])
+            ->latest('requested_at')
+            ->limit(20)
+            ->get()
+            ->map(function (\App\Models\FounderPayoutRequest $request): array {
+                $meta = is_array($request->meta_json) ? $request->meta_json : [];
+
+                return [
+                    'id' => $request->id,
+                    'founder_id' => $request->founder_id,
+                    'founder_name' => $request->founder?->full_name ?: 'Founder',
+                    'company_name' => $request->founder?->company?->company_name ?: 'Company not set yet',
+                    'amount' => (float) $request->amount,
+                    'currency' => (string) $request->currency,
+                    'status' => (string) $request->status,
+                    'requested_at' => optional($request->requested_at)->toDayDateTimeString(),
+                    'processed_at' => optional($request->processed_at)->toDayDateTimeString(),
+                    'destination_summary' => (string) $request->destination_summary,
+                    'notes' => (string) ($request->notes ?? ''),
+                    'reference' => (string) ($meta['paid_reference'] ?? ''),
+                    'rejection_reason' => (string) ($meta['rejection_reason'] ?? ''),
+                ];
+            })
+            ->all();
+
+        $openPayoutRequests = collect($payoutRequests)
+            ->filter(fn (array $request): bool => in_array($request['status'], ['pending', 'processing'], true))
+            ->values()
+            ->all();
+
         return [
             'admin' => $admin,
             'metrics' => [
@@ -280,11 +311,233 @@ class AdminDashboardService
                 'open_exceptions' => count($openExceptions),
                 'stale_modules' => count($staleModules),
                 'watchlist_founders' => $subscriberReport['health']['watchlist'],
+                'open_payout_requests' => count($openPayoutRequests),
             ],
             'urgent_subscribers' => $urgentSubscribers,
             'stale_modules' => $staleModules,
             'exceptions' => $openExceptions,
             'recent_audits' => $moduleMonitoring['recent_audits'],
+            'payout_requests' => $payoutRequests,
+            'open_payout_requests' => $openPayoutRequests,
+        ];
+    }
+
+    public function buildFinanceWorkspace(Founder $admin, array $filters = []): array
+    {
+        $search = trim((string) ($filters['search'] ?? ''));
+        $status = trim((string) ($filters['payout_status'] ?? ''));
+        $checkoutStatus = trim((string) ($filters['checkout_status'] ?? ''));
+
+        $founders = Founder::query()
+            ->where('role', 'founder')
+            ->with(['company', 'payoutAccount', 'walletLedgerEntries'])
+            ->orderBy('full_name')
+            ->get()
+            ->filter(function (Founder $founder) use ($search): bool {
+                if ($search === '') {
+                    return true;
+                }
+
+                $haystack = strtolower(implode(' ', array_filter([
+                    (string) $founder->full_name,
+                    (string) $founder->email,
+                    (string) ($founder->company?->company_name ?? ''),
+                ])));
+
+                return str_contains($haystack, strtolower($search));
+            });
+
+        $walletRows = $founders->map(function (Founder $founder): array {
+            $entries = $founder->walletLedgerEntries;
+            $available = (float) $entries->where('status', 'available')->sum('amount');
+            $pending = (float) $entries->where('status', 'pending')->sum('amount');
+            $reserved = abs((float) $entries->where('status', 'reserved')->sum('amount'));
+            $grossSales = (float) $entries
+                ->where('entry_type', 'credit')
+                ->filter(fn (\App\Models\FounderWalletLedger $entry): bool => in_array((string) $entry->source_category, ['order', 'booking'], true))
+                ->sum('amount');
+            $refundedSales = (float) $entries
+                ->filter(fn (\App\Models\FounderWalletLedger $entry): bool => in_array((string) $entry->source_category, ['order_refund', 'booking_refund'], true))
+                ->sum(fn (\App\Models\FounderWalletLedger $entry): float => (float) (($entry->meta_json['gross_amount'] ?? 0)));
+            $platformFees = abs((float) $entries
+                ->filter(fn (\App\Models\FounderWalletLedger $entry): bool => (string) $entry->source_category === 'platform_fee')
+                ->sum('amount'));
+            $platformFeeReversals = (float) $entries
+                ->filter(fn (\App\Models\FounderWalletLedger $entry): bool => (string) $entry->source_category === 'platform_fee_reversal')
+                ->sum('amount');
+            $netFees = max(0, $platformFees - $platformFeeReversals);
+            $currency = strtoupper((string) ($entries->first()?->currency ?: $founder->payoutAccount?->bank_currency ?: 'USD'));
+
+            return [
+                'founder_id' => $founder->id,
+                'founder_name' => $founder->full_name,
+                'email' => $founder->email,
+                'company_name' => $founder->company?->company_name ?: 'Company not set yet',
+                'business_model' => (string) ($founder->company?->business_model ?? 'hybrid'),
+                'currency' => $currency,
+                'available_balance' => round($available, 2),
+                'pending_balance' => round($pending, 2),
+                'reserved_balance' => round($reserved, 2),
+                'gross_sales_total' => round($grossSales, 2),
+                'refunded_sales_total' => round($refundedSales, 2),
+                'platform_fees_total' => round($netFees, 2),
+                'net_earnings_total' => round(($grossSales - $refundedSales) - $netFees, 2),
+                'stripe_status' => $founder->payoutAccount?->stripe_payouts_enabled ? 'connected' : (($founder->payoutAccount?->stripe_account_id) ? (string) ($founder->payoutAccount->stripe_onboarding_status ?? 'pending') : 'not_connected'),
+                'bank_summary' => $founder->payoutAccount
+                    ? trim(($founder->payoutAccount->bank_name ?: 'Bank') . ' · ' . ($founder->payoutAccount->iban ?: $founder->payoutAccount->account_number ?: 'Saved'))
+                    : 'No payout account yet',
+            ];
+        })->values();
+
+        $payoutRequests = \App\Models\FounderPayoutRequest::query()
+            ->with(['founder.company'])
+            ->latest('requested_at')
+            ->get()
+            ->filter(function (\App\Models\FounderPayoutRequest $request) use ($search, $status): bool {
+                if ($status !== '' && (string) $request->status !== $status) {
+                    return false;
+                }
+
+                if ($search === '') {
+                    return true;
+                }
+
+                $haystack = strtolower(implode(' ', array_filter([
+                    (string) ($request->founder?->full_name ?? ''),
+                    (string) ($request->founder?->email ?? ''),
+                    (string) ($request->founder?->company?->company_name ?? ''),
+                    (string) $request->destination_summary,
+                ])));
+
+                return str_contains($haystack, strtolower($search));
+            })
+            ->map(function (\App\Models\FounderPayoutRequest $request): array {
+                $meta = is_array($request->meta_json) ? $request->meta_json : [];
+
+                return [
+                    'id' => $request->id,
+                    'founder_name' => $request->founder?->full_name ?: 'Founder',
+                    'company_name' => $request->founder?->company?->company_name ?: 'Company not set yet',
+                    'amount' => (float) $request->amount,
+                    'currency' => (string) $request->currency,
+                    'status' => (string) $request->status,
+                    'requested_at' => optional($request->requested_at)->toDayDateTimeString(),
+                    'processed_at' => optional($request->processed_at)->toDayDateTimeString(),
+                    'destination_summary' => (string) $request->destination_summary,
+                    'notes' => (string) ($request->notes ?? ''),
+                    'reference' => (string) ($meta['paid_reference'] ?? ''),
+                    'rejection_reason' => (string) ($meta['rejection_reason'] ?? ''),
+                ];
+            })
+            ->values();
+
+        $ledgerEntries = \App\Models\FounderWalletLedger::query()
+            ->with(['founder.company'])
+            ->latest()
+            ->limit(30)
+            ->get()
+            ->map(function (\App\Models\FounderWalletLedger $entry): array {
+                return [
+                    'founder_name' => $entry->founder?->full_name ?: 'Founder',
+                    'company_name' => $entry->founder?->company?->company_name ?: 'Company not set yet',
+                    'source_platform' => (string) ($entry->source_platform ?? 'os'),
+                    'source_category' => (string) ($entry->source_category ?? ''),
+                    'source_reference' => (string) ($entry->source_reference ?? ''),
+                    'entry_type' => (string) $entry->entry_type,
+                    'amount' => (float) $entry->amount,
+                    'currency' => (string) $entry->currency,
+                    'status' => (string) $entry->status,
+                    'created_at' => optional($entry->created_at)->toDayDateTimeString(),
+                ];
+            })
+            ->values();
+
+        $disputedCheckouts = \App\Models\PublicCheckoutSession::query()->where('checkout_status', 'disputed')->count();
+        $refundedCheckouts = \App\Models\PublicCheckoutSession::query()->where('checkout_status', 'refunded')->count();
+        $checkoutRows = \App\Models\PublicCheckoutSession::query()
+            ->with(['founder.company'])
+            ->latest()
+            ->limit(60)
+            ->get()
+            ->filter(function (\App\Models\PublicCheckoutSession $session) use ($search, $checkoutStatus): bool {
+                if ($checkoutStatus !== '' && (string) $session->checkout_status !== $checkoutStatus) {
+                    return false;
+                }
+
+                if ($search === '') {
+                    return true;
+                }
+
+                $payload = is_array($session->payload_json) ? $session->payload_json : [];
+                $haystack = strtolower(implode(' ', array_filter([
+                    (string) ($session->founder?->full_name ?? ''),
+                    (string) ($session->founder?->email ?? ''),
+                    (string) ($session->founder?->company?->company_name ?? ''),
+                    (string) $session->offer_title,
+                    (string) ($payload['customer_name'] ?? ''),
+                    (string) ($payload['customer_email'] ?? ''),
+                    (string) ($payload['commerce_reference'] ?? ''),
+                    (string) $session->stripe_session_id,
+                    (string) $session->stripe_payment_intent_id,
+                ])));
+
+                return str_contains($haystack, strtolower($search));
+            })
+            ->map(function (\App\Models\PublicCheckoutSession $session): array {
+                $payload = is_array($session->payload_json) ? $session->payload_json : [];
+                $reviewMeta = is_array($payload['finance_review'] ?? null) ? $payload['finance_review'] : [];
+
+                return [
+                    'id' => $session->id,
+                    'founder_name' => $session->founder?->full_name ?: 'Founder',
+                    'company_name' => $session->founder?->company?->company_name ?: 'Company not set yet',
+                    'offer_title' => (string) $session->offer_title,
+                    'platform' => (string) $session->platform,
+                    'category' => (string) $session->category,
+                    'amount' => (float) $session->amount,
+                    'currency' => (string) $session->currency,
+                    'checkout_status' => (string) $session->checkout_status,
+                    'stripe_session_id' => (string) ($session->stripe_session_id ?? ''),
+                    'stripe_payment_intent_id' => (string) ($session->stripe_payment_intent_id ?? ''),
+                    'commerce_reference' => (string) ($payload['commerce_reference'] ?? ''),
+                    'customer_name' => (string) ($payload['customer_name'] ?? ''),
+                    'customer_email' => (string) ($payload['customer_email'] ?? ''),
+                    'completed_at' => optional($session->completed_at)->toDayDateTimeString(),
+                    'created_at' => optional($session->created_at)->toDayDateTimeString(),
+                    'reviewed' => (bool) ($reviewMeta['reviewed'] ?? false),
+                    'reviewed_at' => (string) ($reviewMeta['reviewed_at'] ?? ''),
+                    'reviewed_by' => (string) ($reviewMeta['reviewed_by'] ?? ''),
+                    'review_note' => (string) ($reviewMeta['note'] ?? ''),
+                    'commerce_url' => route('admin.commerce', ['search' => $session->founder?->company?->company_name ?: $session->founder?->full_name ?: '']),
+                ];
+            })
+            ->values();
+
+        return [
+            'admin' => $admin,
+            'filters' => [
+                'search' => $search,
+                'payout_status' => $status,
+                'checkout_status' => $checkoutStatus,
+            ],
+            'metrics' => [
+                'founders_with_wallets' => $walletRows->filter(fn (array $row): bool => $row['gross_sales_total'] > 0 || $row['available_balance'] !== 0.0 || $row['reserved_balance'] !== 0.0)->count(),
+                'wallet_available_total' => round((float) $walletRows->sum('available_balance'), 2),
+                'wallet_reserved_total' => round((float) $walletRows->sum('reserved_balance'), 2),
+                'gross_sales_total' => round((float) $walletRows->sum('gross_sales_total'), 2),
+                'refunded_sales_total' => round((float) $walletRows->sum('refunded_sales_total'), 2),
+                'platform_fees_total' => round((float) $walletRows->sum('platform_fees_total'), 2),
+                'open_payout_requests' => $payoutRequests->filter(fn (array $row): bool => in_array($row['status'], ['pending', 'processing'], true))->count(),
+                'disputed_checkouts' => $disputedCheckouts,
+                'refunded_checkouts' => $refundedCheckouts,
+                'checkouts_needing_review' => $checkoutRows->filter(fn (array $row): bool => in_array($row['checkout_status'], ['disputed', 'refunded'], true) && !$row['reviewed'])->count(),
+            ],
+            'wallet_rows' => $walletRows->sortByDesc('available_balance')->values()->all(),
+            'payout_requests' => $payoutRequests->all(),
+            'recent_ledger_entries' => $ledgerEntries->all(),
+            'payout_status_options' => ['pending', 'processing', 'paid', 'rejected'],
+            'checkout_rows' => $checkoutRows->all(),
+            'checkout_status_options' => ['disputed', 'refunded', 'completed', 'expired'],
         ];
     }
 

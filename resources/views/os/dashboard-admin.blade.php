@@ -20,6 +20,7 @@
                 <a class="nav-item" href="{{ route('admin.system-access') }}">System Access</a>
                 <a class="nav-item" href="{{ route('admin.identity') }}">Identity</a>
                 <a class="nav-item" href="{{ route('admin.commerce') }}">Commerce Control</a>
+                <a class="nav-item" href="{{ route('admin.finance') }}">Finance Control</a>
                 <a class="nav-item" href="{{ route('admin.modules') }}">Module Monitoring</a>
                 <a class="nav-item" href="{{ route('admin.support') }}">Support Center</a>
                 <a class="nav-item" href="/dashboard">OS Home</a>
@@ -91,6 +92,7 @@
                                 <a class="pill" href="{{ route('admin.system-access') }}">Open System Access</a>
                                 <a class="pill" href="{{ route('admin.identity') }}">Open Identity Workspace</a>
                                 <a class="pill" href="{{ route('admin.commerce') }}">Open Commerce Control</a>
+                                <a class="pill" href="{{ route('admin.finance') }}">Open Finance Control</a>
                                 <a class="pill" href="{{ route('admin.modules') }}">Open Module Monitoring</a>
                                 <a class="pill" href="{{ route('admin.support') }}">Open Support Center</a>
                             </div>

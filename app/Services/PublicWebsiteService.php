@@ -16,6 +16,7 @@ class PublicWebsiteService
         $payload = $snapshot?->payload_json ?? [];
         $summary = is_array($payload['summary'] ?? null) ? $payload['summary'] : [];
         $counts = is_array($payload['key_counts'] ?? null) ? $payload['key_counts'] : [];
+        $offerPreferences = $this->offerPaymentPreferences($founder);
 
         $websiteTitle = trim((string) ($summary['website_title'] ?? ''));
         if ($websiteTitle === '') {
@@ -38,9 +39,17 @@ class PublicWebsiteService
             'theme' => (string) ($summary['theme_template'] ?? ''),
             'hero' => $this->buildHero($company, $founder?->full_name ?? '', $businessModel, $counts, $currency),
             'metrics' => $this->buildMetrics($businessModel, $counts, (float) ($summary['gross_revenue'] ?? 0), $currency),
-            'offers' => $this->buildOffers($payload, $businessModel, $currency),
+            'offers' => $this->buildOffers($payload, $businessModel, $currency, $offerPreferences),
             'proof' => $this->buildProof($businessModel, $counts, $summary, $currency),
             'operations' => $this->buildOperations($payload, $businessModel, $currency),
+            'checkout_context' => [
+                'shipping_zones' => collect((array) ($payload['shipping_zones'] ?? []))
+                    ->filter('is_array')
+                    ->map(fn (array $zone): array => [
+                        'area_name' => (string) ($zone['area_name'] ?? ''),
+                        'delivery_charge' => (float) ($zone['delivery_charge'] ?? 0),
+                    ])->values()->all(),
+            ],
             'contact' => [
                 'founder_name' => (string) ($founder?->full_name ?? ''),
                 'email' => (string) ($founder?->email ?? ''),
@@ -99,7 +108,7 @@ class PublicWebsiteService
         return array_slice($metrics, 0, 4);
     }
 
-    private function buildOffers(array $payload, string $businessModel, string $currency): array
+    private function buildOffers(array $payload, string $businessModel, string $currency, array $offerPreferences = []): array
     {
         $items = [];
 
@@ -109,13 +118,18 @@ class PublicWebsiteService
                     continue;
                 }
 
+                $paymentCollection = $offerPreferences['bazaar:' . strtolower((string) ($product['title'] ?? ''))] ?? 'both';
                 $items[] = [
                     'type' => 'product',
                     'title' => (string) ($product['title'] ?? 'Product'),
                     'meta' => trim('SKU ' . (string) ($product['sku'] ?? '') . (($product['qty'] ?? null) !== null ? ' · Stock ' . (int) $product['qty'] : '')),
                     'price' => $currency . ' ' . number_format((float) ($product['price'] ?? 0), 2),
+                    'base_price' => (float) ($product['price'] ?? 0),
+                    'currency' => $currency,
                     'status' => ucfirst((string) ($product['status'] ?? 'active')),
                     'request_options' => [
+                        'payment_collection' => $paymentCollection,
+                        'accepted_payment_methods' => $this->acceptedPaymentMethods($paymentCollection),
                         'variants' => collect((array) ($product['variants'] ?? []))
                             ->filter('is_array')
                             ->map(fn (array $variant): array => [
@@ -154,13 +168,18 @@ class PublicWebsiteService
 
                 $duration = (int) ($service['duration'] ?? 0);
                 $durationUnit = (string) ($service['duration_unit'] ?? 'minutes');
+                $paymentCollection = $offerPreferences['servio:' . strtolower((string) ($service['title'] ?? ''))] ?? 'both';
                 $items[] = [
                     'type' => 'service',
                     'title' => (string) ($service['title'] ?? 'Service'),
                     'meta' => trim(($duration > 0 ? $duration . ' ' . $durationUnit : '') . ((int) ($service['capacity'] ?? 0) > 0 ? ' · Capacity ' . (int) $service['capacity'] : '')),
                     'price' => $currency . ' ' . number_format((float) ($service['price'] ?? 0), 2),
+                    'base_price' => (float) ($service['price'] ?? 0),
+                    'currency' => $currency,
                     'status' => ucfirst((string) ($service['status'] ?? 'active')),
                     'request_options' => [
+                        'payment_collection' => $paymentCollection,
+                        'accepted_payment_methods' => $this->acceptedPaymentMethods($paymentCollection),
                         'additional_services' => collect((array) ($service['additional_services'] ?? []))
                             ->filter('is_array')
                             ->map(fn (array $extra): array => [
@@ -169,6 +188,15 @@ class PublicWebsiteService
                             ])->filter(fn (array $extra): bool => $extra['name'] !== '')
                             ->values()
                             ->all(),
+                        'duration' => $duration,
+                        'duration_unit' => $durationUnit,
+                        'availability_days' => collect((array) ($service['availability_days'] ?? []))
+                            ->map(fn ($day) => trim((string) $day))
+                            ->filter()
+                            ->values()
+                            ->all(),
+                        'open_time' => (string) ($service['open_time'] ?? ''),
+                        'close_time' => (string) ($service['close_time'] ?? ''),
                     ],
                     'details' => array_values(array_filter(array_merge(
                         collect((array) ($service['additional_services'] ?? []))
@@ -226,6 +254,40 @@ class PublicWebsiteService
         ];
 
         return $proof;
+    }
+
+    private function acceptedPaymentMethods(string $paymentCollection): array
+    {
+        return match ($paymentCollection) {
+            'online_only' => ['online'],
+            'cash_only' => ['cash'],
+            default => ['online', 'cash'],
+        };
+    }
+
+    private function offerPaymentPreferences($founder): array
+    {
+        if (!$founder) {
+            return [];
+        }
+
+        return $founder->actionPlans()
+            ->whereIn('platform', ['bazaar', 'servio'])
+            ->where('description', 'not like', 'Config:%')
+            ->get()
+            ->mapWithKeys(function ($actionPlan): array {
+                $description = (string) ($actionPlan->description ?? '');
+                preg_match('/^PaymentCollection:\s*(.+)$/mi', $description, $matches);
+                $paymentCollection = trim((string) ($matches[1] ?? 'both'));
+                if (!in_array($paymentCollection, ['online_only', 'cash_only', 'both'], true)) {
+                    $paymentCollection = 'both';
+                }
+
+                return [
+                    (string) $actionPlan->platform . ':' . strtolower((string) $actionPlan->title) => $paymentCollection,
+                ];
+            })
+            ->all();
     }
 
     private function buildOperations(array $payload, string $businessModel, string $currency): array

@@ -9,6 +9,7 @@ Route::get('/', [OsShellController::class, 'landing'])->name('landing');
 Route::get('/plans', [OsShellController::class, 'plans'])->name('plans');
 Route::post('/integrations/snapshots/{module}', [ModuleSnapshotController::class, 'store'])->name('integrations.snapshots.store');
 Route::post('/integrations/identities/{role}', [IdentitySyncController::class, 'store'])->name('integrations.identities.store');
+Route::post('/integrations/stripe/webhook', [OsShellController::class, 'stripeWebhook'])->name('integrations.stripe.webhook');
 
 Route::middleware('guest')->group(function () {
     Route::get('/login', [OsShellController::class, 'login'])->name('login');
@@ -40,16 +41,24 @@ Route::middleware('auth')->group(function () {
     Route::post('/tasks/{actionPlan}/status', [OsShellController::class, 'founderUpdateTaskStatus'])->name('founder.tasks.status');
     Route::get('/legacy-tools', [OsShellController::class, 'founderLegacyTools'])->name('founder.legacy-tools');
     Route::get('/commerce', [OsShellController::class, 'founderCommerce'])->name('founder.commerce');
+    Route::get('/commerce/wallet', [OsShellController::class, 'founderWallet'])->name('founder.commerce.wallet');
+    Route::get('/commerce/wallet/export', [OsShellController::class, 'founderWalletExport'])->name('founder.commerce.wallet.export');
     Route::get('/commerce/orders', [OsShellController::class, 'founderOrders'])->name('founder.commerce.orders');
     Route::get('/commerce/bookings', [OsShellController::class, 'founderBookings'])->name('founder.commerce.bookings');
     Route::post('/commerce/offers/{actionPlan}', [OsShellController::class, 'founderUpdateCommerceOffer'])->name('founder.commerce.offer.update');
     Route::post('/commerce/configs/{actionPlan}', [OsShellController::class, 'founderUpdateCommerceConfig'])->name('founder.commerce.config.update');
     Route::post('/commerce/settings', [OsShellController::class, 'founderSaveCommerceConfig'])->name('founder.commerce.settings.store');
     Route::post('/commerce/settings/toggle', [OsShellController::class, 'founderToggleCommerceConfig'])->name('founder.commerce.settings.toggle');
+    Route::post('/commerce/payout-account', [OsShellController::class, 'founderSavePayoutAccount'])->name('founder.commerce.payout-account.store');
+    Route::get('/commerce/payout-account/connect', [OsShellController::class, 'founderStartStripePayoutOnboarding'])->name('founder.commerce.payout-account.connect');
+    Route::get('/commerce/payout-account/return', [OsShellController::class, 'founderHandleStripePayoutReturn'])->name('founder.commerce.payout-account.return');
+    Route::post('/commerce/payout-request', [OsShellController::class, 'founderRequestPayout'])->name('founder.commerce.payout-request.store');
     Route::post('/commerce/orders/update', [OsShellController::class, 'founderUpdateOrderOperation'])->name('founder.commerce.orders.update');
+    Route::post('/commerce/orders/refund', [OsShellController::class, 'founderRefundOrder'])->name('founder.commerce.orders.refund');
     Route::post('/commerce/orders/customer', [OsShellController::class, 'founderUpdateOrderCustomer'])->name('founder.commerce.orders.customer');
     Route::post('/commerce/orders/fulfillment', [OsShellController::class, 'founderUpdateOrderFulfillment'])->name('founder.commerce.orders.fulfillment');
     Route::post('/commerce/bookings/update', [OsShellController::class, 'founderUpdateBookingOperation'])->name('founder.commerce.bookings.update');
+    Route::post('/commerce/bookings/refund', [OsShellController::class, 'founderRefundBooking'])->name('founder.commerce.bookings.refund');
     Route::post('/commerce/bookings/customer', [OsShellController::class, 'founderUpdateBookingCustomer'])->name('founder.commerce.bookings.customer');
     Route::post('/commerce/bookings/schedule', [OsShellController::class, 'founderUpdateBookingSchedule'])->name('founder.commerce.bookings.schedule');
     Route::get('/settings', [OsShellController::class, 'founderSettings'])->name('founder.settings');
@@ -76,12 +85,18 @@ Route::middleware('auth')->group(function () {
     Route::get('/admin/system-access', [OsShellController::class, 'adminSystemAccess'])->name('admin.system-access');
     Route::get('/admin/identity', [OsShellController::class, 'adminIdentity'])->name('admin.identity');
     Route::get('/admin/commerce', [OsShellController::class, 'adminCommerce'])->name('admin.commerce');
+    Route::get('/admin/finance', [OsShellController::class, 'adminFinance'])->name('admin.finance');
+    Route::get('/admin/finance/export', [OsShellController::class, 'adminFinanceExport'])->name('admin.finance.export');
+    Route::post('/admin/finance/adjustment', [OsShellController::class, 'adminFinanceAdjustment'])->name('admin.finance.adjustment');
+    Route::post('/admin/finance/checkout/{checkoutSession}/review', [OsShellController::class, 'adminFinanceReviewCheckout'])->name('admin.finance.checkout.review');
     Route::post('/admin/commerce/catalog', [OsShellController::class, 'adminStoreCommerceCatalog'])->name('admin.commerce.catalog.store');
     Route::post('/admin/commerce/catalog/update', [OsShellController::class, 'adminUpdateCommerceCatalog'])->name('admin.commerce.catalog.update');
     Route::post('/admin/commerce/offer/update', [OsShellController::class, 'adminUpdateCommerceOffer'])->name('admin.commerce.offer.update');
     Route::post('/admin/commerce/operation/update', [OsShellController::class, 'adminUpdateCommerceOperation'])->name('admin.commerce.operation.update');
     Route::get('/admin/support', [OsShellController::class, 'adminSupport'])->name('admin.support');
     Route::post('/admin/support/test-mail', [OsShellController::class, 'adminSendSupportTestMail'])->name('admin.support.test-mail');
+    Route::post('/admin/support/payouts/{payoutRequest}/approve', [OsShellController::class, 'adminApprovePayoutRequest'])->name('admin.support.payouts.approve');
+    Route::post('/admin/support/payouts/{payoutRequest}/reject', [OsShellController::class, 'adminRejectPayoutRequest'])->name('admin.support.payouts.reject');
     Route::post('/admin/identity/backfill', [OsShellController::class, 'adminBackfillIdentity'])->name('admin.identity.backfill');
     Route::get('/admin/modules', [OsShellController::class, 'adminModules'])->name('admin.modules');
     Route::get('/admin/subscribers', [OsShellController::class, 'adminSubscribers'])->name('admin.subscribers');
@@ -109,6 +124,12 @@ Route::post('/{websitePath}/request-order', [OsShellController::class, 'publicWe
 Route::post('/{websitePath}/request-booking', [OsShellController::class, 'publicWebsiteBookingRequest'])
     ->where('websitePath', '[A-Za-z0-9\-/]+')
     ->name('public.website.booking');
+Route::get('/checkout/public/{websitePath}/success', [OsShellController::class, 'publicCheckoutSuccess'])
+    ->where('websitePath', '[A-Za-z0-9\-/]+')
+    ->name('public.checkout.success');
+Route::get('/checkout/public/{websitePath}/cancel', [OsShellController::class, 'publicCheckoutCancel'])
+    ->where('websitePath', '[A-Za-z0-9\-/]+')
+    ->name('public.checkout.cancel');
 Route::get('/{websitePath}', [OsShellController::class, 'publicWebsite'])
     ->where('websitePath', '[A-Za-z0-9\-/]+')
     ->name('public.website');

@@ -9,6 +9,8 @@
         $exceptions = $workspace['exceptions'];
         $recentAudits = $workspace['recent_audits'];
         $mailDiagnostics = $workspace['mail_diagnostics'] ?? [];
+        $openPayoutRequests = $workspace['open_payout_requests'] ?? [];
+        $payoutRequests = $workspace['payout_requests'] ?? [];
     @endphp
 
     <div class="sidebar-layout">
@@ -22,6 +24,7 @@
                 <a class="nav-item" href="{{ route('admin.system-access') }}">System Access</a>
                 <a class="nav-item" href="{{ route('admin.identity') }}">Identity</a>
                 <a class="nav-item" href="{{ route('admin.commerce') }}">Commerce Control</a>
+                <a class="nav-item" href="{{ route('admin.finance') }}">Finance Control</a>
                 <a class="nav-item" href="{{ route('admin.modules') }}">Module Monitoring</a>
                 <a class="nav-item active" href="{{ route('admin.support') }}">Support Center</a>
                 <a class="nav-item" href="/dashboard">OS Home</a>
@@ -54,6 +57,7 @@
                 <div class="card metric"><div class="muted">Open exceptions</div><strong>{{ $metrics['open_exceptions'] }}</strong></div>
                 <div class="card metric"><div class="muted">Stale modules</div><strong>{{ $metrics['stale_modules'] }}</strong></div>
                 <div class="card metric"><div class="muted">Watchlist founders</div><strong>{{ $metrics['watchlist_founders'] }}</strong></div>
+                <div class="card metric"><div class="muted">Open payouts</div><strong>{{ $metrics['open_payout_requests'] ?? 0 }}</strong></div>
             </section>
 
             <section class="grid-2">
@@ -108,6 +112,42 @@
             </section>
 
             <section class="grid-2" style="margin-top: 22px;">
+                <div class="card">
+                    <h2>Payout Queue</h2>
+                    <p class="muted">Approve founder withdrawal requests after bank transfer, or reject them to restore the founder wallet balance.</p>
+                    <div class="stack" style="margin-top: 14px;">
+                        @forelse ($openPayoutRequests as $payout)
+                            <div class="stack-item">
+                                <strong>{{ $payout['company_name'] }}</strong><br>
+                                {{ $payout['founder_name'] }} · {{ strtoupper($payout['currency']) }} {{ number_format((float) $payout['amount'], 2) }}
+                                <div class="muted" style="margin-top: 6px;">
+                                    {{ ucfirst($payout['status']) }} · {{ $payout['requested_at'] }} · {{ $payout['destination_summary'] }}
+                                </div>
+                                @if ($payout['notes'] !== '')
+                                    <div class="muted" style="margin-top: 6px;">Founder note: {{ $payout['notes'] }}</div>
+                                @endif
+                                <div class="cta-row" style="margin-top: 12px; flex-wrap: wrap;">
+                                    <form method="POST" action="{{ route('admin.support.payouts.approve', $payout['id']) }}" style="display:flex;gap:10px;flex-wrap:wrap;">
+                                        @csrf
+                                        <input type="text" name="reference" placeholder="Bank transfer reference" style="padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:#fff;min-width:220px;">
+                                        <button class="btn primary" type="submit">Mark paid</button>
+                                    </form>
+                                    <form method="POST" action="{{ route('admin.support.payouts.reject', $payout['id']) }}" style="display:flex;gap:10px;flex-wrap:wrap;">
+                                        @csrf
+                                        <input type="text" name="reason" placeholder="Reason for rejection" style="padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:#fff;min-width:220px;">
+                                        <button class="btn" type="submit">Reject and restore wallet</button>
+                                    </form>
+                                </div>
+                            </div>
+                        @empty
+                            <div class="stack-item">
+                                <strong>No payout requests waiting</strong><br>
+                                Founder withdrawals will appear here once they request an amount above the OS minimum.
+                            </div>
+                        @endforelse
+                    </div>
+                </div>
+
                 <div class="card">
                     <h2>Mail Operations</h2>
                     <p class="muted">Use this to confirm that Hatchers Ai Business OS can send founder verification and support emails before testing the live founder flow.</p>
@@ -173,6 +213,33 @@
                             <div class="stack-item">
                                 <strong>No recent support actions</strong><br>
                                 Once support and recovery work happens in the OS, it will appear here.
+                            </div>
+                        @endforelse
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>Recent Payout Decisions</h2>
+                    <div class="stack" style="margin-top: 14px;">
+                        @php($recentPayoutHistory = collect($payoutRequests)->reject(fn ($row) => in_array($row['status'], ['pending', 'processing'], true))->take(8))
+                        @forelse ($recentPayoutHistory as $payout)
+                            <div class="stack-item">
+                                <strong>{{ $payout['company_name'] }}</strong><br>
+                                {{ $payout['founder_name'] }} · {{ strtoupper($payout['currency']) }} {{ number_format((float) $payout['amount'], 2) }}
+                                <div class="muted" style="margin-top: 6px;">
+                                    {{ ucfirst($payout['status']) }} · {{ $payout['processed_at'] ?: $payout['requested_at'] }}
+                                </div>
+                                @if ($payout['reference'] !== '')
+                                    <div class="muted" style="margin-top: 6px;">Reference: {{ $payout['reference'] }}</div>
+                                @endif
+                                @if ($payout['rejection_reason'] !== '')
+                                    <div class="muted" style="margin-top: 6px;">Reason: {{ $payout['rejection_reason'] }}</div>
+                                @endif
+                            </div>
+                        @empty
+                            <div class="stack-item">
+                                <strong>No payout decisions yet</strong><br>
+                                Approved and rejected payout requests will appear here for support visibility.
                             </div>
                         @endforelse
                     </div>

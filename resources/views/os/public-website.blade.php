@@ -36,6 +36,10 @@
         .site-proof { display: grid; gap: 12px; }
         .site-proof-item { padding: 16px 18px; border-radius: 18px; background: rgba(255,255,255,0.92); border: 1px solid rgba(220,207,191,0.7); }
         .site-footer { padding: 0 24px 34px; color: #6d604f; }
+        .site-summary { margin-top: 12px; padding: 14px 16px; border-radius: 16px; background: rgba(247,243,235,0.9); border: 1px solid rgba(220,207,191,0.72); }
+        .site-summary strong { display: block; font-size: 1rem; }
+        .site-summary .meta { margin-top: 6px; }
+        .site-warning { margin-top: 10px; color: #b45309; font-size: 0.9rem; line-height: 1.45; }
         @media (max-width: 960px) {
             .site-hero-grid, .site-grid { grid-template-columns: 1fr; }
             .site-metrics, .site-offer-grid { grid-template-columns: 1fr 1fr; }
@@ -45,6 +49,135 @@
             .site-metrics, .site-offer-grid { grid-template-columns: 1fr; }
         }
     </style>
+@endsection
+
+@section('scripts')
+    <script>
+        (() => {
+            const formatCurrency = (currency, amount) => `${currency} ${Number(amount || 0).toFixed(2)}`;
+
+            document.querySelectorAll('[data-order-request]').forEach((form) => {
+                const currency = form.dataset.currency || 'USD';
+                const basePrice = Number(form.dataset.basePrice || 0);
+                const quantityInput = form.querySelector('[name="quantity"]');
+                const variantInput = form.querySelector('[name="selected_variant"]');
+                const extrasInputs = Array.from(form.querySelectorAll('[name="selected_extras[]"]'));
+                const summaryValue = form.querySelector('[data-summary-value]');
+                const summaryMeta = form.querySelector('[data-summary-meta]');
+
+                const variantPrices = {};
+                if (variantInput) {
+                    Array.from(variantInput.options).forEach((option) => {
+                        variantPrices[option.value] = Number(option.dataset.price || 0);
+                    });
+                }
+
+                const recompute = () => {
+                    const quantity = Math.max(1, Number(quantityInput?.value || 1));
+                    const variantPrice = variantInput && variantInput.value ? Number(variantPrices[variantInput.value] || basePrice) : basePrice;
+                    const extrasPrice = extrasInputs
+                        .filter((input) => input.checked)
+                        .reduce((sum, input) => sum + Number(input.dataset.price || 0), 0);
+                    const total = (variantPrice + extrasPrice) * quantity;
+
+                    if (summaryValue) {
+                        summaryValue.textContent = formatCurrency(currency, total);
+                    }
+                    if (summaryMeta) {
+                        const selectedExtras = extrasInputs.filter((input) => input.checked).length;
+                        summaryMeta.textContent = `Base ${formatCurrency(currency, variantPrice)} · Extras ${formatCurrency(currency, extrasPrice)} · Qty ${quantity}${selectedExtras ? ` · ${selectedExtras} extra(s)` : ''}`;
+                    }
+                };
+
+                quantityInput?.addEventListener('input', recompute);
+                variantInput?.addEventListener('change', recompute);
+                extrasInputs.forEach((input) => input.addEventListener('change', recompute));
+                recompute();
+            });
+
+            document.querySelectorAll('[data-booking-request]').forEach((form) => {
+                const currency = form.dataset.currency || 'USD';
+                const basePrice = Number(form.dataset.basePrice || 0);
+                const durationMinutes = Number(form.dataset.durationMinutes || 30);
+                const availabilityDays = (form.dataset.availabilityDays || '')
+                    .split('|')
+                    .map((day) => day.trim().toLowerCase())
+                    .filter(Boolean);
+                const openTime = form.dataset.openTime || '';
+                const closeTime = form.dataset.closeTime || '';
+                const addOnInputs = Array.from(form.querySelectorAll('[name="selected_additional_services[]"]'));
+                const bookingDateInput = form.querySelector('[name="booking_date"]');
+                const bookingTimeInput = form.querySelector('[name="booking_time"]');
+                const bookingEndInput = form.querySelector('[name="booking_endtime"]');
+                const summaryValue = form.querySelector('[data-summary-value]');
+                const summaryMeta = form.querySelector('[data-summary-meta]');
+                const warning = form.querySelector('[data-schedule-warning]');
+                const submitButton = form.querySelector('button[type="submit"]');
+
+                const toMinutes = (value) => {
+                    if (!value || !value.includes(':')) {
+                        return null;
+                    }
+                    const [hours, minutes] = value.split(':').map((part) => Number(part));
+                    return (hours * 60) + minutes;
+                };
+
+                const recompute = () => {
+                    const addOnsPrice = addOnInputs
+                        .filter((input) => input.checked)
+                        .reduce((sum, input) => sum + Number(input.dataset.price || 0), 0);
+                    const total = basePrice + addOnsPrice;
+                    let warningText = '';
+
+                    if (bookingTimeInput && bookingEndInput && bookingTimeInput.value) {
+                        const startMinutes = toMinutes(bookingTimeInput.value);
+                        if (startMinutes !== null) {
+                            const endMinutes = startMinutes + durationMinutes;
+                            const endHour = String(Math.floor(endMinutes / 60) % 24).padStart(2, '0');
+                            const endMinute = String(endMinutes % 60).padStart(2, '0');
+                            bookingEndInput.value = `${endHour}:${endMinute}`;
+
+                            if (openTime && closeTime) {
+                                const openMinutes = toMinutes(openTime);
+                                const closeMinutes = toMinutes(closeTime);
+                                if (openMinutes !== null && closeMinutes !== null && (startMinutes < openMinutes || endMinutes > closeMinutes)) {
+                                    warningText = `Available between ${openTime} and ${closeTime}.`;
+                                }
+                            }
+                        }
+                    }
+
+                    if (bookingDateInput && bookingDateInput.value && availabilityDays.length) {
+                        const weekday = new Date(`${bookingDateInput.value}T12:00:00`).toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+                        if (!availabilityDays.includes(weekday)) {
+                            warningText = `Available on ${availabilityDays.join(', ')}.`;
+                        }
+                    }
+
+                    if (summaryValue) {
+                        summaryValue.textContent = formatCurrency(currency, total);
+                    }
+                    if (summaryMeta) {
+                        const selectedAddOns = addOnInputs.filter((input) => input.checked).length;
+                        const endValue = bookingEndInput?.value ? ` · Ends ${bookingEndInput.value}` : '';
+                        summaryMeta.textContent = `Base ${formatCurrency(currency, basePrice)} · Add-ons ${formatCurrency(currency, addOnsPrice)}${selectedAddOns ? ` · ${selectedAddOns} selected` : ''}${endValue}`;
+                    }
+                    if (warning) {
+                        warning.textContent = warningText;
+                    }
+                    if (submitButton) {
+                        submitButton.disabled = warningText !== '';
+                        submitButton.style.opacity = warningText !== '' ? '0.6' : '1';
+                    }
+                };
+
+                addOnInputs.forEach((input) => input.addEventListener('change', recompute));
+                bookingDateInput?.addEventListener('change', recompute);
+                bookingTimeInput?.addEventListener('change', recompute);
+                recompute();
+            });
+        })();
+    </script>
 @endsection
 
 @section('content')
@@ -177,14 +310,14 @@
                             <div class="site-card">
                                 <div style="font-size:1.1rem;font-weight:700;">Order {{ $offer['title'] }}</div>
                                 <div class="meta" style="margin-top:8px;">This creates a real Bazaar order for the founder to manage inside Hatchers Ai Business OS.</div>
-                                <form method="POST" action="{{ route('public.website.order', ['websitePath' => $site['path']]) }}" style="margin-top:14px;display:grid;gap:12px;">
+                                <form method="POST" action="{{ route('public.website.order', ['websitePath' => $site['path']]) }}" style="margin-top:14px;display:grid;gap:12px;" data-order-request data-base-price="{{ $offer['base_price'] ?? 0 }}" data-currency="{{ $offer['currency'] ?? 'USD' }}">
                                     @csrf
                                     <input type="hidden" name="offer_title" value="{{ $offer['title'] }}">
                                     @if (!empty($offer['request_options']['variants']))
                                         <select name="selected_variant" style="width:100%;padding:10px 12px;border-radius:12px;border:1px solid rgba(220,207,191,0.9);background:#fff;">
                                             <option value="">Choose a variant</option>
                                             @foreach ($offer['request_options']['variants'] as $variant)
-                                                <option value="{{ $variant['name'] }}">{{ $variant['name'] }} · {{ $variant['qty'] }} in stock</option>
+                                                <option value="{{ $variant['name'] }}" data-price="{{ $variant['price'] }}">{{ $variant['name'] }} · {{ $variant['qty'] }} in stock</option>
                                             @endforeach
                                         </select>
                                     @endif
@@ -193,12 +326,24 @@
                                         <div style="display:grid;gap:8px;">
                                             @foreach ($offer['request_options']['extras'] as $extra)
                                                 <label style="display:flex;align-items:center;gap:8px;color:#625848;">
-                                                    <input type="checkbox" name="selected_extras[]" value="{{ $extra['name'] }}">
-                                                    <span>{{ $extra['name'] }} (+{{ $offer['price'] !== '' ? '' : '' }}{{ number_format((float) $extra['price'], 2) }})</span>
+                                                    <input type="checkbox" name="selected_extras[]" value="{{ $extra['name'] }}" data-price="{{ $extra['price'] }}">
+                                                    <span>{{ $extra['name'] }} (+{{ number_format((float) $extra['price'], 2) }})</span>
                                                 </label>
                                             @endforeach
                                         </div>
                                     @endif
+                                    <div class="site-summary">
+                                        <strong data-summary-value>{{ $offer['price'] }}</strong>
+                                        <div class="meta" data-summary-meta>Base {{ $offer['price'] }} · Qty 1</div>
+                                    </div>
+                                    <select name="payment_method_choice" style="width:100%;padding:10px 12px;border-radius:12px;border:1px solid rgba(220,207,191,0.9);background:#fff;">
+                                        @if (in_array('online', $offer['request_options']['accepted_payment_methods'] ?? [], true))
+                                            <option value="online">Pay online</option>
+                                        @endif
+                                        @if (in_array('cash', $offer['request_options']['accepted_payment_methods'] ?? [], true))
+                                            <option value="cash">Cash on delivery</option>
+                                        @endif
+                                    </select>
                                     <input type="text" name="customer_name" placeholder="Your name" value="{{ old('customer_name') }}" style="width:100%;padding:10px 12px;border-radius:12px;border:1px solid rgba(220,207,191,0.9);background:#fff;">
                                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
                                         <input type="email" name="customer_email" placeholder="Email" value="{{ old('customer_email') }}" style="width:100%;padding:10px 12px;border-radius:12px;border:1px solid rgba(220,207,191,0.9);background:#fff;">
@@ -224,7 +369,7 @@
                             <div class="site-card">
                                 <div style="font-size:1.1rem;font-weight:700;">Book {{ $offer['title'] }}</div>
                                 <div class="meta" style="margin-top:8px;">This creates a real Servio booking for the founder to schedule and manage inside Hatchers Ai Business OS.</div>
-                                <form method="POST" action="{{ route('public.website.booking', ['websitePath' => $site['path']]) }}" style="margin-top:14px;display:grid;gap:12px;">
+                                <form method="POST" action="{{ route('public.website.booking', ['websitePath' => $site['path']]) }}" style="margin-top:14px;display:grid;gap:12px;" data-booking-request data-base-price="{{ $offer['base_price'] ?? 0 }}" data-currency="{{ $offer['currency'] ?? 'USD' }}" data-duration-minutes="{{ (($offer['request_options']['duration_unit'] ?? 'minutes') === 'hours') ? ((int) ($offer['request_options']['duration'] ?? 1) * 60) : (int) ($offer['request_options']['duration'] ?? 30) }}" data-availability-days="{{ implode('|', $offer['request_options']['availability_days'] ?? []) }}" data-open-time="{{ $offer['request_options']['open_time'] ?? '' }}" data-close-time="{{ $offer['request_options']['close_time'] ?? '' }}">
                                     @csrf
                                     <input type="hidden" name="offer_title" value="{{ $offer['title'] }}">
                                     @if (!empty($offer['request_options']['additional_services']))
@@ -232,12 +377,25 @@
                                         <div style="display:grid;gap:8px;">
                                             @foreach ($offer['request_options']['additional_services'] as $extra)
                                                 <label style="display:flex;align-items:center;gap:8px;color:#625848;">
-                                                    <input type="checkbox" name="selected_additional_services[]" value="{{ $extra['name'] }}">
+                                                    <input type="checkbox" name="selected_additional_services[]" value="{{ $extra['name'] }}" data-price="{{ $extra['price'] }}">
                                                     <span>{{ $extra['name'] }} (+{{ number_format((float) $extra['price'], 2) }})</span>
                                                 </label>
                                             @endforeach
                                         </div>
                                     @endif
+                                    <div class="site-summary">
+                                        <strong data-summary-value>{{ $offer['price'] }}</strong>
+                                        <div class="meta" data-summary-meta>Base {{ $offer['price'] }}</div>
+                                        <div class="site-warning" data-schedule-warning></div>
+                                    </div>
+                                    <select name="payment_method_choice" style="width:100%;padding:10px 12px;border-radius:12px;border:1px solid rgba(220,207,191,0.9);background:#fff;">
+                                        @if (in_array('online', $offer['request_options']['accepted_payment_methods'] ?? [], true))
+                                            <option value="online">Pay online</option>
+                                        @endif
+                                        @if (in_array('cash', $offer['request_options']['accepted_payment_methods'] ?? [], true))
+                                            <option value="cash">Cash on booking</option>
+                                        @endif
+                                    </select>
                                     <input type="text" name="customer_name" placeholder="Your name" value="{{ old('customer_name') }}" style="width:100%;padding:10px 12px;border-radius:12px;border:1px solid rgba(220,207,191,0.9);background:#fff;">
                                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
                                         <input type="email" name="customer_email" placeholder="Email" value="{{ old('customer_email') }}" style="width:100%;padding:10px 12px;border-radius:12px;border:1px solid rgba(220,207,191,0.9);background:#fff;">
@@ -246,7 +404,7 @@
                                     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
                                         <input type="date" name="booking_date" value="{{ old('booking_date') }}" style="width:100%;padding:10px 12px;border-radius:12px;border:1px solid rgba(220,207,191,0.9);background:#fff;">
                                         <input type="time" name="booking_time" value="{{ old('booking_time') }}" style="width:100%;padding:10px 12px;border-radius:12px;border:1px solid rgba(220,207,191,0.9);background:#fff;">
-                                        <input type="time" name="booking_endtime" value="{{ old('booking_endtime') }}" style="width:100%;padding:10px 12px;border-radius:12px;border:1px solid rgba(220,207,191,0.9);background:#fff;">
+                                        <input type="time" name="booking_endtime" value="{{ old('booking_endtime') }}" readonly style="width:100%;padding:10px 12px;border-radius:12px;border:1px solid rgba(220,207,191,0.9);background:#f8f4ec;">
                                     </div>
                                     <input type="text" name="address" placeholder="Address (optional)" value="{{ old('address') }}" style="width:100%;padding:10px 12px;border-radius:12px;border:1px solid rgba(220,207,191,0.9);background:#fff;">
                                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">

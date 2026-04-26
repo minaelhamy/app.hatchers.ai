@@ -82,6 +82,26 @@ class Founder extends Authenticatable
         return $this->hasMany(OsAutomationRule::class);
     }
 
+    public function walletLedgerEntries(): HasMany
+    {
+        return $this->hasMany(FounderWalletLedger::class);
+    }
+
+    public function payoutRequests(): HasMany
+    {
+        return $this->hasMany(FounderPayoutRequest::class);
+    }
+
+    public function payoutAccount(): HasOne
+    {
+        return $this->hasOne(FounderPayoutAccount::class);
+    }
+
+    public function publicCheckoutSessions(): HasMany
+    {
+        return $this->hasMany(PublicCheckoutSession::class);
+    }
+
     public function mentorAssignments(): HasMany
     {
         return $this->hasMany(MentorAssignment::class, 'founder_id');

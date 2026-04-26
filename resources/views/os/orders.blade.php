@@ -55,6 +55,7 @@
                 <nav class="ops-nav">
                     <a class="ops-nav-item" href="/dashboard/founder"><span class="ops-nav-icon">⌂</span><span>Home</span></a>
                     <a class="ops-nav-item active" href="{{ route('founder.commerce') }}"><span class="ops-nav-icon">⌁</span><span>Commerce</span></a>
+                    <a class="ops-nav-item" href="{{ route('founder.commerce.wallet') }}"><span class="ops-nav-icon">$</span><span>Wallet</span></a>
                     <a class="ops-nav-item" href="{{ route('founder.ai-tools') }}"><span class="ops-nav-icon">✦</span><span>AI Tools</span></a>
                     <a class="ops-nav-item" href="{{ route('founder.learning-plan') }}"><span class="ops-nav-icon">▣</span><span>Learning Plan</span></a>
                     <a class="ops-nav-item" href="{{ route('founder.tasks') }}"><span class="ops-nav-icon">◌</span><span>Tasks</span></a>
@@ -183,6 +184,17 @@
                                     </label>
                                     <div><button class="pill" type="submit" style="border:0;cursor:pointer;">Save order in OS</button></div>
                                 </form>
+                                @if (($order['payment_status'] ?? 'unpaid') === 'paid')
+                                    <form method="POST" action="{{ route('founder.commerce.orders.refund') }}" style="margin-top:12px;display:grid;gap:10px;">
+                                        @csrf
+                                        <input type="hidden" name="order_number" value="{{ $order['order_number'] }}">
+                                        <label>
+                                            <span class="muted">Refund reason</span>
+                                            <input name="reason" type="text" placeholder="Optional refund note" style="width:100%;margin-top:6px;border:1px solid rgba(220,207,191,0.9);background:#fff;border-radius:12px;padding:10px 12px;">
+                                        </label>
+                                        <div><button class="ops-nav-item" type="submit" style="border:0;cursor:pointer;display:inline-flex;">Refund order and reverse wallet</button></div>
+                                    </form>
+                                @endif
                                 <form method="POST" action="{{ route('founder.commerce.orders.customer') }}" style="margin-top:14px;display:grid;gap:10px;">
                                     @csrf
                                     <input type="hidden" name="order_number" value="{{ $order['order_number'] }}">
