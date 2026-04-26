@@ -35,7 +35,12 @@
 
     $sidebarItems = array_merge($sidebarItems, [
         ['key' => 'activity', 'label' => 'Activity', 'icon' => '◔', 'href' => route('founder.activity')],
+        ['key' => 'inbox', 'label' => 'Inbox', 'icon' => '✉', 'href' => route('founder.inbox')],
+        ['key' => 'search', 'label' => 'Search', 'icon' => '⌕', 'href' => route('founder.search')],
         ['key' => 'ai-tools', 'label' => 'AI Tools', 'icon' => '✦', 'href' => route('founder.ai-tools')],
+        ['key' => 'automations', 'label' => 'Automations', 'icon' => '↻', 'href' => route('founder.automations')],
+        ['key' => 'analytics', 'label' => 'Analytics', 'icon' => '◒', 'href' => route('founder.analytics')],
+        ['key' => 'media-library', 'label' => 'Media Library', 'icon' => '▥', 'href' => route('founder.media-library')],
         ['key' => 'pods', 'label' => 'Pods', 'icon' => '◍', 'href' => route('founder.pods')],
         ['key' => 'learning-plan', 'label' => 'Learning Plan', 'icon' => '▣', 'href' => route('founder.learning-plan')],
         ['key' => 'settings', 'label' => 'Settings', 'icon' => '⚙', 'href' => route('founder.settings')],

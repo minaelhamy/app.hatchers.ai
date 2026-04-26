@@ -41,7 +41,7 @@
             @include('os.partials.founder-sidebar', [
                 'founder' => $founder,
                 'businessModel' => $founder->company->business_model ?? 'hybrid',
-                'activeKey' => 'ai-tools',
+                'activeKey' => 'analytics',
                 'navClass' => 'analytics-nav',
                 'itemClass' => 'analytics-nav-item',
                 'iconClass' => 'analytics-nav-icon',

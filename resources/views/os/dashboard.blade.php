@@ -211,6 +211,24 @@
             background: linear-gradient(135deg, #4c91ec, #68b4ff);
             color: white;
         }
+        .founder-command-card {
+            background: linear-gradient(135deg, rgba(142, 28, 116, 0.08), rgba(255, 44, 53, 0.06)), rgba(255, 255, 255, 0.96);
+            border: 1px solid rgba(184, 96, 133, 0.26);
+        }
+        .founder-command-grid {
+            display: grid;
+            grid-template-columns: 1.3fr 1fr;
+            gap: 12px;
+        }
+        .founder-mini-stack {
+            display: grid;
+            gap: 10px;
+        }
+        @media (max-width: 900px) {
+            .founder-command-grid {
+                grid-template-columns: 1fr;
+            }
+        }
 
         .founder-task-top {
             display: flex;
@@ -597,19 +615,40 @@
                     </article>
                 </section>
 
+                @php
+                    $guidedPath = $workspace['guided_path'] ?? [];
+                    $primaryStep = $guidedPath[0] ?? null;
+                    $secondarySteps = array_slice($guidedPath, 1, 2);
+                @endphp
                 <section class="founder-section">
                     <h2>Start Here Today</h2>
-                    @foreach (($workspace['guided_path'] ?? []) as $step)
-                        <article class="founder-block">
-                            <div class="founder-row" style="align-items:flex-start;">
-                                <div>
-                                    <div style="font-size: 1.04rem; font-weight: 600;">{{ $step['title'] }}</div>
-                                    <div class="founder-subtle" style="margin-top: 4px;">{{ $step['description'] }}</div>
+                    <div class="founder-command-grid">
+                        @if ($primaryStep)
+                            <article class="founder-block founder-command-card">
+                                <div class="founder-meta">Do this first</div>
+                                <div style="font-size: 1.2rem; font-weight: 700;">{{ $primaryStep['title'] }}</div>
+                                <div class="founder-subtle" style="margin-top: 8px;">{{ $primaryStep['description'] }}</div>
+                                <div style="margin-top: 16px;">
+                                    <a class="founder-badge info" href="{{ $primaryStep['href'] }}" style="text-decoration:none;">{{ $primaryStep['label'] }}</a>
                                 </div>
-                                <a class="founder-badge info" href="{{ $step['href'] }}" style="text-decoration:none;">{{ $step['label'] }}</a>
-                            </div>
-                        </article>
-                    @endforeach
+                            </article>
+                        @endif
+                        <div class="founder-mini-stack">
+                            @foreach ($secondarySteps as $step)
+                                <article class="founder-block">
+                                    <div style="font-size: 1.02rem; font-weight: 600;">{{ $step['title'] }}</div>
+                                    <div class="founder-subtle" style="margin-top: 4px;">{{ $step['description'] }}</div>
+                                    <div style="margin-top: 12px;">
+                                        <a class="founder-badge" href="{{ $step['href'] }}" style="text-decoration:none;">{{ $step['label'] }}</a>
+                                    </div>
+                                </article>
+                            @endforeach
+                            <article class="founder-block">
+                                <div style="font-size: 1.02rem; font-weight: 600;">Today’s revenue focus</div>
+                                <div class="founder-subtle" style="margin-top: 4px;">{{ $workspace['daily_revenue_plan']['focus'] ?? 'Work the next lead, offer, or queue item that moves money forward.' }}</div>
+                            </article>
+                        </div>
+                    </div>
                 </section>
 
                 <section class="founder-section">

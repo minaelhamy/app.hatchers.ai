@@ -3,8 +3,39 @@
 @section('hide_topbar', '1')
 @section('page_class', 'founder-home-page')
 
+@section('head')
+    <style>
+        .page.founder-home-page { padding: 0; }
+        .workspace-shell { min-height:100vh; display:grid; grid-template-columns:220px minmax(0,1fr) 240px; background:#f8f5ee; }
+        .workspace-sidebar, .workspace-rightbar { background:rgba(255,252,247,0.82); border-color:var(--line); border-style:solid; border-width:0 1px 0 0; min-height:100vh; display:flex; flex-direction:column; }
+        .workspace-rightbar { border-width:0 0 0 1px; background:rgba(255,251,246,0.92); }
+        .workspace-sidebar-inner, .workspace-rightbar-inner { padding:22px 18px; }
+        .workspace-brand { display:inline-block; margin-bottom:24px; }
+        .workspace-brand img { width:168px; height:auto; display:block; }
+        .workspace-nav { display:grid; gap:6px; }
+        .workspace-nav-item { display:flex; align-items:center; gap:10px; padding:12px 14px; border-radius:14px; text-decoration:none; color:var(--ink); font-size:0.98rem; }
+        .workspace-nav-item.active { background:#ece6db; }
+        .workspace-nav-icon { width:18px; text-align:center; color:var(--muted); }
+        .workspace-sidebar-footer { margin-top:auto; padding:18px; border-top:1px solid var(--line); display:flex; align-items:center; justify-content:space-between; gap:12px; }
+        .workspace-user { display:flex; align-items:center; gap:10px; }
+        .workspace-avatar { width:30px; height:30px; border-radius:999px; background:#b0a999; color:#fff; display:grid; place-items:center; font-weight:700; font-size:0.92rem; flex-shrink:0; }
+        .workspace-main { padding:26px 28px 28px; }
+        .workspace-main-inner { max-width:980px; margin:0 auto; }
+        .workspace-rightbar h3 { font-size:0.83rem; letter-spacing:0.06em; text-transform:uppercase; color:var(--muted); margin-bottom:12px; }
+        .workspace-rail-list { display:grid; gap:10px; }
+        .workspace-rail-item { background:rgba(255,255,255,0.92); border:1px solid rgba(220,207,191,0.65); border-radius:14px; padding:12px 14px; }
+        .workspace-stage-nav { display:flex; gap:10px; flex-wrap:wrap; margin-top:18px; }
+        .workspace-stage-tab { display:inline-flex; align-items:center; gap:8px; padding:10px 14px; border-radius:999px; text-decoration:none; color:var(--ink); background:rgba(255,255,255,0.88); border:1px solid rgba(220,207,191,0.8); font-weight:600; }
+        .workspace-stage-tab.active { background:#ece6db; }
+        .workspace-stage-helper { margin-top:14px; padding:14px 16px; border-radius:16px; background:rgba(255,255,255,0.92); border:1px solid rgba(220,207,191,0.7); color:var(--muted); }
+        @media (max-width:1240px) { .workspace-shell { grid-template-columns:220px 1fr; } .workspace-rightbar { display:none; } }
+        @media (max-width:900px) { .workspace-shell { grid-template-columns:1fr; } .workspace-sidebar { min-height:auto; border-right:0; border-bottom:1px solid var(--line); } .workspace-sidebar-footer { display:none; } .workspace-main { padding:20px 16px 24px; } }
+    </style>
+@endsection
+
 @section('content')
     @php
+        $founder = auth()->user();
         $companyName = $website['company_name'];
         $businessModel = $website['business_model'];
         $websiteStatus = $website['website_status'];
@@ -30,41 +61,37 @@
         $supportsServices = in_array($businessModel, ['service', 'hybrid'], true);
         $defaultWebsiteTitle = old('website_title', $autopilotDraft['title'] ?? $recommendedCard['website_title']);
         $defaultThemeTemplate = old('theme_template', $autopilotDraft['theme_template'] ?? $recommendedCard['theme']);
+        $websiteStage = request()->query('stage', 'overview');
+        if (!in_array($websiteStage, ['overview', 'setup', 'publish', 'domain'], true)) {
+            $websiteStage = 'overview';
+        }
+        $stageHelp = [
+            'overview' => 'Start here if you are launching for the first time. Review the draft, make sure the message feels right, then move to setup.',
+            'setup' => 'Set the public name, page path, theme, and first offer. This is the main build step before launch.',
+            'publish' => 'Use this step when the draft and setup are ready and you want the public OS site to go live.',
+            'domain' => 'Use this after launch when you want your own branded domain instead of the default app.hatchers.ai path.',
+        ];
     @endphp
 
-    <div class="sidebar-layout">
-        <aside class="sidebar-card">
-            <div class="pill">Founder Workspace</div>
-            <div class="nav-group" style="margin-top: 18px;">
-                <div class="nav-group-title">Core</div>
-                <a class="nav-item" href="/dashboard/founder">Home</a>
-                <a class="nav-item" href="{{ route('founder.tasks') }}">Tasks</a>
-                <a class="nav-item" href="{{ route('founder.first-100') }}">First 100</a>
-                <a class="nav-item" href="{{ route('founder.marketing') }}">Marketing</a>
-            </div>
-            <div class="nav-group">
-                <div class="nav-group-title">Build</div>
-                <a class="nav-item active" href="/website">Website</a>
-                <a class="nav-item" href="{{ route('founder.commerce') }}">Commerce</a>
-                <a class="nav-item" href="{{ route('founder.commerce.wallet') }}">Wallet</a>
-                @if ($supportsProducts)
-                    <a class="nav-item" href="{{ route('founder.commerce.orders') }}">Orders</a>
-                @endif
-                @if ($supportsServices)
-                    <a class="nav-item" href="{{ route('founder.commerce.bookings') }}">Bookings</a>
-                @endif
-            </div>
-            <div class="nav-group">
-                <div class="nav-group-title">More</div>
-                <a class="nav-item" href="{{ route('founder.activity') }}">Activity</a>
-                <a class="nav-item" href="{{ route('founder.ai-tools') }}">AI Tools</a>
-                <a class="nav-item" href="{{ route('founder.pods') }}">Pods</a>
-                <a class="nav-item" href="{{ route('founder.learning-plan') }}">Learning Plan</a>
-                <a class="nav-item" href="{{ route('founder.settings') }}">Settings</a>
-            </div>
+    <div class="workspace-shell">
+        <aside class="workspace-sidebar">
+            @include('os.partials.founder-sidebar', [
+                'founder' => $founder,
+                'businessModel' => $businessModel,
+                'activeKey' => 'website',
+                'navClass' => 'workspace-nav',
+                'itemClass' => 'workspace-nav-item',
+                'iconClass' => 'workspace-nav-icon',
+                'innerClass' => 'workspace-sidebar-inner',
+                'brandClass' => 'workspace-brand',
+                'footerClass' => 'workspace-sidebar-footer',
+                'userClass' => 'workspace-user',
+                'avatarClass' => 'workspace-avatar',
+            ])
         </aside>
 
-        <div>
+        <main class="workspace-main">
+            <div class="workspace-main-inner">
             @if (session('success'))
                 <section class="card" style="margin-bottom: 22px; border-color: rgba(44, 122, 87, 0.35);">
                     <strong>Success</strong>
@@ -80,24 +107,30 @@
             @endif
 
             <section class="hero">
-                <div class="eyebrow">Unified Website Workspace</div>
-                <h1>{{ $companyName }} should publish from one OS, not four disconnected tools.</h1>
+                <div class="eyebrow">Website Launch</div>
+                <h1>Hatchers builds the first website for {{ $companyName }}, then guides the founder through launch.</h1>
                 <p class="muted">
-                    Hatchers OS is the founder workspace at <strong>app.hatchers.ai</strong>. Bazaar and Servio remain the website engines behind the scenes,
-                    but the founder experience should stay centered here.
+                    Stay in one founder workflow: review the draft, finish the setup, publish the site, then connect a custom domain when you are ready.
                 </p>
                 <div class="cta-row">
                     <span class="pill">Business model: {{ ucfirst($businessModel) }}</span>
-                    <span class="pill">Website status: {{ ucfirst(str_replace('_', ' ', $websiteStatus)) }}</span>
-                    <span class="pill">Recommended engine: {{ strtoupper($recommendedEngine) }}</span>
+                    <span class="pill">Site status: {{ ucfirst(str_replace('_', ' ', $websiteStatus)) }}</span>
+                    <span class="pill">Launch draft: {{ ucfirst(str_replace('_', ' ', $generationStatus)) }}</span>
                     <span class="pill">Custom domain: {{ ucfirst(str_replace('_', ' ', $customDomainStatus)) }}</span>
-                    <span class="pill">Draft status: {{ ucfirst(str_replace('_', ' ', $generationStatus)) }}</span>
                 </div>
+                <div class="workspace-stage-nav">
+                    <a class="workspace-stage-tab {{ $websiteStage === 'overview' ? 'active' : '' }}" href="{{ route('website', ['stage' => 'overview']) }}">1. Review Draft</a>
+                    <a class="workspace-stage-tab {{ $websiteStage === 'setup' ? 'active' : '' }}" href="{{ route('website', ['stage' => 'setup']) }}">2. Finish Setup</a>
+                    <a class="workspace-stage-tab {{ $websiteStage === 'publish' ? 'active' : '' }}" href="{{ route('website', ['stage' => 'publish']) }}">3. Publish</a>
+                    <a class="workspace-stage-tab {{ $websiteStage === 'domain' ? 'active' : '' }}" href="{{ route('website', ['stage' => 'domain']) }}">4. Add Domain</a>
+                </div>
+                <div class="workspace-stage-helper">{{ $stageHelp[$websiteStage] }}</div>
             </section>
 
+            @if ($websiteStage === 'overview')
             <section class="grid-2" style="margin-top: 22px;">
                 <div class="card">
-                    <h2>Website Autopilot</h2>
+                    <h2>Draft Review</h2>
                     <p class="muted" style="margin-bottom: 14px;">Hatchers uses the founder brief, ICP, and vertical blueprint to draft the first site structure before the founder starts editing.</p>
                     @if ($autopilotDraft)
                         <div class="stack">
@@ -106,12 +139,12 @@
                                 <span class="muted">{{ $autopilotDraft['hero']['headline'] ?? 'First website draft ready' }}</span>
                             </div>
                             <div class="stack-item">
-                                <strong>Blueprint and audience</strong><br>
+                                <strong>Who this site is for</strong><br>
                                 {{ $autopilot['blueprint_name'] ?: 'Blueprint pending' }} · {{ $autopilot['primary_icp_name'] ?: 'ICP pending' }}<br>
                                 <span class="muted">{{ $autopilot['problem_solved'] ?: 'Founder problem statement will shape the site message here.' }}</span>
                             </div>
                             <div class="stack-item">
-                                <strong>Sell Like Crazy angle</strong><br>
+                                <strong>Core promise</strong><br>
                                 {{ $autopilotDraft['sell_like_crazy']['core_promise'] ?? 'Core promise pending' }}<br>
                                 <span class="muted">{{ $autopilotDraft['sell_like_crazy']['lead_angle'] ?? '' }}</span>
                             </div>
@@ -148,7 +181,7 @@
                             </div>
                             @if (!empty($autopilotDraft['funnel_blocks'] ?? []))
                                 <div class="stack-item">
-                                    <strong>Sell Like Crazy funnel blocks</strong><br>
+                                    <strong>Direct-response sections</strong><br>
                                     @foreach (($autopilotDraft['funnel_blocks'] ?? []) as $blockKey => $block)
                                         <div class="muted" style="margin-top:8px;">
                                             {{ ucwords(str_replace('_', ' ', $blockKey)) }} ·
@@ -158,12 +191,12 @@
                                 </div>
                             @endif
                             <div class="stack-item">
-                                <strong>Launch system status</strong><br>
+                                <strong>Launch plan status</strong><br>
                                 <span class="muted">
                                     @if ($launchSystem)
-                                        {{ ucfirst(str_replace('_', ' ', $launchSystem['status'] ?? 'active')) }} · {{ strtoupper($launchSystem['selected_engine'] ?? '') }} · {{ $launchSystem['applied_at'] ? 'Applied ' . $launchSystem['applied_at'] : 'Not applied yet' }}
+                                        {{ ucfirst(str_replace('_', ' ', $launchSystem['status'] ?? 'active')) }} · {{ $launchSystem['applied_at'] ? 'Applied ' . $launchSystem['applied_at'] : 'Not applied yet' }}
                                     @else
-                                        This draft has not been locked into the active launch system yet.
+                                        This draft has not been locked into the active launch plan yet.
                                     @endif
                                 </span>
                             </div>
@@ -225,15 +258,17 @@
                     @endif
                 </div>
             </section>
+            @endif
 
+            @if ($websiteStage === 'setup')
             <section class="grid-2" style="margin-top: 22px;">
                 <div class="card">
-                    <h2>Choose Website Path</h2>
-                    <p class="muted" style="margin-bottom: 14px;">Hatchers OS chooses the right engine behind the scenes, but the founder should make this choice from one workflow.</p>
+                    <h2>Finish Website Setup</h2>
+                    <p class="muted" style="margin-bottom: 14px;">Set the public name, page path, business type, and theme for the site Hatchers will publish for you.</p>
                     <form method="POST" action="/website/setup" class="stack">
                         @csrf
                         <div class="stack-item">
-                            <strong>Website engine</strong><br>
+                            <strong>Storefront type</strong><br>
                             @if (count($engines) === 1)
                                 <input type="hidden" name="website_engine" value="{{ $engines[0]['key'] }}" data-engine-select>
                                 <div class="pill" style="margin-top:10px;">{{ $engines[0]['label'] }} · {{ $engines[0]['role'] }}</div>
@@ -248,7 +283,7 @@
                             @endif
                         </div>
                         <div class="stack-item">
-                            <strong>Business path</strong><br>
+                            <strong>Business type</strong><br>
                             <select name="website_mode" style="margin-top: 10px; width: 100%; padding: 12px; border-radius: 14px; border: 1px solid var(--line); background: #fff;">
                                 @foreach (['product' => 'Product business', 'service' => 'Service business', 'hybrid' => 'Hybrid business'] as $value => $label)
                                     <option value="{{ $value }}" @selected(old('website_mode', $businessModel) === $value)>
@@ -258,7 +293,7 @@
                             </select>
                         </div>
                         <div class="stack-item">
-                            <strong>Website title</strong><br>
+                            <strong>Public site title</strong><br>
                             <input
                                 type="text"
                                 name="website_title"
@@ -267,7 +302,7 @@
                                 placeholder="Enter the public website title">
                         </div>
                         <div class="stack-item">
-                            <strong>Website path</strong><br>
+                            <strong>Public page path</strong><br>
                             <input
                                 type="text"
                                 name="website_path"
@@ -297,38 +332,11 @@
                     </form>
                 </div>
 
-                <div class="card">
-                    <h2>Publish From Hatchers OS</h2>
-                    <p class="muted" style="margin-bottom: 14px;">Publishing should happen from the OS, while Bazaar or Servio handles the storefront engine in the background.</p>
-                    <div class="stack">
-                        <div class="stack-item">
-                            <strong>Recommended public site</strong><br>
-                            {{ preg_replace('#^https?://#', '', $recommendedSubdomain) }}
-                        </div>
-                        <div class="stack-item">
-                            <strong>Current website path</strong><br>
-                            app.hatchers.ai/{{ $websitePath }}
-                        </div>
-                        <div class="stack-item">
-                            <strong>Current website status</strong><br>
-                            {{ ucfirst(str_replace('_', ' ', $websiteStatus)) }}
-                        </div>
-                        <div class="stack-item">
-                            <strong>Publishing note</strong><br>
-                            Once published, the OS records the site as live under the OS URL structure and routes the engine behind the scenes.
-                        </div>
-                    </div>
-                    <form method="POST" action="/website/publish" style="margin-top: 18px;">
-                        @csrf
-                        <input type="hidden" name="website_engine" value="{{ $recommendedEngine }}" data-publish-engine>
-                        <button class="btn primary" type="submit">Publish Website</button>
-                    </form>
-                </div>
             </section>
 
             <section class="grid-2" style="margin-top: 22px;">
                 <div class="card">
-                    <h2>Add Your First Website Item</h2>
+                    <h2>Add Your First Offer</h2>
                     <p class="muted" style="margin-bottom: 14px;">This lets founders create the first product or service directly from Hatchers OS without jumping into engine dashboards first.</p>
                     <form method="POST" action="/website/starter" class="stack">
                         @csrf
@@ -374,13 +382,63 @@
                     </form>
                 </div>
 
+            </section>
+            @endif
+
+            @if ($websiteStage === 'publish')
+            <section class="grid-2" style="margin-top: 22px;">
                 <div class="card">
-                    <h2>Connect Custom Domain</h2>
-                    <p class="muted" style="margin-bottom: 14px;">This first OS version captures the founder’s custom domain and writes it into the selected engine, then guides DNS setup from the OS.</p>
+                    <h2>Publish Your Website</h2>
+                    <p class="muted" style="margin-bottom: 14px;">Use this when the draft and setup look right and you want the public OS site to go live.</p>
+                    <div class="stack">
+                        <div class="stack-item">
+                            <strong>Public website</strong><br>
+                            {{ preg_replace('#^https?://#', '', $recommendedSubdomain) }}
+                        </div>
+                        <div class="stack-item">
+                            <strong>Current page path</strong><br>
+                            app.hatchers.ai/{{ $websitePath }}
+                        </div>
+                        <div class="stack-item">
+                            <strong>Current site status</strong><br>
+                            {{ ucfirst(str_replace('_', ' ', $websiteStatus)) }}
+                        </div>
+                        <div class="stack-item">
+                            <strong>What happens on publish</strong><br>
+                            Once published, the OS records the site as live under the OS URL structure and routes the storefront behind the scenes.
+                        </div>
+                    </div>
+                    <form method="POST" action="/website/publish" style="margin-top: 18px;">
+                        @csrf
+                        <input type="hidden" name="website_engine" value="{{ $recommendedEngine }}" data-publish-engine>
+                        <button class="btn primary" type="submit">Publish Website</button>
+                    </form>
+                </div>
+
+                <div class="card">
+                    <h2>Before You Publish</h2>
+                    <div class="stack" style="margin-top: 14px;">
+                        @foreach ($domainModel as $item)
+                            <div class="stack-item">
+                                <strong>{{ $item['title'] }}</strong><br>
+                                {{ $item['value'] }}<br>
+                                <span class="muted">{{ $item['description'] }}</span>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            </section>
+            @endif
+
+            @if ($websiteStage === 'domain')
+            <section class="grid-2" style="margin-top: 22px;">
+                <div class="card">
+                    <h2>Connect Your Custom Domain</h2>
+                    <p class="muted" style="margin-bottom: 14px;">Use this after launch when you want the site to live on your own branded address.</p>
                     <form method="POST" action="/website/domain" class="stack">
                         @csrf
                         <div class="stack-item">
-                            <strong>Engine</strong><br>
+                            <strong>Storefront type</strong><br>
                             @if (count($engines) === 1)
                                 <input type="hidden" name="website_engine" value="{{ $engines[0]['key'] }}" data-domain-engine>
                                 <div class="pill" style="margin-top:10px;">{{ $engines[0]['label'] }}</div>
@@ -403,7 +461,7 @@
                         <div class="stack-item">
                             <strong>DNS target</strong><br>
                             <span data-dns-target>{{ $dnsTargets[$recommendedEngine] ?? '' }}</span><br>
-                            <span class="muted">Create a CNAME for `www` pointing to the engine host above. After DNS propagates, Hatchers can serve the site from your branded domain.</span>
+                            <span class="muted">Create a CNAME for `www` pointing to the host above. After DNS propagates, Hatchers can serve the site from your branded domain.</span>
                         </div>
                         <div class="stack-item">
                             <strong>Connection status</strong><br>
@@ -414,8 +472,28 @@
                         </div>
                     </form>
                 </div>
-            </section>
 
+                <div class="card">
+                    <h2>How Domain Setup Works</h2>
+                    <div class="stack" style="margin-top: 14px;">
+                        <div class="stack-item">
+                            <strong>Keep the founder workflow here</strong><br>
+                            Founders should not have to think in terms of separate platform brands to launch a branded website.
+                        </div>
+                        <div class="stack-item">
+                            <strong>Point the domain once</strong><br>
+                            Hatchers stores the desired domain here, then routes the storefront behind the scenes.
+                        </div>
+                        <div class="stack-item">
+                            <strong>Promote the branded link later</strong><br>
+                            If you need to move fast, publish first on the OS path and connect the branded domain after.
+                        </div>
+                    </div>
+                </div>
+            </section>
+            @endif
+
+            @if ($websiteStage === 'overview')
             <section class="metrics">
                 <div class="card metric">
                     <div class="muted">Founder Workspace</div>
@@ -519,7 +597,7 @@
 
             <section class="grid-2" style="margin-top: 22px;">
                 <div class="card">
-                    <h2>What We Already Have Working</h2>
+                    <h2>What Hatchers Already Prepared</h2>
                     <div class="stack" style="margin-top: 14px;">
                         <div class="stack-item">
                             <strong>Shared intelligence</strong><br>
@@ -541,7 +619,7 @@
                 </div>
 
                 <div class="card">
-                    <h2>Next OS Build Steps</h2>
+                    <h2>What To Do Next</h2>
                     <div class="stack" style="margin-top: 14px;">
                         @foreach ($nextSteps as $step)
                             <div class="stack-item">
@@ -552,7 +630,53 @@
                     </div>
                 </div>
             </section>
-        </div>
+            @endif
+            </div>
+        </main>
+
+        <aside class="workspace-rightbar">
+            <div class="workspace-rightbar-inner">
+                <h3>Launch Flow</h3>
+                <div class="workspace-rail-list">
+                    <div class="workspace-rail-item">
+                        <strong>Status</strong><br>
+                        <span class="muted">{{ ucfirst(str_replace('_', ' ', $websiteStatus)) }} · {{ ucfirst(str_replace('_', ' ', $generationStatus)) }}</span>
+                    </div>
+                    <div class="workspace-rail-item">
+                        <strong>Current step</strong><br>
+                        <span class="muted">{{ ucfirst($websiteStage) }}</span>
+                    </div>
+                    <div class="workspace-rail-item">
+                        <strong>Public path</strong><br>
+                        <span class="muted">{{ preg_replace('#^https?://#', '', $currentWebsiteUrl) }}</span>
+                    </div>
+                    <div class="workspace-rail-item">
+                        <strong>Storefront type</strong><br>
+                        <span class="muted">{{ strtoupper($recommendedEngine) }} for {{ ucfirst($businessModel) }}</span>
+                    </div>
+                </div>
+
+                <h3 style="margin-top:22px;">Next Steps</h3>
+                <div class="workspace-rail-list">
+                    @foreach (array_slice($nextSteps, 0, 4) as $step)
+                        <div class="workspace-rail-item">
+                            <strong>{{ $step['title'] }}</strong><br>
+                            <span class="muted">{{ $step['description'] }}</span>
+                        </div>
+                    @endforeach
+                </div>
+
+                <h3 style="margin-top:22px;">Domain Model</h3>
+                <div class="workspace-rail-list">
+                    @foreach ($domainModel as $item)
+                        <div class="workspace-rail-item">
+                            <strong>{{ $item['title'] }}</strong><br>
+                            <span class="muted">{{ $item['value'] }}</span>
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+        </aside>
     </div>
 
     <script>

@@ -28,6 +28,8 @@
         .ops-metric strong { display:block; font-size:1.55rem; margin-top:6px; }
         .ops-grid { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:12px; }
         .ops-stack { display:grid; gap:10px; }
+        .ops-action { display:inline-flex; align-items:center; gap:10px; padding:10px 14px; border-radius:12px; text-decoration:none; color:var(--ink); font-size:0.95rem; background:#f0ece4; border:0; cursor:pointer; font:inherit; }
+        .ops-action.primary { background:linear-gradient(90deg,#8e1c74,#ff2c35); color:#fff; }
         @media (max-width:1240px) { .ops-shell { grid-template-columns:220px 1fr; } .ops-rightbar { display:none; } }
         @media (max-width:900px) { .ops-shell { grid-template-columns:1fr; } .ops-sidebar { min-height:auto; border-right:0; border-bottom:1px solid var(--line); } .ops-sidebar-footer { display:none; } .ops-main { padding:20px 16px 24px; } .ops-grid, .ops-metrics { grid-template-columns:1fr; } }
     </style>
@@ -74,6 +76,22 @@
                     <div class="ops-metric"><div class="muted">Services</div><strong>{{ $ops['counts']['services'] }}</strong></div>
                     <div class="ops-metric"><div class="muted">Customers</div><strong>{{ $ops['counts']['customers'] }}</strong></div>
                     <div class="ops-metric"><div class="muted">Revenue</div><strong>{{ $ops['currency'] }} {{ number_format($ops['gross_revenue'], 0) }}</strong></div>
+                </section>
+
+                <section class="ops-card" style="margin-bottom:12px;">
+                    <h2 style="margin-bottom:12px;">Start With The Queue</h2>
+                    <div class="ops-grid">
+                        <div class="rail-item">
+                            <strong>Need scheduling</strong><br>
+                            <span class="muted">{{ $unscheduledBookings }} booking{{ $unscheduledBookings === 1 ? '' : 's' }} do not have a confirmed time yet.</span>
+                            <div style="margin-top:10px;"><a class="ops-action primary" href="{{ route('founder.commerce.bookings', ['status' => 'all', 'queue' => 'unscheduled']) }}">Open scheduling queue</a></div>
+                        </div>
+                        <div class="rail-item">
+                            <strong>Need staff assignment</strong><br>
+                            <span class="muted">{{ $needsStaffAssignment }} booking{{ $needsStaffAssignment === 1 ? '' : 's' }} still need an assigned provider.</span>
+                            <div style="margin-top:10px;"><a class="ops-action" href="{{ route('founder.commerce.bookings', ['status' => 'all', 'queue' => 'needs_staff']) }}">Open staff queue</a></div>
+                        </div>
+                    </div>
                 </section>
 
                 <section class="ops-grid">
@@ -133,7 +151,7 @@
                         </label>
                         <div style="grid-column:1 / -1;display:flex;gap:10px;flex-wrap:wrap;">
                             <button class="pill" type="submit" style="border:0;cursor:pointer;">Apply filters</button>
-                            <a class="ops-nav-item active" href="{{ route('founder.commerce.bookings') }}" style="display:inline-flex;text-decoration:none;">Clear</a>
+                            <a class="ops-action" href="{{ route('founder.commerce.bookings') }}" style="text-decoration:none;">Clear</a>
                         </div>
                     </form>
                     <div class="muted" style="margin-top:12px;">Showing queue: {{ $activeQueueLabel }}</div>
@@ -189,7 +207,7 @@
                                             <span class="muted">Refund reason</span>
                                             <input name="reason" type="text" placeholder="Optional refund note" style="width:100%;margin-top:6px;border:1px solid rgba(220,207,191,0.9);background:#fff;border-radius:12px;padding:10px 12px;">
                                         </label>
-                                        <div><button class="ops-nav-item" type="submit" style="border:0;cursor:pointer;display:inline-flex;">Refund booking and reverse wallet</button></div>
+                                        <div><button class="ops-action" type="submit">Refund booking and reverse wallet</button></div>
                                     </form>
                                 @endif
                                 <form method="POST" action="{{ route('founder.commerce.bookings.customer') }}" style="margin-top:14px;display:grid;gap:10px;">
@@ -204,7 +222,7 @@
                                     <label><span class="muted">City</span><input name="city" type="text" value="{{ $booking['city'] ?? '' }}" style="width:100%;margin-top:6px;border:1px solid rgba(220,207,191,0.9);background:#fff;border-radius:12px;padding:10px 12px;"></label>
                                     <label><span class="muted">State</span><input name="state" type="text" value="{{ $booking['state'] ?? '' }}" style="width:100%;margin-top:6px;border:1px solid rgba(220,207,191,0.9);background:#fff;border-radius:12px;padding:10px 12px;"></label>
                                     <label><span class="muted">Country</span><input name="country" type="text" value="{{ $booking['country'] ?? '' }}" style="width:100%;margin-top:6px;border:1px solid rgba(220,207,191,0.9);background:#fff;border-radius:12px;padding:10px 12px;"></label>
-                                    <div><button class="ops-nav-item active" type="submit" style="border:0;cursor:pointer;display:inline-flex;">Save customer details</button></div>
+                                    <div><button class="ops-action primary" type="submit">Save customer details</button></div>
                                 </form>
                                 <details style="margin-top:14px;">
                                     <summary style="cursor:pointer;font-weight:600;">Booking details</summary>

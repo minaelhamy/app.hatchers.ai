@@ -47,6 +47,10 @@
         .commerce-actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:14px; }
         .commerce-rightbar h3 { font-size:0.83rem; letter-spacing:0.06em; text-transform:uppercase; color:var(--muted); margin-bottom:12px; }
         .rail-list { display:grid; gap:10px; margin-top:14px; }
+        .commerce-view-nav { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:18px; }
+        .commerce-view-tab { display:inline-flex; align-items:center; gap:8px; padding:10px 14px; border-radius:999px; text-decoration:none; color:var(--ink); background:rgba(255,255,255,0.88); border:1px solid rgba(220,207,191,0.8); font-weight:600; }
+        .commerce-view-tab.active { background:#ece6db; }
+        .commerce-helper { margin-bottom:18px; padding:14px 16px; border-radius:16px; background:rgba(255,255,255,0.92); border:1px solid rgba(220,207,191,0.7); color:var(--muted); }
         @media (max-width:1240px) { .commerce-shell { grid-template-columns:220px 1fr; } .commerce-rightbar { display:none; } }
         @media (max-width:900px) { .commerce-shell { grid-template-columns:1fr; } .commerce-sidebar { min-height:auto; border-right:0; border-bottom:1px solid var(--line); } .commerce-sidebar-footer { display:none; } .commerce-main { padding:20px 16px 24px; } .commerce-grid, .commerce-metrics { grid-template-columns:1fr; } }
     </style>
@@ -73,6 +77,16 @@
             'product' => 'Manage your products, discounts, shipping plans, and orders from one OS workspace powered by Bazaar behind the scenes.',
             default => 'Manage your products, services, storefront readiness, orders, and bookings from one OS workspace powered by Bazaar and Servio behind the scenes.',
         };
+        $commerceView = request()->query('view', 'overview');
+        if (!in_array($commerceView, ['overview', 'offers', 'operations', 'money'], true)) {
+            $commerceView = 'overview';
+        }
+        $commerceViewHelp = [
+            'overview' => 'Start here to understand where the business stands today before changing offers or payout settings.',
+            'offers' => 'Use this mode when you are shaping what you sell, how it is priced, and how it appears in the storefront.',
+            'operations' => 'Use this mode when you need to manage orders, bookings, coupons, shipping, or service policies.',
+            'money' => 'Use this mode for wallet balance, payout setup, withdrawals, and payment operations.',
+        ];
     @endphp
 
     <div class="commerce-shell">
@@ -96,6 +110,13 @@
             <div class="commerce-main-inner">
                 <h1>Commerce</h1>
                 <p>{{ $commerceHeading }}</p>
+                <div class="commerce-view-nav">
+                    <a class="commerce-view-tab {{ $commerceView === 'overview' ? 'active' : '' }}" href="{{ route('founder.commerce', ['view' => 'overview']) }}">Overview</a>
+                    <a class="commerce-view-tab {{ $commerceView === 'offers' ? 'active' : '' }}" href="{{ route('founder.commerce', ['view' => 'offers']) }}">Offers</a>
+                    <a class="commerce-view-tab {{ $commerceView === 'operations' ? 'active' : '' }}" href="{{ route('founder.commerce', ['view' => 'operations']) }}">Operations</a>
+                    <a class="commerce-view-tab {{ $commerceView === 'money' ? 'active' : '' }}" href="{{ route('founder.commerce', ['view' => 'money']) }}">Money</a>
+                </div>
+                <div class="commerce-helper">{{ $commerceViewHelp[$commerceView] }}</div>
 
                 @if (session('success'))
                     <div class="commerce-banner success">{{ session('success') }}</div>
@@ -117,6 +138,7 @@
                     <div class="commerce-metric"><div class="commerce-card-copy">Revenue</div><strong>{{ $growth['gross_revenue_formatted'] }}</strong></div>
                 </section>
 
+                @if ($commerceView === 'overview')
                 <section class="commerce-section">
                     <h2>Connected Engine{{ $engines->count() > 1 ? 's' : '' }}</h2>
                     <div class="commerce-grid">
@@ -140,7 +162,9 @@
                         @endforeach
                     </div>
                 </section>
+                @endif
 
+                @if ($commerceView === 'offers')
                 <section class="commerce-section">
                     <h2>Live Catalog Sync</h2>
                     <div class="commerce-grid">
@@ -422,8 +446,9 @@
                         @endforelse
                     </div>
                 </section>
+                @endif
 
-                @if ($supportsProducts)
+                @if ($commerceView === 'operations' && $supportsProducts)
                     <section class="commerce-section">
                         <h2>Discounts And Shipping</h2>
                         <div class="commerce-grid">
@@ -526,7 +551,7 @@
                     </section>
                 @endif
 
-                @if ($supportsServices)
+                @if ($commerceView === 'operations' && $supportsServices)
                     <section class="commerce-section">
                         <h2>Booking Policies</h2>
                         <div class="commerce-grid">
@@ -616,7 +641,7 @@
                     </section>
                 @endif
 
-                @if ($supportsProducts)
+                @if (in_array($commerceView, ['overview', 'operations'], true) && $supportsProducts)
                     <section class="commerce-section">
                         <h2>Orders</h2>
                         <div class="commerce-grid">
@@ -631,6 +656,106 @@
                                 <div class="commerce-card-title">Public storefront and checkout</div>
                                 <div class="commerce-card-copy">The live public experience should route through Hatchers Ai Business OS URLs while Bazaar handles the storefront backend.</div>
                                 <div class="commerce-actions"><a class="commerce-cta" href="{{ route('website') }}">Open website workspace</a></div>
+                            </div>
+                        </div>
+                    </section>
+                @endif
+
+                @if (in_array($commerceView, ['overview', 'operations'], true) && $supportsServices)
+                    <section class="commerce-section">
+                        <h2>Bookings</h2>
+                        <div class="commerce-grid">
+                            <div class="commerce-card">
+                                <div class="commerce-card-meta">Bookings</div>
+                                <div class="commerce-card-title">{{ $growth['booking_count'] }} bookings tracked</div>
+                                <div class="commerce-card-copy">Servio snapshots feed the OS with booking and service delivery signals while the OS stays the founder-facing workspace.</div>
+                                <div class="commerce-actions"><a class="commerce-cta" href="{{ route('founder.commerce.bookings') }}">Open bookings view</a></div>
+                            </div>
+                            <div class="commerce-card">
+                                <div class="commerce-card-meta">Website</div>
+                                <div class="commerce-card-title">Public service site and booking flow</div>
+                                <div class="commerce-card-copy">The live public experience should route through Hatchers Ai Business OS URLs while Servio handles the booking backend.</div>
+                                <div class="commerce-actions"><a class="commerce-cta" href="{{ route('website') }}">Open website workspace</a></div>
+                            </div>
+                        </div>
+                    </section>
+                @endif
+
+                @if ($commerceView === 'money')
+                    <section class="commerce-section">
+                        <h2>Founder Wallet</h2>
+                        <div class="commerce-grid">
+                            <div class="commerce-card">
+                                <div class="commerce-card-meta">Balance</div>
+                                <div class="commerce-card-title">{{ $walletSummary['currency'] }} {{ number_format((float) $walletSummary['available_balance'], 2) }}</div>
+                                <div class="commerce-card-copy">Available balance ready for future payout requests after platform fees, refunds, and reserves.</div>
+                                <div class="commerce-chip">Pending: {{ $walletSummary['currency'] }} {{ number_format((float) $walletSummary['pending_balance'], 2) }}</div>
+                                <div class="commerce-chip">Reserved: {{ $walletSummary['currency'] }} {{ number_format((float) $walletSummary['reserved_balance'], 2) }}</div>
+                                <div class="commerce-chip">Gross sales: {{ $walletSummary['currency'] }} {{ number_format((float) ($walletSummary['gross_sales_total'] ?? 0), 2) }}</div>
+                                <div class="commerce-chip">Net earnings: {{ $walletSummary['currency'] }} {{ number_format((float) ($walletSummary['net_earnings_total'] ?? 0), 2) }}</div>
+                                <div class="commerce-actions">
+                                    <a class="commerce-secondary" href="{{ route('founder.commerce.wallet') }}" style="text-decoration:none;">Open wallet history</a>
+                                </div>
+                            </div>
+                            <div class="commerce-card">
+                                <div class="commerce-card-meta">Payout setup</div>
+                                <div class="commerce-card-title">
+                                    @if ($payoutAccount)
+                                        {{ $payoutAccount->bank_name ?? 'Saved payout account' }}
+                                    @else
+                                        Connect where payouts should go
+                                    @endif
+                                </div>
+                                <div class="commerce-card-copy">
+                                    @if ($payoutAccount && $payoutAccount->stripe_payouts_enabled)
+                                        Stripe Connect is enabled, so payout requests can attempt automatic transfer.
+                                    @elseif ($payoutAccount && $payoutAccount->stripe_account_id)
+                                        Finish Stripe onboarding to enable automatic payouts.
+                                    @else
+                                        Save bank details and connect Stripe if you want automated payout handling.
+                                    @endif
+                                </div>
+                                <div class="commerce-actions">
+                                    <a class="commerce-cta" href="{{ route('founder.commerce.payout-account.connect') }}">
+                                        @if ($payoutAccount && $payoutAccount->stripe_account_id)
+                                            Continue Stripe onboarding
+                                        @else
+                                            Connect Stripe payouts
+                                        @endif
+                                    </a>
+                                </div>
+                                <form method="POST" action="{{ route('founder.commerce.payout-account.store') }}" class="commerce-field" style="margin-top:12px;">
+                                    @csrf
+                                    <input name="account_holder_name" type="text" placeholder="Account holder" value="{{ old('account_holder_name', $payoutAccount->account_holder_name ?? $founder->full_name) }}">
+                                    <input name="bank_name" type="text" placeholder="Bank name" value="{{ old('bank_name', $payoutAccount->bank_name ?? '') }}">
+                                    <input name="account_number" type="text" placeholder="Account number" value="{{ old('account_number', $payoutAccount->account_number ?? '') }}">
+                                    <input name="iban" type="text" placeholder="IBAN" value="{{ old('iban', $payoutAccount->iban ?? '') }}">
+                                    <input name="swift_code" type="text" placeholder="SWIFT code" value="{{ old('swift_code', $payoutAccount->swift_code ?? '') }}">
+                                    <input name="routing_number" type="text" placeholder="Routing number" value="{{ old('routing_number', $payoutAccount->routing_number ?? '') }}">
+                                    <input name="bank_country" type="text" placeholder="Bank country" value="{{ old('bank_country', $payoutAccount->bank_country ?? '') }}">
+                                    <input name="bank_currency" type="text" placeholder="Currency" value="{{ old('bank_currency', $payoutAccount->bank_currency ?? $walletSummary['currency']) }}">
+                                    <button class="commerce-secondary" type="submit">Save payout account</button>
+                                </form>
+                            </div>
+                            <div class="commerce-card">
+                                <div class="commerce-card-meta">Withdraw to bank</div>
+                                <div class="commerce-card-title">Minimum payout: USD {{ number_format((float) $walletSummary['minimum_payout_amount'], 2) }}</div>
+                                <div class="commerce-card-copy">Request a withdrawal once the available balance is high enough and your payout destination is ready.</div>
+                                <form method="POST" action="{{ route('founder.commerce.payout-request.store') }}" class="commerce-field" style="margin-top:12px;">
+                                    @csrf
+                                    <input name="amount" type="number" step="0.01" min="50" placeholder="50.00">
+                                    <textarea name="notes" placeholder="Optional payout note"></textarea>
+                                    <button class="commerce-cta" type="submit">Request withdrawal</button>
+                                </form>
+                            </div>
+                            <div class="commerce-card">
+                                <div class="commerce-card-meta">Recent payout requests</div>
+                                <div class="commerce-card-title">Latest money movement</div>
+                                @forelse ($recentPayoutRequests as $payoutRequest)
+                                    <div class="commerce-chip">{{ strtoupper($payoutRequest->currency) }} {{ number_format((float) $payoutRequest->amount, 2) }} · {{ ucfirst($payoutRequest->status) }} · {{ optional($payoutRequest->requested_at)->toDateString() }}</div>
+                                @empty
+                                    <div class="commerce-card-copy">No payout requests yet.</div>
+                                @endforelse
                             </div>
                         </div>
                     </section>

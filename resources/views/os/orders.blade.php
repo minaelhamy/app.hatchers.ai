@@ -28,6 +28,8 @@
         .ops-metric strong { display:block; font-size:1.55rem; margin-top:6px; }
         .ops-grid { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:12px; }
         .ops-stack { display:grid; gap:10px; }
+        .ops-action { display:inline-flex; align-items:center; gap:10px; padding:10px 14px; border-radius:12px; text-decoration:none; color:var(--ink); font-size:0.95rem; background:#f0ece4; border:0; cursor:pointer; font:inherit; }
+        .ops-action.primary { background:linear-gradient(90deg,#8e1c74,#ff2c35); color:#fff; }
         @media (max-width:1240px) { .ops-shell { grid-template-columns:220px 1fr; } .ops-rightbar { display:none; } }
         @media (max-width:900px) { .ops-shell { grid-template-columns:1fr; } .ops-sidebar { min-height:auto; border-right:0; border-bottom:1px solid var(--line); } .ops-sidebar-footer { display:none; } .ops-main { padding:20px 16px 24px; } .ops-grid, .ops-metrics { grid-template-columns:1fr; } }
     </style>
@@ -75,6 +77,22 @@
                     <div class="ops-metric"><div class="muted">Products</div><strong>{{ $ops['counts']['products'] }}</strong></div>
                     <div class="ops-metric"><div class="muted">Customers</div><strong>{{ $ops['counts']['customers'] }}</strong></div>
                     <div class="ops-metric"><div class="muted">Revenue</div><strong>{{ $ops['currency'] }} {{ number_format($ops['gross_revenue'], 0) }}</strong></div>
+                </section>
+
+                <section class="ops-card" style="margin-bottom:12px;">
+                    <h2 style="margin-bottom:12px;">Start With The Queue</h2>
+                    <div class="ops-grid">
+                        <div class="rail-item">
+                            <strong>Pending action</strong><br>
+                            <span class="muted">{{ $pendingOrders }} order{{ $pendingOrders === 1 ? '' : 's' }} still need founder action.</span>
+                            <div style="margin-top:10px;"><a class="ops-action primary" href="{{ route('founder.commerce.orders', ['status' => 'all', 'queue' => 'pending']) }}">Open pending queue</a></div>
+                        </div>
+                        <div class="rail-item">
+                            <strong>Awaiting payment</strong><br>
+                            <span class="muted">{{ $awaitingPaymentOrders }} order{{ $awaitingPaymentOrders === 1 ? '' : 's' }} are still unpaid.</span>
+                            <div style="margin-top:10px;"><a class="ops-action" href="{{ route('founder.commerce.orders', ['status' => 'all', 'queue' => 'unpaid']) }}">Open unpaid queue</a></div>
+                        </div>
+                    </div>
                 </section>
 
                 <section class="ops-grid">
@@ -134,7 +152,7 @@
                         </label>
                         <div style="grid-column:1 / -1;display:flex;gap:10px;flex-wrap:wrap;">
                             <button class="pill" type="submit" style="border:0;cursor:pointer;">Apply filters</button>
-                            <a class="ops-nav-item active" href="{{ route('founder.commerce.orders') }}" style="display:inline-flex;text-decoration:none;">Clear</a>
+                            <a class="ops-action" href="{{ route('founder.commerce.orders') }}" style="text-decoration:none;">Clear</a>
                         </div>
                     </form>
                     <div class="muted" style="margin-top:12px;">Showing queue: {{ $activeQueueLabel }}</div>
@@ -186,7 +204,7 @@
                                             <span class="muted">Refund reason</span>
                                             <input name="reason" type="text" placeholder="Optional refund note" style="width:100%;margin-top:6px;border:1px solid rgba(220,207,191,0.9);background:#fff;border-radius:12px;padding:10px 12px;">
                                         </label>
-                                        <div><button class="ops-nav-item" type="submit" style="border:0;cursor:pointer;display:inline-flex;">Refund order and reverse wallet</button></div>
+                                        <div><button class="ops-action" type="submit">Refund order and reverse wallet</button></div>
                                     </form>
                                 @endif
                                 <form method="POST" action="{{ route('founder.commerce.orders.customer') }}" style="margin-top:14px;display:grid;gap:10px;">
@@ -200,7 +218,7 @@
                                     <label><span class="muted">Landmark</span><input name="landmark" type="text" value="{{ $order['landmark'] ?? '' }}" style="width:100%;margin-top:6px;border:1px solid rgba(220,207,191,0.9);background:#fff;border-radius:12px;padding:10px 12px;"></label>
                                     <label><span class="muted">Postal code</span><input name="postal_code" type="text" value="{{ $order['postal_code'] ?? '' }}" style="width:100%;margin-top:6px;border:1px solid rgba(220,207,191,0.9);background:#fff;border-radius:12px;padding:10px 12px;"></label>
                                     <label><span class="muted">Delivery area</span><input name="delivery_area" type="text" value="{{ $order['delivery_area'] ?? '' }}" style="width:100%;margin-top:6px;border:1px solid rgba(220,207,191,0.9);background:#fff;border-radius:12px;padding:10px 12px;"></label>
-                                    <div><button class="ops-nav-item active" type="submit" style="border:0;cursor:pointer;display:inline-flex;">Save customer details</button></div>
+                                    <div><button class="ops-action primary" type="submit">Save customer details</button></div>
                                 </form>
                                 <details style="margin-top:14px;">
                                     <summary style="cursor:pointer;font-weight:600;">Order details and line items</summary>

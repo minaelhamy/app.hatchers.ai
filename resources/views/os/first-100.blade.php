@@ -51,6 +51,10 @@
         .tracker-badge { display:inline-flex; align-items:center; justify-content:center; padding:7px 11px; border-radius:999px; background:#ece6db; font-size:0.84rem; }
         .tracker-badge.success { background:rgba(44,122,87,0.12); color:#21643a; }
         .tracker-badge.warning { background:rgba(154,107,27,0.12); color:#9a6b1b; }
+        .tracker-mode-nav { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:18px; }
+        .tracker-mode-tab { display:inline-flex; align-items:center; gap:8px; padding:10px 14px; border-radius:999px; text-decoration:none; color:var(--ink); background:rgba(255,255,255,0.88); border:1px solid rgba(220,207,191,0.8); font-weight:600; }
+        .tracker-mode-tab.active { background:#ece6db; }
+        .tracker-helper { margin-bottom:18px; padding:14px 16px; border-radius:16px; background:rgba(255,255,255,0.92); border:1px solid rgba(220,207,191,0.7); color:var(--muted); }
         @media (max-width:1240px) { .tracker-shell { grid-template-columns:220px 1fr; } .tracker-rightbar { display:none; } }
         @media (max-width:900px) { .tracker-shell { grid-template-columns:1fr; } .tracker-sidebar { min-height:auto; border-right:0; border-bottom:1px solid var(--line); } .tracker-sidebar-footer { display:none; } .tracker-main { padding:20px 16px 24px; } .tracker-grid, .tracker-metrics, .tracker-form-grid { grid-template-columns:1fr; } }
     </style>
@@ -71,6 +75,16 @@
         $offlineBridge = $tracker['offline_bridge'];
         $filters = $tracker['filters'];
         $leads = $tracker['leads'];
+        $trackerMode = request()->query('mode', 'today');
+        if (!in_array($trackerMode, ['today', 'pipeline', 'scripts', 'offline'], true)) {
+            $trackerMode = 'today';
+        }
+        $trackerModeHelp = [
+            'today' => 'Use this mode when you want the OS to tell you who to contact and what to do right now.',
+            'pipeline' => 'Use this mode when you need to add leads, filter the pipeline, and manage records in detail.',
+            'scripts' => 'Use this mode when you are actively messaging leads and need scripts, objections, and follow-up rules.',
+            'offline' => 'Use this mode when you are running flyer, QR, referral, or in-person campaigns and want source attribution.',
+        ];
     @endphp
 
     <div class="tracker-shell">
@@ -94,6 +108,13 @@
             <div class="tracker-main-inner">
                 <h1>First 100 Customers</h1>
                 <p>Turn your website, offers, and local outreach into a real customer pipeline. This is the founder workspace for named leads, follow-up, and first-customer momentum.</p>
+                <div class="tracker-mode-nav">
+                    <a class="tracker-mode-tab {{ $trackerMode === 'today' ? 'active' : '' }}" href="{{ route('founder.first-100', array_filter(['mode' => 'today'])) }}">Today</a>
+                    <a class="tracker-mode-tab {{ $trackerMode === 'pipeline' ? 'active' : '' }}" href="{{ route('founder.first-100', array_filter(['mode' => 'pipeline'])) }}">Pipeline</a>
+                    <a class="tracker-mode-tab {{ $trackerMode === 'scripts' ? 'active' : '' }}" href="{{ route('founder.first-100', array_filter(['mode' => 'scripts'])) }}">Scripts</a>
+                    <a class="tracker-mode-tab {{ $trackerMode === 'offline' ? 'active' : '' }}" href="{{ route('founder.first-100', array_filter(['mode' => 'offline'])) }}">Offline</a>
+                </div>
+                <div class="tracker-helper">{{ $trackerModeHelp[$trackerMode] }}</div>
 
                 @if (session('success'))
                     <div class="tracker-banner success">{{ session('success') }}</div>
@@ -113,6 +134,7 @@
                     <div class="tracker-metric"><div class="tracker-muted">Pipeline value</div><strong>USD {{ number_format((float) $metrics['estimated_pipeline_value'], 2) }}</strong></div>
                 </section>
 
+                @if ($trackerMode === 'today')
                 <section class="tracker-card" style="margin-bottom:12px;">
                     <h2 class="tracker-section-title">{{ $dailyPlan['headline'] }}</h2>
                     <div class="tracker-muted">{{ $dailyPlan['focus'] }}</div>
@@ -164,7 +186,9 @@
                         @endforeach
                     </div>
                 </section>
+                @endif
 
+                @if ($trackerMode === 'scripts')
                 <section class="tracker-card" style="margin-bottom:12px;">
                     <h2 class="tracker-section-title">{{ $conversationEngine['headline'] }}</h2>
                     <div class="tracker-muted">{{ $conversationEngine['focus'] }}</div>
@@ -234,7 +258,9 @@
                         </div>
                     @endif
                 </section>
+                @endif
 
+                @if ($trackerMode === 'offline')
                 <section class="tracker-card" style="margin-bottom:12px;">
                     <h2 class="tracker-section-title">{{ $offlineBridge['headline'] }}</h2>
                     <div class="tracker-muted">{{ $offlineBridge['focus'] }}</div>
@@ -297,9 +323,11 @@
                                 </div>
                             @endforeach
                         </div>
-                    @endif
-                </section>
+                        @endif
+                    </section>
+                @endif
 
+                @if ($trackerMode === 'pipeline')
                 <section class="tracker-grid">
                     <div class="tracker-card">
                         <h2 class="tracker-section-title">Add a lead</h2>
@@ -547,6 +575,7 @@
                         @endforelse
                     </div>
                 </section>
+                @endif
             </div>
         </main>
 
