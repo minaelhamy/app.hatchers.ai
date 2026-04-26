@@ -58,7 +58,7 @@
         <main class="media-main">
             <div class="media-main-inner">
                 <h1>Media Library</h1>
-                <p>Shared assets from across your OS workflows.</p>
+                <p>Review the images, campaign drafts, and website assets your business is generating inside Hatchers OS.</p>
 
                 <section class="media-grid">
                     <div class="media-card">
@@ -81,17 +81,17 @@
                     </div>
 
                     <div class="media-card">
-                        <h2>Website Themes</h2>
+                        <h2>Website Visuals</h2>
                         <div class="stack" style="margin-top:14px;">
                             @forelse ($allThemes as $theme)
                                 <div class="stack-item">
                                     <strong>{{ $theme['label'] ?? ('Theme ' . ($theme['id'] ?? '')) }}</strong><br>
-                                    <span class="muted">{{ !empty($theme['preview_url']) ? 'Preview image available for this theme.' : 'Theme option available inside the website workspace.' }}</span>
+                                    <span class="muted">{{ !empty($theme['preview_url']) ? 'Preview image available for this website style.' : 'This website style is available inside the website workspace.' }}</span>
                                 </div>
                             @empty
                                 <div class="stack-item">
-                                    <strong>No theme previews yet</strong><br>
-                                    <span class="muted">Theme options will appear here as the website workspace loads Bazaar and Servio themes.</span>
+                                    <strong>No website visuals yet</strong><br>
+                                    <span class="muted">Website visuals will appear here as your site draft and campaign media keep growing inside the OS.</span>
                                 </div>
                             @endforelse
                         </div>
@@ -104,7 +104,7 @@
             <div class="media-rightbar-inner">
                 <h3>OS Direction</h3>
                 <div class="rail-list">
-                    <div class="mini-note">This library should feel like one shared workspace for campaigns, drafts, offers, and website assets, not four separate products.</div>
+                    <div class="mini-note">This library is where campaign media, generated drafts, offer assets, and website visuals come together in one OS-native workspace.</div>
                 </div>
             </div>
         </aside>

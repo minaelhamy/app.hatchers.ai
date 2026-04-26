@@ -529,7 +529,7 @@
 
                 addBubble('user', message);
                 textarea.value = '';
-                if (status) status.textContent = 'Atlas is thinking...';
+                if (status) status.textContent = 'Hatchers AI is thinking...';
                 if (sendButton) sendButton.disabled = true;
 
                 try {
@@ -548,19 +548,19 @@
 
                     const data = await response.json();
                     if (!response.ok || !data.success) {
-                        addBubble('atlas', data.error || 'Atlas could not respond right now.');
-                        if (status) status.textContent = 'Atlas is temporarily unavailable.';
+                        addBubble('atlas', data.error || 'Hatchers AI could not respond right now.');
+                        if (status) status.textContent = 'Hatchers AI is temporarily unavailable.';
                     } else {
-                        addBubble('atlas', data.reply || 'Atlas is here.', data.actions || []);
+                        addBubble('atlas', data.reply || 'Hatchers AI is here.', data.actions || []);
                         if (data.refresh) {
-                            if (status) status.textContent = 'Atlas updated your workspace. Refreshing summary...';
+                            if (status) status.textContent = 'Hatchers AI updated your workspace. Refreshing summary...';
                             window.setTimeout(() => window.location.reload(), 900);
                         } else if (status) {
-                            status.textContent = 'Atlas is synced with your OS context.';
+                            status.textContent = 'Hatchers AI is synced with your OS context.';
                         }
                     }
                 } catch (error) {
-                    addBubble('atlas', 'Atlas could not respond right now.');
+                    addBubble('atlas', 'Hatchers AI could not respond right now.');
                     if (status) status.textContent = 'Connection issue. Please try again.';
                 } finally {
                     if (sendButton) sendButton.disabled = false;

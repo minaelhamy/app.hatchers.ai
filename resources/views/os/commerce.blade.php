@@ -73,9 +73,9 @@
         $supportsServices = in_array($businessModel, ['service', 'hybrid'], true);
         $automationSummary = $dashboard['automation_summary'] ?? ['active_count' => 0, 'items' => [], 'has_unpaid_order_rule' => false, 'has_unscheduled_booking_rule' => false, 'has_provider_assignment_rule' => false];
         $commerceHeading = match ($businessModel) {
-            'service' => 'Manage your services, booking rules, and delivery flow from one OS workspace powered by Servio behind the scenes.',
-            'product' => 'Manage your products, discounts, shipping plans, and orders from one OS workspace powered by Bazaar behind the scenes.',
-            default => 'Manage your products, services, storefront readiness, orders, and bookings from one OS workspace powered by Bazaar and Servio behind the scenes.',
+            'service' => 'Manage your services, booking rules, and delivery flow from one OS workspace.',
+            'product' => 'Manage your products, discounts, shipping plans, and orders from one OS workspace.',
+            default => 'Manage your products, services, storefront readiness, orders, and bookings from one OS workspace.',
         };
         $commerceView = request()->query('view', 'overview');
         if (!in_array($commerceView, ['overview', 'offers', 'operations', 'money'], true)) {
@@ -170,18 +170,18 @@
                     <div class="commerce-grid">
                         @if ($supportsProducts)
                             <div class="commerce-card">
-                                <div class="commerce-card-meta">Bazaar Categories & Taxes</div>
+                                <div class="commerce-card-meta">Product Categories & Taxes</div>
                                 <div class="commerce-card-title">Live product catalog definitions</div>
-                                <div class="commerce-card-copy">These are the current Bazaar-side categories and tax rules visible to the OS after sync.</div>
+                                <div class="commerce-card-copy">These are the current product categories and tax rules visible to the OS after sync.</div>
                                 @forelse ($commerceCatalogs['bazaar']['categories'] as $category)
                                     <div class="commerce-chip">{{ $category['title'] }} · {{ ucfirst($category['status']) }}</div>
                                 @empty
-                                    <div class="commerce-chip">No Bazaar categories synced yet</div>
+                                    <div class="commerce-chip">No product categories synced yet</div>
                                 @endforelse
                                 @forelse ($commerceCatalogs['bazaar']['taxes'] as $tax)
                                     <div class="commerce-chip">{{ $tax['title'] }} · {{ $tax['value'] }} {{ $tax['type'] }} · {{ ucfirst($tax['status']) }}</div>
                                 @empty
-                                    <div class="commerce-chip">No Bazaar taxes synced yet</div>
+                                    <div class="commerce-chip">No product taxes synced yet</div>
                                 @endforelse
                                 @foreach (($commerceCatalogs['bazaar']['products'] ?? []) as $product)
                                     @foreach (($product['variants'] ?? []) as $variant)
@@ -195,23 +195,23 @@
                         @endif
                         @if ($supportsServices)
                             <div class="commerce-card">
-                                <div class="commerce-card-meta">Servio Categories, Taxes, And Add-ons</div>
+                                <div class="commerce-card-meta">Service Categories, Taxes, And Add-ons</div>
                                 <div class="commerce-card-title">Live service catalog definitions</div>
-                                <div class="commerce-card-copy">These are the current Servio-side categories, tax rules, and service add-ons visible to the OS after sync.</div>
+                                <div class="commerce-card-copy">These are the current service categories, tax rules, and service add-ons visible to the OS after sync.</div>
                                 @forelse ($commerceCatalogs['servio']['categories'] as $category)
                                     <div class="commerce-chip">{{ $category['title'] }} · {{ ucfirst($category['status']) }}</div>
                                 @empty
-                                    <div class="commerce-chip">No Servio categories synced yet</div>
+                                    <div class="commerce-chip">No service categories synced yet</div>
                                 @endforelse
                                 @forelse ($commerceCatalogs['servio']['taxes'] as $tax)
                                     <div class="commerce-chip">{{ $tax['title'] }} · {{ $tax['value'] }} {{ $tax['type'] }} · {{ ucfirst($tax['status']) }}</div>
                                 @empty
-                                    <div class="commerce-chip">No Servio taxes synced yet</div>
+                                    <div class="commerce-chip">No service taxes synced yet</div>
                                 @endforelse
                                 @forelse ($commerceCatalogs['servio']['additional_services'] as $service)
                                     <div class="commerce-chip">{{ $service['title'] }} · {{ number_format((float) ($service['price'] ?? 0), 2) }}</div>
                                 @empty
-                                    <div class="commerce-chip">No Servio add-on services synced yet</div>
+                                    <div class="commerce-chip">No service add-ons synced yet</div>
                                 @endforelse
                                 @foreach (($commerceCatalogs['servio']['staff'] ?? []) as $staff)
                                     <div class="commerce-chip">{{ $staff['title'] }} · ID {{ $staff['id'] }}</div>
@@ -301,7 +301,7 @@
                             <div class="commerce-card">
                                 <div class="commerce-card-meta">Product Manager</div>
                                 <div class="commerce-card-title">Add a product from the OS</div>
-                                <div class="commerce-card-copy">This creates the product in Bazaar without pushing the founder into Bazaar first.</div>
+                                <div class="commerce-card-copy">Create the product here and keep the founder workflow inside Hatchers OS.</div>
                                 <form method="POST" action="/website/starter" class="commerce-field">
                                     @csrf
                                     <input type="hidden" name="website_engine" value="bazaar">
@@ -321,7 +321,7 @@
                             <div class="commerce-card">
                                 <div class="commerce-card-meta">Services Manager</div>
                                 <div class="commerce-card-title">Add a service from the OS</div>
-                                <div class="commerce-card-copy">This creates the service in Servio so the founder can keep building from the OS.</div>
+                                <div class="commerce-card-copy">Create the service here and keep the founder workflow inside Hatchers OS.</div>
                                 <form method="POST" action="/website/starter" class="commerce-field">
                                     @csrf
                                     <input type="hidden" name="website_engine" value="servio">
@@ -455,7 +455,7 @@
                             <div class="commerce-card">
                                 <div class="commerce-card-meta">Coupons</div>
                                 <div class="commerce-card-title">Add coupon codes from the OS</div>
-                                <div class="commerce-card-copy">Coupons belong here in the OS. Saving from this workspace now syncs the discount rule directly into Bazaar too.</div>
+                                <div class="commerce-card-copy">Coupons belong here in the OS and should be managed from this workspace.</div>
                                 <form method="POST" action="{{ route('founder.commerce.settings.store') }}" class="commerce-field">
                                     @csrf
                                     <input type="hidden" name="setting_type" value="coupon">
@@ -507,7 +507,7 @@
                             <div class="commerce-card">
                                 <div class="commerce-card-meta">Shipping</div>
                                 <div class="commerce-card-title">Set shipping plans from the OS</div>
-                                <div class="commerce-card-copy">Shipping plans should be configured here, not in a separate storefront admin. Saving from this workspace now syncs the shipping area into Bazaar too.</div>
+                                <div class="commerce-card-copy">Shipping plans should be configured here, not in a separate storefront admin.</div>
                                 <form method="POST" action="{{ route('founder.commerce.settings.store') }}" class="commerce-field">
                                     @csrf
                                     <input type="hidden" name="setting_type" value="shipping">
@@ -558,7 +558,7 @@
                             <div class="commerce-card">
                                 <div class="commerce-card-meta">Coupons</div>
                                 <div class="commerce-card-title">Add service coupons from the OS</div>
-                                <div class="commerce-card-copy">Service discounts should be managed in the OS too. Saving here now syncs the coupon directly into Servio.</div>
+                                <div class="commerce-card-copy">Service discounts should be managed in the OS too.</div>
                                 <form method="POST" action="{{ route('founder.commerce.settings.store') }}" class="commerce-field" style="margin-top:14px;">
                                     @csrf
                                     <input type="hidden" name="setting_type" value="coupon">
@@ -608,9 +608,9 @@
                             </div>
 
                             <div class="commerce-card">
-                                <div class="commerce-card-meta">Servio Operations</div>
+                                <div class="commerce-card-meta">Service Operations</div>
                                 <div class="commerce-card-title">Configure booking rules from the OS</div>
-                                <div class="commerce-card-copy">Availability, session length, buffer time, and cancellation policy should all be managed from Hatchers Ai Business OS for a service business.</div>
+                                <div class="commerce-card-copy">Availability, session length, buffer time, and cancellation policy should all be managed from Hatchers OS for a service business.</div>
                                 <form method="POST" action="{{ route('founder.commerce.settings.store') }}" class="commerce-field">
                                     @csrf
                                     <input type="hidden" name="setting_type" value="booking_policy">
@@ -634,7 +634,7 @@
                             <div class="commerce-card">
                                 <div class="commerce-card-meta">Bookings</div>
                                 <div class="commerce-card-title">{{ $growth['booking_count'] }} bookings tracked</div>
-                                <div class="commerce-card-copy">Servio snapshots feed the OS with booking and service delivery signals while the OS stays the founder-facing workspace.</div>
+                                <div class="commerce-card-copy">The OS keeps booking and service delivery signals visible in one founder-facing workspace.</div>
                                 <div class="commerce-actions"><a class="commerce-cta" href="{{ route('founder.commerce.bookings') }}">Open bookings view</a></div>
                             </div>
                         </div>
@@ -648,13 +648,13 @@
                             <div class="commerce-card">
                                 <div class="commerce-card-meta">Orders</div>
                                 <div class="commerce-card-title">{{ $growth['order_count'] }} orders tracked</div>
-                                <div class="commerce-card-copy">Bazaar snapshots feed the OS with store health, order volume, and storefront readiness so the founder sees commerce state from one place.</div>
+                                <div class="commerce-card-copy">The OS keeps store health, order volume, and storefront readiness visible in one place.</div>
                                 <div class="commerce-actions"><a class="commerce-cta" href="{{ route('founder.commerce.orders') }}">Open orders view</a></div>
                             </div>
                             <div class="commerce-card">
                                 <div class="commerce-card-meta">Website</div>
                                 <div class="commerce-card-title">Public storefront and checkout</div>
-                                <div class="commerce-card-copy">The live public experience should route through Hatchers Ai Business OS URLs while Bazaar handles the storefront backend.</div>
+                                <div class="commerce-card-copy">The live public experience stays on your Hatchers OS website path.</div>
                                 <div class="commerce-actions"><a class="commerce-cta" href="{{ route('website') }}">Open website workspace</a></div>
                             </div>
                         </div>
@@ -668,13 +668,13 @@
                             <div class="commerce-card">
                                 <div class="commerce-card-meta">Bookings</div>
                                 <div class="commerce-card-title">{{ $growth['booking_count'] }} bookings tracked</div>
-                                <div class="commerce-card-copy">Servio snapshots feed the OS with booking and service delivery signals while the OS stays the founder-facing workspace.</div>
+                                <div class="commerce-card-copy">The OS keeps booking and service delivery signals visible in one founder-facing workspace.</div>
                                 <div class="commerce-actions"><a class="commerce-cta" href="{{ route('founder.commerce.bookings') }}">Open bookings view</a></div>
                             </div>
                             <div class="commerce-card">
                                 <div class="commerce-card-meta">Website</div>
                                 <div class="commerce-card-title">Public service site and booking flow</div>
-                                <div class="commerce-card-copy">The live public experience should route through Hatchers Ai Business OS URLs while Servio handles the booking backend.</div>
+                                <div class="commerce-card-copy">The live public experience stays on your Hatchers OS website path.</div>
                                 <div class="commerce-actions"><a class="commerce-cta" href="{{ route('website') }}">Open website workspace</a></div>
                             </div>
                         </div>

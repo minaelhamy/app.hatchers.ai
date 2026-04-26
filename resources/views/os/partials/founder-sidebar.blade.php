@@ -41,7 +41,6 @@
         ['key' => 'automations', 'label' => 'Automations', 'icon' => '↻', 'href' => route('founder.automations')],
         ['key' => 'analytics', 'label' => 'Analytics', 'icon' => '◒', 'href' => route('founder.analytics')],
         ['key' => 'media-library', 'label' => 'Media Library', 'icon' => '▥', 'href' => route('founder.media-library')],
-        ['key' => 'pods', 'label' => 'Pods', 'icon' => '◍', 'href' => route('founder.pods')],
         ['key' => 'learning-plan', 'label' => 'Learning Plan', 'icon' => '▣', 'href' => route('founder.learning-plan')],
         ['key' => 'settings', 'label' => 'Settings', 'icon' => '⚙', 'href' => route('founder.settings')],
     ]);

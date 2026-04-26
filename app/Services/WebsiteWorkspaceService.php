@@ -39,11 +39,7 @@ class WebsiteWorkspaceService
         $recommendedSubdomain = $this->buildRecommendedSubdomain($slug, $recommendedEngine, $websitePath);
         $currentWebsiteUrl = (string) ($company?->website_url ?? '');
         if ($currentWebsiteUrl === '') {
-            $currentWebsiteUrl = $this->buildPublicWebsiteUrl(
-                $slug,
-                $websitePath,
-                (string) ($company?->custom_domain ?? '')
-            );
+            $currentWebsiteUrl = $this->buildPublicWebsiteUrl($slug, $websitePath, '');
         }
 
         $engines = [];
@@ -53,7 +49,7 @@ class WebsiteWorkspaceService
                 $engine === 'bazaar' ? $bazaar : $servio,
                 $slug,
                 $websitePath,
-                (string) ($company?->custom_domain ?? '')
+                ''
             );
         }
 
@@ -71,9 +67,9 @@ class WebsiteWorkspaceService
             'website_path' => $websitePath,
             'current_website_url' => $currentWebsiteUrl,
             'recommended_subdomain' => $recommendedSubdomain,
-            'custom_domain_example' => 'www.' . $slug . '.com',
-            'custom_domain' => (string) ($company?->custom_domain ?? ''),
-            'custom_domain_status' => (string) ($company?->custom_domain_status ?? 'not_connected'),
+            'custom_domain_example' => '',
+            'custom_domain' => '',
+            'custom_domain_status' => 'disabled',
             'engines' => $engines,
             'theme_options' => $themeOptions,
             'supported_engines' => $supportedEngines,
@@ -100,11 +96,6 @@ class WebsiteWorkspaceService
                     'title' => 'Default published site',
                     'value' => preg_replace('#^https?://#', '', $recommendedSubdomain) ?? $recommendedSubdomain,
                     'description' => 'By default the public business site lives inside Hatchers Ai Business OS under app.hatchers.ai/{company}.',
-                ],
-                [
-                    'title' => 'Custom domain',
-                    'value' => 'www.' . $slug . '.com',
-                    'description' => 'When the founder is ready, the public website can point to their own branded domain.',
                 ],
             ],
             'next_steps' => $this->buildNextSteps($businessModel, $recommendedEngine, $bazaar, $servio),
@@ -185,15 +176,15 @@ class WebsiteWorkspaceService
 
         if (($bazaar?->readiness_score ?? 0) < 50) {
             $steps[] = [
-                'title' => 'Complete your product website setup',
-                'description' => 'Choose a theme, add the first products, and finalize store branding so Bazaar is ready to publish.',
+                'title' => 'Complete your product setup',
+                'description' => 'Choose a theme, add the first products, and make the public store ready to publish inside Hatchers OS.',
             ];
         }
 
         if (($servio?->readiness_score ?? 0) < 50) {
             $steps[] = [
-                'title' => 'Complete your service website setup',
-                'description' => 'Choose a theme, add the first services, and configure booking availability so Servio is ready to publish.',
+                'title' => 'Complete your service setup',
+                'description' => 'Choose a theme, add the first services, and configure booking availability so the public site is ready to publish inside Hatchers OS.',
             ];
         }
 
@@ -243,9 +234,7 @@ class WebsiteWorkspaceService
 
     private function buildPublicWebsiteUrl(string $slug, string $path, string $customDomain): string
     {
-        $host = trim($customDomain) !== ''
-            ? $this->normalizeDomainHost($customDomain)
-            : 'app.hatchers.ai';
+        $host = 'app.hatchers.ai';
         $normalizedPath = $this->normalizeWebsitePath($path);
         if ($normalizedPath === '') {
             $normalizedPath = $slug;

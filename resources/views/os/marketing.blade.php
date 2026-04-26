@@ -74,7 +74,7 @@
 @section('content')
     @php
         $founder = $dashboard['founder'];
-        $atlas = $dashboard['atlas'];
+        $atlas = $dashboard['atlas'] ?? [];
         $moduleCards = collect($dashboard['module_cards'] ?? []);
         $atlasCard = $moduleCards->firstWhere('key', 'atlas');
         $launchCards = $launchCards ?? [];
@@ -104,7 +104,7 @@
         <main class="marketing-main">
             <div class="marketing-main-inner">
                 <h1>Marketing</h1>
-                <p>Manage campaigns, content generation, and Atlas-backed marketing workflows from one OS workspace.</p>
+                <p>Manage campaigns, content generation, and publishing from one OS workspace.</p>
 
                 @if (session('success'))
                     <div class="marketing-banner success">{{ session('success') }}</div>
@@ -124,18 +124,18 @@
                 <section class="marketing-metrics">
                     <div class="marketing-metric">
                         <div class="marketing-card-copy">Generated posts</div>
-                        <strong>{{ $atlas['generated_posts_count'] }}</strong>
+                        <strong>{{ $atlas['generated_posts_count'] ?? 0 }}</strong>
                     </div>
                     <div class="marketing-metric">
                         <div class="marketing-card-copy">Campaigns</div>
-                        <strong>{{ $atlas['generated_campaigns_count'] }}</strong>
+                        <strong>{{ $atlas['generated_campaigns_count'] ?? 0 }}</strong>
                     </div>
                     <div class="marketing-metric">
                         <div class="marketing-card-copy">Images</div>
-                        <strong>{{ $atlas['generated_images_count'] }}</strong>
+                        <strong>{{ $atlas['generated_images_count'] ?? 0 }}</strong>
                     </div>
                     <div class="marketing-metric">
-                        <div class="marketing-card-copy">Atlas readiness</div>
+                        <div class="marketing-card-copy">Campaign readiness</div>
                         <strong>{{ $atlasCard['readiness_score'] ?? 0 }}%</strong>
                     </div>
                 </section>
@@ -146,7 +146,7 @@
                         <div class="marketing-card">
                             <div class="marketing-card-meta">Create Campaign</div>
                             <div class="marketing-card-title">Draft a new campaign in the OS</div>
-                            <div class="marketing-card-copy">This creates the campaign in Atlas through Hatchers Ai Business OS, then brings it back into your unified workspace.</div>
+                            <div class="marketing-card-copy">Create the campaign here, keep the draft here, and manage the work here.</div>
                             <form class="marketing-inline-form" method="POST" action="{{ route('founder.marketing.campaign.create') }}">
                                 @csrf
                                 <div class="marketing-field">
@@ -158,7 +158,7 @@
                                 </div>
                                 <div class="marketing-field">
                                     <label for="campaign-description">Campaign brief</label>
-                                    <textarea id="campaign-description" name="description" placeholder="What are we launching, who is it for, and what should Atlas generate?" required>{{ old('description') }}</textarea>
+                                    <textarea id="campaign-description" name="description" placeholder="What are we launching, who is it for, and what should the OS create?" required>{{ old('description') }}</textarea>
                                     @error('description')
                                         <div class="field-error">{{ $message }}</div>
                                     @enderror
@@ -171,7 +171,7 @@
                         <div class="marketing-card">
                             <div class="marketing-card-meta">Campaigns</div>
                             <div class="marketing-card-title">Open campaign workspace</div>
-                            <div class="marketing-card-copy">Review active campaigns, archived campaigns, linked posts, and the current growth goal that Atlas is using.</div>
+                            <div class="marketing-card-copy">Review active campaigns, archived campaigns, linked posts, and the current growth goal for your business.</div>
                             <a class="marketing-cta" href="{{ route('founder.ai-tools') }}">Back to AI Tools</a>
                         </div>
                     </div>
@@ -183,7 +183,7 @@
                         <div class="marketing-card">
                             <div class="marketing-card-meta">Plan Content</div>
                             <div class="marketing-card-title">Create a content request in the OS</div>
-                            <div class="marketing-card-copy">Plan the next post, email, blog, or landing page brief here. Hatchers OS keeps the queue visible and syncs the intent back to Atlas.</div>
+                            <div class="marketing-card-copy">Plan the next post, email, blog, or landing page brief here. Hatchers OS keeps the queue visible and ready for generation.</div>
                             <form class="marketing-inline-form" method="POST" action="{{ route('founder.marketing.content-request.create') }}">
                                 @csrf
                                 <div class="marketing-field">
@@ -349,7 +349,7 @@
                         @forelse ($atlas['recent_campaigns'] as $campaign)
                             <div class="marketing-card">
                                 <div class="marketing-card-title">{{ $campaign['title'] ?? 'Campaign' }}</div>
-                                <div class="marketing-card-copy">{{ $campaign['description'] ?? 'Saved in Atlas.' }}</div>
+                                <div class="marketing-card-copy">{{ $campaign['description'] ?? 'Saved in Campaign Studio.' }}</div>
                                 <div class="marketing-chip">{{ (int) ($campaign['generated_posts_count'] ?? 0) }} linked posts</div>
                                 <div class="marketing-actions">
                                     @if (!empty($campaign['url']))
@@ -370,19 +370,19 @@
                         @empty
                             <div class="marketing-card">
                                 <div class="marketing-card-title">No active campaigns yet</div>
-                                <div class="marketing-card-copy">As Atlas campaigns are created and synced into the OS, they will appear here as first-class founder items.</div>
+                                <div class="marketing-card-copy">As campaigns are created in the OS, they will appear here as first-class founder items.</div>
                             </div>
                         @endforelse
                     </div>
                 </section>
 
                 <section class="marketing-section">
-                    <h2>Atlas History</h2>
+                    <h2>Campaign Activity</h2>
                     <div class="marketing-grid">
                         <div class="marketing-card">
                             <div class="marketing-card-meta">Chats, Agents, Content</div>
-                            <div class="marketing-card-title">Recent Atlas history inside the OS</div>
-                            <div class="marketing-card-copy">This keeps recent Atlas conversations, agent work, and content activity visible without sending the founder back to Atlas just to understand what happened.</div>
+                            <div class="marketing-card-title">Recent AI and campaign activity</div>
+                            <div class="marketing-card-copy">This keeps recent campaign generation, AI work, and content activity visible without sending the founder anywhere else.</div>
                             <div class="rail-list" style="margin-top: 14px;">
                                 @forelse ($atlasHistory as $item)
                                     <div class="rail-item">
@@ -392,8 +392,8 @@
                                     </div>
                                 @empty
                                     <div class="rail-item">
-                                        <strong>No Atlas history yet</strong><br>
-                                        As Atlas activity keeps syncing into Hatchers Ai Business OS, recent chats, agent actions, and content history will appear here.
+                                        <strong>No campaign activity yet</strong><br>
+                                        As you create campaigns and drafts, the recent activity timeline will appear here.
                                     </div>
                                 @endforelse
                             </div>
@@ -403,7 +403,7 @@
                             <div class="marketing-card-meta">OS Direction</div>
                             <div class="marketing-card-title">Keep marketing inside the OS</div>
                             <div class="marketing-card-copy">
-                                The goal is to let founders create campaigns, manage content, review history, and publish toward the right target from one OS-native workflow while Atlas stays the backend engine.
+                                The goal is to let founders create campaigns, manage content, review history, and publish toward the right target from one OS-native workflow.
                             </div>
                             <div class="marketing-actions">
                                 <a class="marketing-cta" href="{{ route('founder.activity') }}">Open Activity Center</a>
@@ -416,10 +416,10 @@
                 <section class="marketing-section">
                     <h2>Archived Campaigns</h2>
                     <div class="marketing-grid">
-                        @forelse ($atlas['archived_campaigns'] as $campaign)
+                        @forelse (($atlas['archived_campaigns'] ?? []) as $campaign)
                             <div class="marketing-card">
                                 <div class="marketing-card-title">{{ $campaign['title'] ?? 'Archived campaign' }}</div>
-                                <div class="marketing-card-copy">{{ $campaign['description'] ?? 'Archived in Atlas.' }}</div>
+                                <div class="marketing-card-copy">{{ $campaign['description'] ?? 'Archived in Campaign Studio.' }}</div>
                                 <div class="marketing-chip">{{ (int) ($campaign['generated_posts_count'] ?? 0) }} linked posts</div>
                                 <div class="marketing-actions">
                                     @if (!empty($campaign['url']))
@@ -446,7 +446,7 @@
         <aside class="marketing-rightbar">
             <div class="marketing-rightbar-inner">
                 <h3>Current Goal</h3>
-                <div class="mini-note">{{ $atlas['primary_growth_goal'] ?: 'No primary growth goal has synced from Atlas yet.' }}</div>
+                <div class="mini-note">{{ $atlas['primary_growth_goal'] ?? 'No primary growth goal has been set yet.' }}</div>
 
                 <h3 style="margin-top:22px;">Connected Tools</h3>
                 <div class="rail-list">

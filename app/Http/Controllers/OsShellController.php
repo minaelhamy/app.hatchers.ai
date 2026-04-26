@@ -54,6 +54,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -2946,6 +2947,7 @@ class OsShellController extends Controller
         return view('os.settings', [
             'pageTitle' => 'Settings',
             'dashboard' => $founderDashboardService->build($user),
+            'intelligence' => $user->company?->intelligence,
         ]);
     }
 
@@ -2963,6 +2965,20 @@ class OsShellController extends Controller
             'company_name' => ['required', 'string', 'max:255'],
             'company_brief' => ['nullable', 'string', 'max:2000'],
             'business_model' => ['required', Rule::in(['product', 'service', 'hybrid'])],
+            'company_logo' => ['nullable', 'image', 'max:4096'],
+            'target_audience' => ['nullable', 'string', 'max:255'],
+            'ideal_customer_profile' => ['nullable', 'string', 'max:1000'],
+            'primary_icp_name' => ['nullable', 'string', 'max:255'],
+            'problem_solved' => ['nullable', 'string', 'max:1000'],
+            'brand_voice' => ['nullable', 'string', 'max:255'],
+            'differentiators' => ['nullable', 'string', 'max:1000'],
+            'core_offer' => ['nullable', 'string', 'max:255'],
+            'primary_growth_goal' => ['nullable', 'string', 'max:255'],
+            'known_blockers' => ['nullable', 'string', 'max:500'],
+            'objections' => ['nullable', 'string', 'max:1200'],
+            'buying_triggers' => ['nullable', 'string', 'max:1200'],
+            'local_market_notes' => ['nullable', 'string', 'max:1200'],
+            'visual_style' => ['nullable', 'string', 'max:500'],
         ]);
 
         $user->forceFill([
@@ -2978,11 +2994,40 @@ class OsShellController extends Controller
             'website_status' => 'not_started',
         ]);
 
+        $logoPath = (string) ($company->company_logo_path ?? '');
+        if ($request->hasFile('company_logo')) {
+            if ($logoPath !== '' && Storage::disk('public')->exists($logoPath)) {
+                Storage::disk('public')->delete($logoPath);
+            }
+            $logoPath = (string) $request->file('company_logo')->store('company-logos', 'public');
+        }
+
         $company->forceFill([
             'company_name' => (string) $validated['company_name'],
             'company_brief' => (string) ($validated['company_brief'] ?? ''),
             'business_model' => (string) $validated['business_model'],
+            'company_logo_path' => $logoPath !== '' ? $logoPath : null,
         ])->save();
+
+        CompanyIntelligence::updateOrCreate(
+            ['company_id' => $company->id],
+            [
+                'target_audience' => (string) ($validated['target_audience'] ?? ''),
+                'ideal_customer_profile' => (string) ($validated['ideal_customer_profile'] ?? ''),
+                'primary_icp_name' => (string) ($validated['primary_icp_name'] ?? ''),
+                'problem_solved' => (string) ($validated['problem_solved'] ?? ''),
+                'brand_voice' => (string) ($validated['brand_voice'] ?? ''),
+                'differentiators' => (string) ($validated['differentiators'] ?? ''),
+                'core_offer' => (string) ($validated['core_offer'] ?? ''),
+                'primary_growth_goal' => (string) ($validated['primary_growth_goal'] ?? ''),
+                'known_blockers' => (string) ($validated['known_blockers'] ?? ''),
+                'objections' => (string) ($validated['objections'] ?? ''),
+                'buying_triggers' => (string) ($validated['buying_triggers'] ?? ''),
+                'local_market_notes' => (string) ($validated['local_market_notes'] ?? ''),
+                'visual_style' => (string) ($validated['visual_style'] ?? ''),
+                'intelligence_updated_at' => now(),
+            ]
+        );
 
         return redirect()->route('founder.settings')->with('success', 'Founder settings updated from Hatchers Ai Business OS.');
     }
@@ -7594,8 +7639,8 @@ class OsShellController extends Controller
             $assets[] = [
                 'type' => 'Campaign',
                 'title' => (string) ($campaign['title'] ?? 'Campaign draft'),
-                'description' => (string) ($campaign['description'] ?? 'Atlas campaign asset'),
-                'source' => 'Atlas',
+                'description' => (string) ($campaign['description'] ?? 'Campaign asset'),
+                'source' => 'Campaign Studio',
             ];
         }
 

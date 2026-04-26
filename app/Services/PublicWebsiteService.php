@@ -39,6 +39,7 @@ class PublicWebsiteService
             'business_model' => $businessModel,
             'engine' => $engine,
             'path' => trim((string) ($company->website_path ?? ''), '/'),
+            'logo_url' => !empty($company->company_logo_path) ? asset('storage/' . ltrim((string) $company->company_logo_path, '/')) : null,
             'theme' => (string) ($summary['theme_template'] ?? ''),
             'hero' => $this->buildHero($company, $founder?->full_name ?? '', $businessModel, $counts, $currency, $draftOutput),
             'metrics' => $this->buildMetrics($businessModel, $counts, (float) ($summary['gross_revenue'] ?? 0), $currency),

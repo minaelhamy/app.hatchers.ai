@@ -62,14 +62,13 @@
         $defaultWebsiteTitle = old('website_title', $autopilotDraft['title'] ?? $recommendedCard['website_title']);
         $defaultThemeTemplate = old('theme_template', $autopilotDraft['theme_template'] ?? $recommendedCard['theme']);
         $websiteStage = request()->query('stage', 'overview');
-        if (!in_array($websiteStage, ['overview', 'setup', 'publish', 'domain'], true)) {
+        if (!in_array($websiteStage, ['overview', 'setup', 'publish'], true)) {
             $websiteStage = 'overview';
         }
         $stageHelp = [
             'overview' => 'Start here if you are launching for the first time. Review the draft, make sure the message feels right, then move to setup.',
             'setup' => 'Set the public name, page path, theme, and first offer. This is the main build step before launch.',
             'publish' => 'Use this step when the draft and setup are ready and you want the public OS site to go live.',
-            'domain' => 'Use this after launch when you want your own branded domain instead of the default app.hatchers.ai path.',
         ];
     @endphp
 
@@ -110,19 +109,17 @@
                 <div class="eyebrow">Website Launch</div>
                 <h1>Hatchers builds the first website for {{ $companyName }}, then guides the founder through launch.</h1>
                 <p class="muted">
-                    Stay in one founder workflow: review the draft, finish the setup, publish the site, then connect a custom domain when you are ready.
+                    Stay in one founder workflow: review the draft, finish the setup, and publish the site at your Hatchers OS website path.
                 </p>
                 <div class="cta-row">
                     <span class="pill">Business model: {{ ucfirst($businessModel) }}</span>
                     <span class="pill">Site status: {{ ucfirst(str_replace('_', ' ', $websiteStatus)) }}</span>
                     <span class="pill">Launch draft: {{ ucfirst(str_replace('_', ' ', $generationStatus)) }}</span>
-                    <span class="pill">Custom domain: {{ ucfirst(str_replace('_', ' ', $customDomainStatus)) }}</span>
                 </div>
                 <div class="workspace-stage-nav">
                     <a class="workspace-stage-tab {{ $websiteStage === 'overview' ? 'active' : '' }}" href="{{ route('website', ['stage' => 'overview']) }}">1. Review Draft</a>
                     <a class="workspace-stage-tab {{ $websiteStage === 'setup' ? 'active' : '' }}" href="{{ route('website', ['stage' => 'setup']) }}">2. Finish Setup</a>
                     <a class="workspace-stage-tab {{ $websiteStage === 'publish' ? 'active' : '' }}" href="{{ route('website', ['stage' => 'publish']) }}">3. Publish</a>
-                    <a class="workspace-stage-tab {{ $websiteStage === 'domain' ? 'active' : '' }}" href="{{ route('website', ['stage' => 'domain']) }}">4. Add Domain</a>
                 </div>
                 <div class="workspace-stage-helper">{{ $stageHelp[$websiteStage] }}</div>
             </section>
@@ -159,8 +156,8 @@
                             </div>
                             @if (!empty($autopilotDraft['atlas_handoff']['asset_slots'] ?? []))
                                 <div class="stack-item">
-                                    <strong>Atlas asset handoff</strong><br>
-                                    <span class="muted">Atlas has the website asset brief and slot plan for image selection.</span>
+                                    <strong>Creative asset plan</strong><br>
+                                    <span class="muted">Hatchers prepared the image brief and asset slots for this website draft.</span>
                                     @foreach (($autopilotDraft['atlas_handoff']['asset_slots'] ?? []) as $slot)
                                         <div class="muted" style="margin-top:8px;">
                                             {{ $slot['slot_label'] ?? 'Slot' }} · {{ $slot['query'] ?? '' }} · {{ ucfirst(str_replace('_', ' ', $slot['status'] ?? 'requested')) }}
@@ -191,7 +188,7 @@
                                 </div>
                             @endif
                             <div class="stack-item">
-                                <strong>Launch plan status</strong><br>
+                                <strong>Website plan status</strong><br>
                                 <span class="muted">
                                     @if ($launchSystem)
                                         {{ ucfirst(str_replace('_', ' ', $launchSystem['status'] ?? 'active')) }} · {{ $launchSystem['applied_at'] ? 'Applied ' . $launchSystem['applied_at'] : 'Not applied yet' }}
@@ -430,7 +427,7 @@
             </section>
             @endif
 
-            @if ($websiteStage === 'domain')
+            @if (false && $websiteStage === 'domain')
             <section class="grid-2" style="margin-top: 22px;">
                 <div class="card">
                     <h2>Connect Your Custom Domain</h2>
@@ -508,8 +505,8 @@
                     <strong style="font-size: 1.15rem;">{{ preg_replace('#^https?://#', '', $currentWebsiteUrl) }}</strong>
                 </div>
                 <div class="card metric">
-                    <div class="muted">Custom Domain Path</div>
-                    <strong style="font-size: 1.15rem;">{{ $customDomainExample }}</strong>
+                    <div class="muted">Website Path</div>
+                    <strong style="font-size: 1.15rem;">/{{ ltrim($websitePath, '/') }}</strong>
                 </div>
             </section>
 
@@ -532,15 +529,15 @@
                     <div class="stack" style="margin-top: 14px;">
                         <div class="stack-item">
                             <strong>One founder workspace</strong><br>
-                            Founders should build and manage from Hatchers OS, even when the underlying engine is Bazaar or Servio.
+                            Founders should build and manage from Hatchers OS without having to learn separate tool names.
                         </div>
                         <div class="stack-item">
                             <strong>One publishing language</strong><br>
-                            The founder should choose a public website and domain, not choose between separate platform brands.
+                            The founder should choose a public website path and launch flow, not separate platform brands.
                         </div>
                         <div class="stack-item">
                             <strong>Engine routing behind the scenes</strong><br>
-                            Product-heavy businesses route to Bazaar first, service-heavy businesses route to Servio first, and hybrid businesses can use both.
+                            Hatchers chooses the right commerce and service routing behind the scenes while the founder stays in one workflow.
                         </div>
                     </div>
                 </div>
@@ -601,15 +598,15 @@
                     <div class="stack" style="margin-top: 14px;">
                         <div class="stack-item">
                             <strong>Shared intelligence</strong><br>
-                            Bazaar and Servio already push snapshots into Hatchers OS, so the founder dashboard can summarize website readiness, revenue, products, services, orders, and bookings.
+                            Hatchers already brings together website readiness, revenue, offers, orders, bookings, and campaign context in one founder workspace.
                         </div>
                         <div class="stack-item">
-                            <strong>OS-native path and domain control</strong><br>
-                            Founders can now manage website title, website path, custom domain, and publish flow from the same OS website workspace.
+                            <strong>OS-native website control</strong><br>
+                            Founders can now manage website title, website path, and publish flow from the same website workspace.
                         </div>
                         <div class="stack-item">
-                            <strong>Cross-platform actions</strong><br>
-                            The OS assistant can already create and update real Bazaar and Servio records after explicit confirmation.
+                            <strong>Direct founder actions</strong><br>
+                            The OS can already create and update the real records the public website depends on after explicit confirmation.
                         </div>
                         <div class="stack-item">
                             <strong>Unified founder logic</strong><br>
@@ -651,8 +648,8 @@
                         <span class="muted">{{ preg_replace('#^https?://#', '', $currentWebsiteUrl) }}</span>
                     </div>
                     <div class="workspace-rail-item">
-                        <strong>Storefront type</strong><br>
-                        <span class="muted">{{ strtoupper($recommendedEngine) }} for {{ ucfirst($businessModel) }}</span>
+                        <strong>Website type</strong><br>
+                        <span class="muted">{{ ucfirst($businessModel) }} business</span>
                     </div>
                 </div>
 
@@ -666,7 +663,7 @@
                     @endforeach
                 </div>
 
-                <h3 style="margin-top:22px;">Domain Model</h3>
+                <h3 style="margin-top:22px;">Website Path</h3>
                 <div class="workspace-rail-list">
                     @foreach ($domainModel as $item)
                         <div class="workspace-rail-item">

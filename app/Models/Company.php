@@ -31,6 +31,7 @@ class Company extends Model
         'custom_domain',
         'custom_domain_status',
         'company_brief',
+        'company_logo_path',
     ];
 
     public function founder(): BelongsTo

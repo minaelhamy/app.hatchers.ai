@@ -48,12 +48,14 @@
 @section('content')
     @php
         $founder = $dashboard['founder'];
-        $workspace = $dashboard['workspace'];
+        $workspace = $dashboard['workspace'] ?? [];
         $launchCards = $launchCards ?? [];
-        $aiTools = $workspace['ai_tools'];
+        $aiTools = $workspace['ai_tools'] ?? [];
+        $company = $dashboard['company'] ?? null;
         $primaryGoal = $dashboard['atlas']['primary_growth_goal'] ?? '';
         $recentCampaigns = $dashboard['atlas']['recent_campaigns'] ?? [];
         $moduleCards = $dashboard['module_cards'] ?? [];
+        $logoUrl = !empty($company?->company_logo_path) ? asset('storage/' . ltrim((string) $company->company_logo_path, '/')) : null;
     @endphp
 
     <div class="tools-shell">
@@ -75,33 +77,66 @@
 
         <main class="tools-main">
             <div class="tools-main-inner">
-                <h1>AI Tools</h1>
-                <p>One place to use Atlas-led workflows, OS-native tools, and backend engines while Hatchers Ai OS absorbs the old products.</p>
+                <h1>AI Studio</h1>
+                <p>Use one OS workspace for brand direction, campaign work, and AI help without switching products.</p>
 
                 <section class="tools-section">
                     <div class="tools-highlight">
                         <div class="highlight-label">Recommended next move</div>
                         <div style="font-size:1.2rem;font-weight:700;">{{ $primaryGoal !== '' ? $primaryGoal : 'Use AI to move your next founder sprint forward.' }}</div>
-                        <div class="highlight-copy">This workspace is the transition layer: the founder should work here, while Atlas, LMS, Bazaar, and Servio keep powering the backend until we fully absorb their frontends.</div>
-                        <div class="highlight-badge">Ask AI anything about your project...</div>
+                        <div class="highlight-copy">Start here when you want to shape your company story, launch a campaign, review generated work, or ask the OS for help with your next move.</div>
+                        <div class="highlight-badge">Ask AI anything about your business...</div>
                     </div>
                 </section>
 
                 <section class="tools-section">
-                    <h2>OS AI Workflows</h2>
+                    <h2>Core Studios</h2>
                     <div class="tools-grid">
-                        @foreach ($aiTools as $tool)
-                            <div class="tool-card">
-                                <div class="tool-card-row">
-                                    <div>
-                                        <div class="tool-card-title">{{ $tool['title'] }}</div>
-                                        <div class="tool-card-copy">Bring this workflow into Hatchers Ai OS so founders can use it without switching products.</div>
-                                    </div>
-                                    <div class="tool-card-icon">□</div>
+                        <div class="tool-card">
+                            <div class="tool-card-row">
+                                <div>
+                                    <div class="tool-card-title">Brand Studio</div>
+                                    <div class="tool-card-copy">Upload your logo, sharpen your ICP, define your brand voice, and keep your company intelligence in one place.</div>
                                 </div>
-                                <a class="tool-card-secondary" href="/dashboard/founder">Open from Home</a>
+                                <div class="tool-card-icon">◌</div>
                             </div>
-                        @endforeach
+                            @if ($logoUrl)
+                                <div style="margin-top:12px;">
+                                    <img src="{{ $logoUrl }}" alt="{{ $company?->company_name ?: 'Company logo' }}" style="width:88px;height:auto;border-radius:14px;border:1px solid var(--line);display:block;">
+                                </div>
+                            @endif
+                            <a class="tool-card-cta" href="{{ route('founder.settings') }}">Open Brand Studio</a>
+                        </div>
+                        <div class="tool-card">
+                            <div class="tool-card-row">
+                                <div>
+                                    <div class="tool-card-title">Campaign Studio</div>
+                                    <div class="tool-card-copy">Create campaigns, queue content, review drafts, and keep campaign history inside the OS.</div>
+                                </div>
+                                <div class="tool-card-icon">✦</div>
+                            </div>
+                            <a class="tool-card-cta" href="{{ route('founder.marketing') }}">Open Campaign Studio</a>
+                        </div>
+                        <div class="tool-card">
+                            <div class="tool-card-row">
+                                <div>
+                                    <div class="tool-card-title">AI Agents</div>
+                                    <div class="tool-card-copy">Use guided AI help for tasks, offers, messaging, website updates, and next-best actions.</div>
+                                </div>
+                                <div class="tool-card-icon">◇</div>
+                            </div>
+                            <a class="tool-card-secondary" href="/dashboard/founder">Open Founder Home</a>
+                        </div>
+                        <div class="tool-card">
+                            <div class="tool-card-row">
+                                <div>
+                                    <div class="tool-card-title">Media Library</div>
+                                    <div class="tool-card-copy">Review generated campaign assets, drafts, and website visuals in one shared OS library.</div>
+                                </div>
+                                <div class="tool-card-icon">▥</div>
+                            </div>
+                            <a class="tool-card-secondary" href="{{ route('founder.media-library') }}">Open Media Library</a>
+                        </div>
                     </div>
                 </section>
 
@@ -132,23 +167,7 @@
                 </section>
 
                 <section class="tools-section">
-                    <h2>Atlas-Led Actions</h2>
-                    <div class="tools-grid">
-                        <div class="tool-card">
-                            <div class="tool-card-title">Campaign generation</div>
-                            <div class="tool-card-copy">Use the OS marketing workspace to manage campaigns and content while Atlas continues powering the backend.</div>
-                            <a class="tool-card-cta" href="{{ route('founder.marketing') }}">Open Marketing Workspace</a>
-                        </div>
-                        <div class="tool-card">
-                            <div class="tool-card-title">Founder guidance</div>
-                            <div class="tool-card-copy">Use the founder dashboard assistant and AI prompt bar to ask for next steps, messaging, offers, and weekly execution support.</div>
-                            <a class="tool-card-secondary" href="/dashboard/founder">Go to Founder Home</a>
-                        </div>
-                    </div>
-                </section>
-
-                <section class="tools-section">
-                    <h2>Connected Engines</h2>
+                    <h2>OS Modules</h2>
                     <div class="tools-grid">
                         @foreach ($launchCards as $launch)
                             <div class="tool-card">
@@ -159,14 +178,14 @@
                                     </div>
                                     <div class="tool-card-icon">{{ strtoupper(substr($launch['module'], 0, 1)) }}</div>
                                 </div>
-                                <a class="tool-card-cta" href="{{ route('founder.marketing') }}">Open in OS</a>
+                                <a class="tool-card-cta" href="/dashboard/founder">Open in OS</a>
                             </div>
                         @endforeach
                     </div>
                 </section>
 
                 <section class="tools-section">
-                    <h2>Live AI and Module Context</h2>
+                    <h2>Readiness Snapshot</h2>
                     <div class="tools-grid">
                         @foreach (array_slice($moduleCards, 0, 4) as $module)
                             <div class="tool-card">
@@ -187,18 +206,18 @@
                     @forelse (array_slice($recentCampaigns, 0, 3) as $campaign)
                         <div class="rail-item">
                             <div style="font-weight:600;">{{ $campaign['title'] ?? 'Campaign' }}</div>
-                            <div style="margin-top:4px;color:var(--muted);">{{ $campaign['description'] ?? 'Saved in Atlas.' }}</div>
+                            <div style="margin-top:4px;color:var(--muted);">{{ $campaign['description'] ?? 'Saved in Campaign Studio.' }}</div>
                         </div>
                     @empty
                         <div class="rail-item">
                             <div style="font-weight:600;">No campaigns yet</div>
-                            <div style="margin-top:4px;color:var(--muted);">Atlas campaigns will appear here as they sync into the OS.</div>
+                            <div style="margin-top:4px;color:var(--muted);">Your campaign work will appear here as you start using Campaign Studio.</div>
                         </div>
                     @endforelse
                 </div>
 
-                <h3 style="margin-top:22px;">OS Direction</h3>
-                <div class="mini-note">This page is the beginning of the unified tools layer. Over time these tool cards should become fully OS-native workflows instead of launcher cards.</div>
+                <h3 style="margin-top:22px;">Use This Page For</h3>
+                <div class="mini-note">Start here when you need brand context, campaign generation, AI assistance, or generated media. This should feel like one OS-native control center.</div>
             </div>
         </aside>
     </div>

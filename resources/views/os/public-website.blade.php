@@ -240,8 +240,8 @@
                 @endif
 
                 <div class="site-brand">
-                    <img src="/brand/hatchers-ai-logo.png" alt="Hatchers AI">
-                    <div class="site-host">Published from Hatchers Ai Business OS</div>
+                    <img src="{{ $site['logo_url'] ?: '/brand/hatchers-ai-logo.png' }}" alt="{{ $siteTitle }}">
+                    <div class="site-host">Published on {{ request()->getHost() }}</div>
                 </div>
 
                 <div class="site-hero-grid">
@@ -259,7 +259,7 @@
                     <div class="site-panel">
                         <div style="font-size:0.82rem;letter-spacing:0.12em;color:#7d6b56;">LIVE WEBSITE</div>
                         <div style="font-size:1.6rem;font-weight:700;margin-top:10px;">{{ $siteTitle }}</div>
-                        <div class="meta" style="margin-top:10px;">Running on {{ strtoupper($site['engine']) }} backend infrastructure while staying published under the Hatchers OS domain model.</div>
+                        <div class="meta" style="margin-top:10px;">Live at {{ request()->getHost() }}/{{ ltrim($site['path'], '/') }} and managed entirely from Hatchers OS.</div>
                         @if (!empty($site['updated_at']))
                             <div class="meta" style="margin-top:12px;">Last synced {{ $site['updated_at'] }}</div>
                         @endif
@@ -348,8 +348,8 @@
                 <div class="site-offers">
                     <div>
                         <div class="site-eyebrow">AVAILABLE NOW</div>
-                        <h2 style="font-size:2rem;letter-spacing:-0.03em;margin:0 0 8px;">Offers running through the OS</h2>
-                        <p style="color:#625848;max-width:62ch;">This public website is rendered inside `app.hatchers.ai`, while the founder keeps managing products, services, orders, and bookings from the OS workspace.</p>
+                        <h2 style="font-size:2rem;letter-spacing:-0.03em;margin:0 0 8px;">Available now</h2>
+                        <p style="color:#625848;max-width:62ch;">Everything here is managed from Hatchers OS, including the offers, requests, payments, and follow-up.</p>
                     </div>
 
                     <div class="site-card">
@@ -417,7 +417,7 @@
                         @foreach ($productOffers as $offer)
                             <div class="site-card">
                                 <div style="font-size:1.1rem;font-weight:700;">Order {{ $offer['title'] }}</div>
-                                <div class="meta" style="margin-top:8px;">This creates a real Bazaar order for the founder to manage inside Hatchers Ai Business OS.</div>
+                                <div class="meta" style="margin-top:8px;">Send your request here and the founder will receive it directly inside Hatchers OS.</div>
                                 <form method="POST" action="{{ route('public.website.order', ['websitePath' => $site['path']]) }}" style="margin-top:14px;display:grid;gap:12px;" data-order-request data-base-price="{{ $offer['base_price'] ?? 0 }}" data-currency="{{ $offer['currency'] ?? 'USD' }}">
                                     @csrf
                                     <input type="hidden" name="offer_title" value="{{ $offer['title'] }}">
@@ -478,7 +478,7 @@
                         @foreach ($serviceOffers as $offer)
                             <div class="site-card">
                                 <div style="font-size:1.1rem;font-weight:700;">Book {{ $offer['title'] }}</div>
-                                <div class="meta" style="margin-top:8px;">This creates a real Servio booking for the founder to schedule and manage inside Hatchers Ai Business OS.</div>
+                                <div class="meta" style="margin-top:8px;">Send your booking request here and the founder will schedule it directly inside Hatchers OS.</div>
                                 <form method="POST" action="{{ route('public.website.booking', ['websitePath' => $site['path']]) }}" style="margin-top:14px;display:grid;gap:12px;" data-booking-request data-base-price="{{ $offer['base_price'] ?? 0 }}" data-currency="{{ $offer['currency'] ?? 'USD' }}" data-duration-minutes="{{ (($offer['request_options']['duration_unit'] ?? 'minutes') === 'hours') ? ((int) ($offer['request_options']['duration'] ?? 1) * 60) : (int) ($offer['request_options']['duration'] ?? 30) }}" data-availability-days="{{ implode('|', $offer['request_options']['availability_days'] ?? []) }}" data-open-time="{{ $offer['request_options']['open_time'] ?? '' }}" data-close-time="{{ $offer['request_options']['close_time'] ?? '' }}">
                                     @csrf
                                     <input type="hidden" name="offer_title" value="{{ $offer['title'] }}">
@@ -542,7 +542,7 @@
             <section class="site-section" style="padding-top: 0;">
                 <div class="site-wrap">
                     <div class="site-eyebrow">HOW THIS BUSINESS OPERATES</div>
-                    <h2 style="font-size:2rem;letter-spacing:-0.03em;margin:0 0 16px;">Live operating signals from the OS</h2>
+                    <h2 style="font-size:2rem;letter-spacing:-0.03em;margin:0 0 16px;">How this business operates</h2>
                     <div class="site-offer-grid">
                         @foreach ($operations as $operation)
                             <div class="site-card">

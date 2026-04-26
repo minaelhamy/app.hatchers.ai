@@ -91,7 +91,7 @@
         <aside class="tracker-sidebar">
             @include('os.partials.founder-sidebar', [
                 'founder' => $founder,
-                'businessModel' => $businessModel,
+                'businessModel' => $founder->company->business_model ?? 'hybrid',
                 'activeKey' => 'first-100',
                 'navClass' => 'tracker-nav',
                 'itemClass' => 'tracker-nav-item',
