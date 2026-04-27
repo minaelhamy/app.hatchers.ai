@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ $pageTitle ?? 'Hatchers OS' }}</title>
+    @php
+        $osEmbedMode = request()->boolean('os_embed');
+    @endphp
     <style>
         :root {
             --bg: #f6f1e8;
@@ -436,6 +439,10 @@
     <style>
         .page.founder-home-page {
             padding: 0;
+        }
+
+        body.os-founder-body {
+            overflow-x: hidden;
         }
 
         .page.founder-home-page,
@@ -895,6 +902,292 @@
             box-shadow: 0 10px 20px rgba(61, 46, 28, 0.08);
         }
 
+        .os-window-host {
+            position: absolute;
+            inset: 24px 236px 120px 178px;
+            pointer-events: none;
+            z-index: 6;
+        }
+
+        .os-app-window {
+            position: absolute;
+            border-radius: 30px;
+            overflow: hidden;
+            border: 1px solid rgba(214, 201, 184, 0.84);
+            background: rgba(255, 251, 245, 0.92);
+            box-shadow:
+                0 26px 80px rgba(55, 41, 24, 0.18),
+                inset 0 1px 0 rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(12px);
+            pointer-events: auto;
+            min-width: 320px;
+            min-height: 260px;
+        }
+
+        .os-app-window.active {
+            box-shadow:
+                0 30px 90px rgba(55, 41, 24, 0.22),
+                0 0 0 1px rgba(255, 255, 255, 0.24),
+                inset 0 1px 0 rgba(255, 255, 255, 0.84);
+        }
+
+        .os-app-window-bar,
+        .os-inline-window-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 14px 18px;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(244, 237, 227, 0.78));
+            border-bottom: 1px solid rgba(214, 201, 184, 0.72);
+        }
+
+        .os-app-window-dots,
+        .os-inline-window-dots {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+        }
+
+        .os-app-window-dots span,
+        .os-inline-window-dots span {
+            width: 10px;
+            height: 10px;
+            border-radius: 999px;
+            display: inline-block;
+        }
+
+        .os-app-window-dots span:nth-child(1),
+        .os-inline-window-dots span:nth-child(1) { background: #ff7965; }
+        .os-app-window-dots span:nth-child(2),
+        .os-inline-window-dots span:nth-child(2) { background: #f6c85e; }
+        .os-app-window-dots span:nth-child(3),
+        .os-inline-window-dots span:nth-child(3) { background: #68c06a; }
+
+        .os-app-window-title,
+        .os-inline-window-title {
+            flex: 1;
+            min-width: 0;
+            text-align: center;
+            font-size: 0.92rem;
+            font-weight: 700;
+            letter-spacing: 0.01em;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .os-app-window-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .os-app-window-close {
+            width: 34px;
+            height: 34px;
+            border-radius: 12px;
+            border: 1px solid rgba(214, 201, 184, 0.9);
+            background: rgba(255, 255, 255, 0.82);
+            cursor: pointer;
+            font: inherit;
+        }
+
+        .os-app-window-frame {
+            width: 100%;
+            height: calc(100% - 64px);
+            border: 0;
+            background: #fffdf8;
+            display: block;
+        }
+
+        .os-desktop-home .founder-main,
+        .os-desktop-home .founder-rightbar {
+            position: relative;
+            z-index: 2;
+        }
+
+        .os-desktop-home .founder-main-inner,
+        .os-desktop-home .founder-rightbar-inner {
+            position: relative;
+            z-index: 2;
+        }
+
+        .os-inline-window-bar {
+            margin: -28px -30px 22px;
+            border-top-left-radius: 34px;
+            border-top-right-radius: 34px;
+        }
+
+        .page.founder-home-page.os-embed-mode .page,
+        body.os-embed-mode .page.founder-home-page {
+            background: transparent !important;
+        }
+
+        body.os-embed-mode .shell,
+        body.os-embed-mode .page.founder-home-page,
+        body.os-embed-mode .founder-home,
+        body.os-embed-mode .workspace-shell,
+        body.os-embed-mode .tracker-shell,
+        body.os-embed-mode .marketing-shell,
+        body.os-embed-mode .settings-shell,
+        body.os-embed-mode .learning-shell,
+        body.os-embed-mode .notifications-shell,
+        body.os-embed-mode .tools-shell,
+        body.os-embed-mode .media-shell,
+        body.os-embed-mode .activity-shell,
+        body.os-embed-mode .wallet-shell,
+        body.os-embed-mode .commerce-shell,
+        body.os-embed-mode .ops-shell,
+        body.os-embed-mode .tasks-shell,
+        body.os-embed-mode .analytics-shell,
+        body.os-embed-mode .atlas-frame-shell {
+            min-height: 100vh;
+            background: transparent !important;
+        }
+
+        body.os-embed-mode .founder-sidebar,
+        body.os-embed-mode .workspace-sidebar,
+        body.os-embed-mode .tracker-sidebar,
+        body.os-embed-mode .marketing-sidebar,
+        body.os-embed-mode .settings-sidebar,
+        body.os-embed-mode .learning-sidebar,
+        body.os-embed-mode .notifications-sidebar,
+        body.os-embed-mode .tools-sidebar,
+        body.os-embed-mode .media-sidebar,
+        body.os-embed-mode .activity-sidebar,
+        body.os-embed-mode .wallet-sidebar,
+        body.os-embed-mode .commerce-sidebar,
+        body.os-embed-mode .ops-sidebar,
+        body.os-embed-mode .tasks-sidebar,
+        body.os-embed-mode .analytics-sidebar,
+        body.os-embed-mode .atlas-frame-sidebar,
+        body.os-embed-mode .founder-rightbar,
+        body.os-embed-mode .workspace-rightbar,
+        body.os-embed-mode .tracker-rightbar,
+        body.os-embed-mode .marketing-rightbar,
+        body.os-embed-mode .settings-rightbar,
+        body.os-embed-mode .learning-rightbar,
+        body.os-embed-mode .notifications-rightbar,
+        body.os-embed-mode .tools-rightbar,
+        body.os-embed-mode .media-rightbar,
+        body.os-embed-mode .activity-rightbar,
+        body.os-embed-mode .wallet-rightbar,
+        body.os-embed-mode .commerce-rightbar,
+        body.os-embed-mode .ops-rightbar,
+        body.os-embed-mode .tasks-rightbar,
+        body.os-embed-mode .analytics-rightbar {
+            display: none !important;
+        }
+
+        body.os-embed-mode .founder-home,
+        body.os-embed-mode .workspace-shell,
+        body.os-embed-mode .tracker-shell,
+        body.os-embed-mode .marketing-shell,
+        body.os-embed-mode .settings-shell,
+        body.os-embed-mode .learning-shell,
+        body.os-embed-mode .notifications-shell,
+        body.os-embed-mode .tools-shell,
+        body.os-embed-mode .media-shell,
+        body.os-embed-mode .activity-shell,
+        body.os-embed-mode .wallet-shell,
+        body.os-embed-mode .commerce-shell,
+        body.os-embed-mode .ops-shell,
+        body.os-embed-mode .tasks-shell,
+        body.os-embed-mode .analytics-shell,
+        body.os-embed-mode .atlas-frame-shell {
+            grid-template-columns: 1fr !important;
+        }
+
+        body.os-embed-mode .founder-main,
+        body.os-embed-mode .workspace-main,
+        body.os-embed-mode .tracker-main,
+        body.os-embed-mode .marketing-main,
+        body.os-embed-mode .settings-main,
+        body.os-embed-mode .learning-main,
+        body.os-embed-mode .notifications-main,
+        body.os-embed-mode .tools-main,
+        body.os-embed-mode .media-main,
+        body.os-embed-mode .activity-main,
+        body.os-embed-mode .wallet-main,
+        body.os-embed-mode .commerce-main,
+        body.os-embed-mode .ops-main,
+        body.os-embed-mode .tasks-main,
+        body.os-embed-mode .analytics-main,
+        body.os-embed-mode .atlas-frame-main {
+            padding: 12px !important;
+        }
+
+        body.os-embed-mode .founder-main-inner,
+        body.os-embed-mode .workspace-main-inner,
+        body.os-embed-mode .tracker-main-inner,
+        body.os-embed-mode .marketing-main-inner,
+        body.os-embed-mode .settings-main-inner,
+        body.os-embed-mode .learning-main-inner,
+        body.os-embed-mode .notifications-main-inner,
+        body.os-embed-mode .tools-main-inner,
+        body.os-embed-mode .media-main-inner,
+        body.os-embed-mode .activity-main-inner,
+        body.os-embed-mode .wallet-main-inner,
+        body.os-embed-mode .commerce-main-inner,
+        body.os-embed-mode .ops-main-inner,
+        body.os-embed-mode .tasks-main-inner,
+        body.os-embed-mode .analytics-main-inner,
+        body.os-embed-mode .atlas-frame-main-inner {
+            min-height: calc(100vh - 24px);
+            border-radius: 24px;
+            padding: 24px 24px 28px !important;
+        }
+
+        body.os-embed-mode .assistant {
+            display: none !important;
+        }
+
+        .os-boot-screen {
+            position: fixed;
+            inset: 0;
+            display: grid;
+            place-items: center;
+            background: linear-gradient(165deg, #bfb0a8 0%, #e8d5cc 100%);
+            z-index: 9999;
+            transition: opacity 0.75s ease, visibility 0.75s ease;
+        }
+
+        .os-boot-screen.hidden {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        .os-boot-inner {
+            display: grid;
+            justify-items: center;
+            gap: 22px;
+        }
+
+        .os-boot-mark {
+            width: 64px;
+            height: 64px;
+            border-radius: 18px;
+            background: linear-gradient(135deg,#e11d74,#ef4444);
+            box-shadow: 0 16px 40px rgba(225,29,116,0.3);
+        }
+
+        .os-boot-title {
+            font-size: 16px;
+            letter-spacing: 0.2em;
+            color: rgba(40,30,30,0.7);
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .os-boot-copy {
+            margin-top: 6px;
+            font-size: 12px;
+            color: rgba(40,30,30,0.45);
+            letter-spacing: 0.08em;
+        }
+
         @media (max-width: 1240px) {
             .page.founder-home-page .founder-home,
             .page.founder-home-page .workspace-shell,
@@ -981,10 +1274,14 @@
             .os-launcher-nav {
                 grid-template-columns: repeat(4, minmax(0, 1fr));
             }
+
+            .os-window-host {
+                inset: 18px 18px 160px 18px;
+            }
         }
     </style>
 </head>
-<body>
+<body class="{{ $osEmbedMode ? 'os-embed-mode ' : '' }}{{ trim($__env->yieldContent('page_class')) === 'founder-home-page' ? 'os-founder-body' : '' }}">
     @php
         $authUser = auth()->user();
         $hideTopbar = trim($__env->yieldContent('hide_topbar')) === '1';
@@ -1026,6 +1323,15 @@
             @yield('content')
         </main>
     </div>
+    @if (trim($__env->yieldContent('page_class')) === 'founder-home-page' && !$osEmbedMode)
+        <div class="os-boot-screen" data-os-boot>
+            <div class="os-boot-inner">
+                <div class="os-boot-mark"></div>
+                <div class="os-boot-title">Hatchers OS</div>
+                <div class="os-boot-copy">Loading your workspace…</div>
+            </div>
+        </div>
+    @endif
     @yield('assistant')
     <script>
         (() => {
@@ -1219,6 +1525,204 @@
                     });
                 });
             });
+        })();
+    </script>
+    <script>
+        (() => {
+            const boot = document.querySelector('[data-os-boot]');
+            if (!boot || typeof window.sessionStorage === 'undefined') return;
+
+            const storageKey = 'hatchers-os-boot-seen';
+            if (window.sessionStorage.getItem(storageKey) === '1') {
+                boot.classList.add('hidden');
+                return;
+            }
+
+            window.setTimeout(() => {
+                boot.classList.add('hidden');
+                window.sessionStorage.setItem(storageKey, '1');
+            }, 1800);
+        })();
+    </script>
+    <script>
+        (() => {
+            const page = document.querySelector('.page.founder-home-page');
+            if (!page) return;
+
+            const selectors = [
+                '.founder-main-inner',
+                '.workspace-main-inner',
+                '.tracker-main-inner',
+                '.marketing-main-inner',
+                '.settings-main-inner',
+                '.learning-main-inner',
+                '.notifications-main-inner',
+                '.tools-main-inner',
+                '.media-main-inner',
+                '.activity-main-inner',
+                '.wallet-main-inner',
+                '.commerce-main-inner',
+                '.ops-main-inner',
+                '.tasks-main-inner',
+                '.analytics-main-inner',
+                '.atlas-frame-main-inner'
+            ];
+
+            selectors.forEach((selector) => {
+                page.querySelectorAll(selector).forEach((panel) => {
+                    if (panel.querySelector('.os-inline-window-bar')) return;
+                    const heading = panel.querySelector('h1, h2');
+                    const title = heading?.textContent?.trim() || 'Workspace';
+                    const bar = document.createElement('div');
+                    bar.className = 'os-inline-window-bar';
+                    bar.innerHTML = `
+                        <div class="os-inline-window-dots"><span></span><span></span><span></span></div>
+                        <div class="os-inline-window-title">${title}</div>
+                        <div style="width:34px;"></div>
+                    `;
+                    panel.prepend(bar);
+                });
+            });
+        })();
+    </script>
+    <script>
+        (() => {
+            const desktop = document.querySelector('[data-os-desktop-home]');
+            const host = document.querySelector('[data-os-window-host]');
+            if (!desktop || !host) return;
+
+            const launcherNodes = Array.from(document.querySelectorAll('[data-launcher-route]'));
+            const routeMap = {};
+            launcherNodes.forEach((node) => {
+                const key = node.dataset.launcherKey;
+                if (!key || routeMap[key]) return;
+                routeMap[key] = {
+                    key,
+                    label: node.dataset.launcherLabel || key,
+                    route: node.dataset.launcherRoute || '/',
+                    icon: node.dataset.launcherIcon || key.slice(0, 2).toUpperCase(),
+                };
+            });
+
+            let zIndex = 20;
+            const windows = new Map();
+
+            const withEmbedParam = (url) => {
+                try {
+                    const target = new URL(url, window.location.origin);
+                    target.searchParams.set('os_embed', '1');
+                    return `${target.pathname}${target.search}${target.hash}`;
+                } catch (error) {
+                    return url.includes('?') ? `${url}&os_embed=1` : `${url}?os_embed=1`;
+                }
+            };
+
+            const focusWindow = (key) => {
+                const active = windows.get(key);
+                if (!active) return;
+                windows.forEach((entry) => entry.el.classList.remove('active'));
+                zIndex += 1;
+                active.el.style.zIndex = String(zIndex);
+                active.el.classList.add('active');
+            };
+
+            const buildWindow = (app, startX, startY) => {
+                const win = document.createElement('section');
+                win.className = 'os-app-window active';
+                win.dataset.windowKey = app.key;
+                win.style.left = `${startX}px`;
+                win.style.top = `${startY}px`;
+                win.style.width = '560px';
+                win.style.height = '520px';
+                win.style.zIndex = String(++zIndex);
+                win.innerHTML = `
+                    <div class="os-app-window-bar" data-window-drag>
+                        <div class="os-app-window-dots"><span></span><span></span><span></span></div>
+                        <div class="os-app-window-title">${app.label}</div>
+                        <div class="os-app-window-actions">
+                            <button class="os-app-window-close" type="button" aria-label="Close ${app.label}">×</button>
+                        </div>
+                    </div>
+                    <iframe class="os-app-window-frame" title="${app.label}" src="${withEmbedParam(app.route)}"></iframe>
+                `;
+                host.appendChild(win);
+
+                const close = () => {
+                    win.remove();
+                    windows.delete(app.key);
+                };
+
+                win.querySelector('.os-app-window-close')?.addEventListener('click', close);
+                win.addEventListener('mousedown', () => focusWindow(app.key));
+
+                const dragHandle = win.querySelector('[data-window-drag]');
+                let dragging = false;
+                let originX = 0;
+                let originY = 0;
+                let baseX = 0;
+                let baseY = 0;
+
+                dragHandle?.addEventListener('mousedown', (event) => {
+                    dragging = true;
+                    focusWindow(app.key);
+                    originX = event.clientX;
+                    originY = event.clientY;
+                    baseX = parseFloat(win.style.left || '0');
+                    baseY = parseFloat(win.style.top || '0');
+                    document.body.style.userSelect = 'none';
+                    event.preventDefault();
+                });
+
+                window.addEventListener('mousemove', (event) => {
+                    if (!dragging) return;
+                    const nextX = baseX + (event.clientX - originX);
+                    const nextY = baseY + (event.clientY - originY);
+                    win.style.left = `${Math.max(16, nextX)}px`;
+                    win.style.top = `${Math.max(16, nextY)}px`;
+                });
+
+                window.addEventListener('mouseup', () => {
+                    dragging = false;
+                    document.body.style.userSelect = '';
+                });
+
+                windows.set(app.key, { el: win, close });
+                focusWindow(app.key);
+            };
+
+            const openApp = (key) => {
+                const app = routeMap[key];
+                if (!app) return;
+                if (windows.has(key)) {
+                    focusWindow(key);
+                    return;
+                }
+
+                const count = windows.size;
+                buildWindow(app, 72 + (count * 42), 88 + (count * 34));
+            };
+
+            launcherNodes.forEach((node) => {
+                node.addEventListener('click', (event) => {
+                    if (node.dataset.dragMoved === '1') return;
+                    event.preventDefault();
+                    const key = node.dataset.launcherKey;
+                    if (key) openApp(key);
+                });
+
+                node.addEventListener('contextmenu', (event) => {
+                    if (!node.classList.contains('os-dock-item')) return;
+                    event.preventDefault();
+                    const key = node.dataset.launcherKey;
+                    const active = key ? windows.get(key) : null;
+                    if (active) active.close();
+                });
+            });
+
+            const initialKey = desktop.dataset.osOpen;
+            if (initialKey && routeMap[initialKey]) {
+                window.setTimeout(() => openApp(initialKey), 220);
+            }
         })();
     </script>
     @yield('scripts')

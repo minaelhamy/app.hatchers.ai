@@ -75,6 +75,8 @@
                 draggable="true"
                 data-launcher-key="{{ $item['key'] }}"
                 data-launcher-label="{{ $item['label'] }}"
+                data-launcher-route="{{ $item['href'] }}"
+                data-launcher-icon="{{ $item['icon'] }}"
             >
                 <span class="os-launcher-app-surface tone-{{ $item['accent'] }}">
                     <span class="{{ $sidebarIconClass }} os-launcher-app-glyph">{{ $item['icon'] }}</span>
@@ -94,6 +96,10 @@
                 class="os-dock-item {{ $sidebarActive === $item['key'] ? 'active' : '' }}"
                 href="{{ $item['href'] }}"
                 title="{{ $item['label'] }}"
+                data-launcher-key="{{ $item['key'] }}"
+                data-launcher-label="{{ $item['label'] }}"
+                data-launcher-route="{{ $item['href'] }}"
+                data-launcher-icon="{{ $item['icon'] }}"
             >
                 <span class="os-dock-surface tone-{{ $item['accent'] }}">{{ $item['icon'] }}</span>
             </a>

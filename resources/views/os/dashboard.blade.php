@@ -549,7 +549,7 @@
         $nextBestActions = $workspace['next_best_actions'];
     @endphp
 
-    <div class="founder-home">
+    <div class="founder-home os-desktop-home" data-os-desktop-home data-os-open="{{ e((string) request('open', '')) }}">
         <aside class="founder-sidebar">
             @include('os.partials.founder-sidebar', [
                 'founder' => $founder,
@@ -565,6 +565,8 @@
                 'avatarClass' => 'founder-avatar',
             ])
         </aside>
+
+        <div class="os-window-host" data-os-window-host></div>
 
         <main class="founder-main">
             <div class="founder-main-inner">
