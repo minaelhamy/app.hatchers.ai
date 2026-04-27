@@ -27,6 +27,7 @@ class PublicWebsiteService
         $summary = is_array($payload['summary'] ?? null) ? $payload['summary'] : [];
         $counts = is_array($payload['key_counts'] ?? null) ? $payload['key_counts'] : [];
         $offerPreferences = $this->offerPaymentPreferences($founder);
+        $engineVendorSlug = trim((string) ($payload['username'] ?? ''));
 
         $websiteTitle = trim((string) ($summary['website_title'] ?? ''));
         if ($websiteTitle === '') {
@@ -42,12 +43,11 @@ class PublicWebsiteService
         }
 
         $storefrontUrl = trim((string) ($summary['website_url'] ?? ''));
-        $storefrontHost = parse_url($storefrontUrl, PHP_URL_HOST);
-        $osHost = parse_url((string) config('app.url'), PHP_URL_HOST) ?: 'app.hatchers.ai';
-        $usesEngineStorefront = $storefrontUrl !== ''
-            && is_string($storefrontHost)
-            && $storefrontHost !== ''
-            && strcasecmp($storefrontHost, $osHost) !== 0;
+        $engineBaseUrl = rtrim((string) config('modules.' . $engine . '.base_url', ''), '/');
+        $engineProxyUrl = $engineBaseUrl !== '' && $engineVendorSlug !== ''
+            ? $engineBaseUrl . '/' . ltrim($engineVendorSlug, '/')
+            : $storefrontUrl;
+        $usesEngineStorefront = $engineProxyUrl !== '';
 
         return [
             'title' => $websiteTitle,
@@ -56,6 +56,8 @@ class PublicWebsiteService
             'path' => $websitePath,
             'logo_url' => !empty($company->company_logo_path) ? asset('storage/' . ltrim((string) $company->company_logo_path, '/')) : null,
             'source_storefront_url' => $storefrontUrl,
+            'engine_proxy_url' => $engineProxyUrl,
+            'engine_vendor_slug' => $engineVendorSlug,
             'uses_engine_storefront' => $usesEngineStorefront,
             'theme' => (string) ($summary['theme_template'] ?? ''),
             'hero' => $this->buildHero($company, $founder?->full_name ?? '', $businessModel, $counts, $currency, $draftOutput),

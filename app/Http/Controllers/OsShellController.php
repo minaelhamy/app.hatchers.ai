@@ -52,11 +52,13 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
+use Symfony\Component\HttpFoundation\Cookie;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Throwable;
 
@@ -3919,15 +3921,30 @@ class OsShellController extends Controller
             abort(404);
         }
 
+        $site = $publicWebsiteService->build($company);
+        if (($site['uses_engine_storefront'] ?? false) && !empty($site['engine_proxy_url'])) {
+            return $this->proxyEngineStorefront($company, '', request(), $publicWebsiteService);
+        }
+
         return view('os.public-website', [
             'pageTitle' => (string) ($company->company_name ?: 'Business Website'),
-            'site' => $publicWebsiteService->build($company),
+            'site' => $site,
             'sourceContext' => [
                 'src' => trim((string) request()->query('src', '')),
                 'promo' => trim((string) request()->query('promo', '')),
                 'offer' => trim((string) request()->query('offer', '')),
             ],
         ]);
+    }
+
+    public function publicWebsiteProxy(string $websiteRoot, string $proxyPath, Request $request, PublicWebsiteService $publicWebsiteService)
+    {
+        $company = $this->resolvePublicWebsiteRootCompany($websiteRoot);
+        if (!$company) {
+            abort(404);
+        }
+
+        return $this->proxyEngineStorefront($company, $proxyPath, $request, $publicWebsiteService);
     }
 
     public function publicWebsiteIntroRequest(string $websitePath, Request $request): RedirectResponse
@@ -6975,6 +6992,232 @@ class OsShellController extends Controller
 
                 return $path === $normalizedPath;
             });
+    }
+
+    private function resolvePublicWebsiteRootCompany(string $websiteRoot): ?Company
+    {
+        return $this->resolvePublicWebsiteCompany($websiteRoot);
+    }
+
+    private function proxyEngineStorefront(Company $company, string $proxyPath, Request $request, PublicWebsiteService $publicWebsiteService)
+    {
+        $site = $publicWebsiteService->build($company);
+        $engineProxyUrl = trim((string) ($site['engine_proxy_url'] ?? ''));
+        $websiteRoot = trim((string) ($site['path'] ?? $company->website_path ?? ''), '/');
+
+        if ($engineProxyUrl === '' || $websiteRoot === '') {
+            return view('os.public-website', [
+                'pageTitle' => (string) ($company->company_name ?: 'Business Website'),
+                'site' => $site,
+                'sourceContext' => [
+                    'src' => trim((string) $request->query('src', '')),
+                    'promo' => trim((string) $request->query('promo', '')),
+                    'offer' => trim((string) $request->query('offer', '')),
+                ],
+            ]);
+        }
+
+        $targetUrl = rtrim($engineProxyUrl, '/');
+        $proxyPath = trim($proxyPath, '/');
+        if ($proxyPath !== '') {
+            $targetUrl .= '/' . $proxyPath;
+        }
+
+        $options = [
+            'query' => $request->query(),
+            'allow_redirects' => false,
+        ];
+
+        $cookiePrefix = $this->engineStorefrontCookiePrefix((string) ($site['engine'] ?? 'storefront'), $websiteRoot);
+
+        $forwardHeaders = array_filter([
+            'Accept' => $request->header('Accept'),
+            'Accept-Language' => $request->header('Accept-Language'),
+            'User-Agent' => $request->userAgent(),
+            'Referer' => $request->header('Referer'),
+            'X-Requested-With' => $request->header('X-Requested-With'),
+        ], static fn ($value) => filled($value));
+
+        $upstreamCookieHeader = $this->upstreamStorefrontCookieHeader($request, $cookiePrefix);
+        if ($upstreamCookieHeader !== '') {
+            $forwardHeaders['Cookie'] = $upstreamCookieHeader;
+        }
+
+        $client = Http::withHeaders($forwardHeaders)->withOptions($options);
+        $method = strtoupper($request->method());
+
+        if (!in_array($method, ['GET', 'HEAD'], true)) {
+            $contentType = strtolower((string) $request->header('Content-Type', ''));
+            if (str_contains($contentType, 'application/json')) {
+                $options['body'] = $request->getContent();
+                $forwardHeaders['Content-Type'] = $request->header('Content-Type');
+                $client = Http::withHeaders($forwardHeaders)->withOptions($options);
+            } else {
+                $client = Http::withHeaders($forwardHeaders)->withOptions($options)->asForm();
+                $options['form_params'] = $request->except(['_token']);
+            }
+        }
+
+        $upstream = $client->send($method, $targetUrl, $options);
+        $status = $upstream->status();
+        $contentType = strtolower((string) $upstream->header('Content-Type', 'text/html; charset=UTF-8'));
+
+        if ($status >= 300 && $status < 400 && filled($upstream->header('Location'))) {
+            $location = $this->rewriteStorefrontUrlToOsPath((string) $upstream->header('Location'), $engineProxyUrl, $websiteRoot);
+
+            return redirect()->away($location, $status);
+        }
+
+        $body = $upstream->body();
+        if (str_contains($contentType, 'text/html')) {
+            $body = $this->rewriteStorefrontHtmlForOs($body, $engineProxyUrl, $websiteRoot);
+        } elseif (str_contains($contentType, 'javascript') || str_contains($contentType, 'json')) {
+            $body = $this->rewriteStorefrontTextForOs($body, $engineProxyUrl, $websiteRoot);
+        }
+
+        $response = response($body, $status);
+
+        foreach ($upstream->headers() as $header => $values) {
+            $headerName = (string) $header;
+            if (in_array(strtolower($headerName), ['content-length', 'transfer-encoding', 'content-encoding', 'set-cookie'], true)) {
+                continue;
+            }
+
+            foreach ((array) $values as $value) {
+                $response->headers->set($headerName, $value, false);
+            }
+        }
+
+        $setCookieHeaders = $upstream->headers()['Set-Cookie'] ?? [];
+        foreach ((array) $setCookieHeaders as $cookieLine) {
+            $response->headers->setCookie($this->rewriteStorefrontCookie((string) $cookieLine, $request, $cookiePrefix, $websiteRoot));
+        }
+
+        return $response;
+    }
+
+    private function rewriteStorefrontHtmlForOs(string $html, string $engineProxyUrl, string $websiteRoot): string
+    {
+        $rewritten = $this->rewriteStorefrontTextForOs($html, $engineProxyUrl, $websiteRoot);
+        $prefix = '/' . trim($websiteRoot, '/');
+
+        $rewritten = preg_replace('/\b(href|src|action)=([\"\'])\/(?!\/)/i', '$1=$2' . $prefix . '/', $rewritten) ?? $rewritten;
+        $rewritten = preg_replace('/url\(([\"\']?)\/(?!\/)/i', 'url($1' . $prefix . '/', $rewritten) ?? $rewritten;
+
+        return $rewritten;
+    }
+
+    private function rewriteStorefrontTextForOs(string $content, string $engineProxyUrl, string $websiteRoot): string
+    {
+        $osBaseUrl = rtrim((string) config('app.url'), '/') . '/' . trim($websiteRoot, '/');
+        $normalizedEngineUrl = rtrim($engineProxyUrl, '/');
+        $escapedEngineUrl = str_replace('/', '\\/', $normalizedEngineUrl);
+        $escapedOsBaseUrl = str_replace('/', '\\/', $osBaseUrl);
+
+        $rewritten = str_replace(
+            [$normalizedEngineUrl, $escapedEngineUrl],
+            [$osBaseUrl, $escapedOsBaseUrl],
+            $content
+        );
+
+        $prefix = '/' . trim($websiteRoot, '/');
+
+        $patterns = [
+            '/([="\':(,\s])\/(?!\/)/' => '$1' . $prefix . '/',
+            '/(url\([\"\']?)\/(?!\/)/i' => '$1' . $prefix . '/',
+        ];
+
+        foreach ($patterns as $pattern => $replacement) {
+            $candidate = preg_replace($pattern, $replacement, $rewritten);
+            if (is_string($candidate)) {
+                $rewritten = $candidate;
+            }
+        }
+
+        return $rewritten;
+    }
+
+    private function rewriteStorefrontUrlToOsPath(string $url, string $engineProxyUrl, string $websiteRoot): string
+    {
+        $rewritten = $this->rewriteStorefrontTextForOs($url, $engineProxyUrl, $websiteRoot);
+        $trimmed = trim($rewritten);
+
+        if (preg_match('/^https?:\/\//i', $trimmed)) {
+            return $trimmed;
+        }
+
+        if (str_starts_with($trimmed, '/')) {
+            return rtrim((string) config('app.url'), '/') . $trimmed;
+        }
+
+        return rtrim((string) config('app.url'), '/') . '/' . trim($websiteRoot, '/') . '/' . ltrim($trimmed, '/');
+    }
+
+    private function rewriteStorefrontCookie(string $cookieLine, Request $request, string $cookiePrefix, string $websiteRoot): Cookie
+    {
+        $parts = array_map('trim', explode(';', $cookieLine));
+        $nameValue = array_shift($parts) ?: '=';
+        [$name, $value] = array_pad(explode('=', $nameValue, 2), 2, '');
+        $name = $cookiePrefix . $name;
+
+        $expires = 0;
+        $path = '/' . trim($websiteRoot, '/');
+        $secure = $request->isSecure();
+        $httpOnly = true;
+        $sameSite = null;
+
+        foreach ($parts as $part) {
+            [$attribute, $attributeValue] = array_pad(explode('=', $part, 2), 2, '');
+            $attribute = strtolower(trim($attribute));
+            $attributeValue = trim($attributeValue);
+
+            if ($attribute === 'expires' && $attributeValue !== '') {
+                $timestamp = strtotime($attributeValue);
+                if ($timestamp !== false) {
+                    $expires = $timestamp;
+                }
+            } elseif ($attribute === 'path' && $attributeValue !== '') {
+                $path = $attributeValue;
+            } elseif ($attribute === 'secure') {
+                $secure = true;
+            } elseif ($attribute === 'httponly') {
+                $httpOnly = true;
+            } elseif ($attribute === 'samesite' && $attributeValue !== '') {
+                $sameSite = $attributeValue;
+            }
+        }
+
+        $minutes = $expires > 0 ? max(0, (int) ceil(($expires - time()) / 60)) : 0;
+
+        return Cookie::create($name, $value, $minutes, $path, null, $secure, $httpOnly, false, $sameSite);
+    }
+
+    private function engineStorefrontCookiePrefix(string $engine, string $websiteRoot): string
+    {
+        $normalizedRoot = preg_replace('/[^A-Za-z0-9_]/', '_', trim($websiteRoot, '/')) ?: 'site';
+        $normalizedEngine = preg_replace('/[^A-Za-z0-9_]/', '_', trim($engine)) ?: 'storefront';
+
+        return 'hatchers_' . strtolower($normalizedEngine) . '_' . strtolower($normalizedRoot) . '_';
+    }
+
+    private function upstreamStorefrontCookieHeader(Request $request, string $cookiePrefix): string
+    {
+        $pairs = [];
+
+        foreach ($request->cookies->all() as $name => $value) {
+            if (!str_starts_with((string) $name, $cookiePrefix)) {
+                continue;
+            }
+
+            $upstreamName = substr((string) $name, strlen($cookiePrefix));
+            if ($upstreamName === '') {
+                continue;
+            }
+
+            $pairs[] = $upstreamName . '=' . rawurlencode((string) $value);
+        }
+
+        return implode('; ', $pairs);
     }
 
     private function resolvePublicWebsiteOffer(array $site, string $type, string $title): ?array

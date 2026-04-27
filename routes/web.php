@@ -155,6 +155,10 @@ Route::get('/checkout/public/{websitePath}/success', [OsShellController::class, 
 Route::get('/checkout/public/{websitePath}/cancel', [OsShellController::class, 'publicCheckoutCancel'])
     ->where('websitePath', '[A-Za-z0-9\-/]+')
     ->name('public.checkout.cancel');
-Route::get('/{websitePath}', [OsShellController::class, 'publicWebsite'])
+Route::any('/{websiteRoot}/{proxyPath}', [OsShellController::class, 'publicWebsiteProxy'])
+    ->where('websiteRoot', '[A-Za-z0-9\-]+')
+    ->where('proxyPath', '.*')
+    ->name('public.website.proxy');
+Route::match(['GET', 'POST'], '/{websitePath}', [OsShellController::class, 'publicWebsite'])
     ->where('websitePath', '[A-Za-z0-9\-/]+')
     ->name('public.website');
