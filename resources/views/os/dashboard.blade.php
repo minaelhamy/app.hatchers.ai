@@ -9,522 +9,230 @@
             padding: 0;
         }
 
-        .founder-home {
+        .os-desktop-scene {
+            position: relative;
             min-height: 100vh;
+            padding: 42px 44px 56px;
+            background:
+                radial-gradient(circle at 78% 14%, rgba(230, 184, 188, 0.28), transparent 0 16%),
+                linear-gradient(165deg, #ddd2c8 0%, #c8b8b0 100%);
+            overflow: hidden;
+        }
+
+        .os-desktop-scene::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(255, 255, 255, 0.11) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.11) 1px, transparent 1px);
+            background-size: 88px 88px;
+            opacity: 0.35;
+            pointer-events: none;
+        }
+
+        .os-desktop-frame {
+            position: relative;
+            min-height: calc(100vh - 84px);
+            border-radius: 24px;
+            border: 1px solid rgba(209, 198, 187, 0.82);
+            background:
+                radial-gradient(circle at 78% 18%, rgba(234, 197, 201, 0.24), transparent 0 18%),
+                linear-gradient(180deg, rgba(243, 236, 229, 0.92), rgba(234, 223, 214, 0.94));
+            box-shadow:
+                0 16px 40px rgba(71, 52, 31, 0.08),
+                inset 0 1px 0 rgba(255, 255, 255, 0.56);
+            overflow: hidden;
+        }
+
+        .os-desktop-bar {
+            position: relative;
+            z-index: 2;
             display: grid;
-            grid-template-columns: 220px minmax(0, 1fr) 220px;
-            background: #f8f5ee;
+            grid-template-columns: 1fr auto;
+            gap: 18px;
+            align-items: center;
+            padding: 14px 20px 12px;
         }
 
-        .founder-sidebar,
-        .founder-rightbar {
-            background: rgba(255, 252, 247, 0.8);
-            border-color: var(--line);
-            border-style: solid;
-            border-width: 0 1px 0 0;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .founder-rightbar {
-            border-width: 0 0 0 1px;
-            background: rgba(255, 251, 246, 0.9);
-        }
-
-        .founder-sidebar-inner,
-        .founder-rightbar-inner {
-            padding: 22px 18px;
-        }
-
-        .founder-brand {
-            display: inline-block;
-            margin-bottom: 24px;
-        }
-
-        .founder-brand img {
-            width: 168px;
-            height: auto;
-            display: block;
-        }
-
-        .founder-nav {
-            display: grid;
-            gap: 6px;
-        }
-
-        .founder-nav-item {
+        .os-desktop-bar-left {
             display: flex;
             align-items: center;
-            gap: 10px;
-            padding: 12px 14px;
-            border-radius: 14px;
-            text-decoration: none;
-            color: var(--ink);
-            font-size: 0.98rem;
-        }
-
-        .founder-nav-item.active {
-            background: #ece6db;
-        }
-
-        .founder-nav-icon {
-            width: 18px;
-            text-align: center;
-            color: var(--muted);
-        }
-
-        .founder-sidebar-footer {
-            margin-top: auto;
-            padding: 18px;
-            border-top: 1px solid var(--line);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 12px;
-        }
-
-        .founder-user {
-            display: flex;
-            align-items: center;
-            gap: 10px;
+            gap: 18px;
             min-width: 0;
         }
 
-        .founder-avatar {
-            width: 30px;
-            height: 30px;
-            border-radius: 999px;
-            background: #b0a999;
-            color: #fff;
-            display: grid;
-            place-items: center;
+        .os-desktop-brand {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none;
+            color: rgba(55, 44, 38, 0.92);
             font-weight: 700;
-            font-size: 0.92rem;
+            letter-spacing: -0.01em;
+        }
+
+        .os-desktop-brand-mark {
+            width: 20px;
+            height: 20px;
+            border-radius: 6px;
+            background: linear-gradient(135deg, #e11d74, #ef4444);
+            box-shadow: 0 8px 22px rgba(225, 29, 116, 0.25);
             flex-shrink: 0;
         }
 
-        .founder-user-name {
+        .os-desktop-brand-name {
+            font-size: 1rem;
+        }
+
+        .os-desktop-search {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            width: min(580px, 100%);
+            padding: 8px 16px;
+            border-radius: 999px;
+            border: 1px solid rgba(246, 240, 234, 0.92);
+            background: rgba(255, 248, 243, 0.62);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75);
+            color: rgba(94, 82, 75, 0.7);
+            backdrop-filter: blur(10px);
+        }
+
+        .os-desktop-search svg {
+            width: 16px;
+            height: 16px;
+            opacity: 0.7;
+            flex-shrink: 0;
+        }
+
+        .os-desktop-search-text {
+            flex: 1;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-        }
-
-        .founder-main {
-            padding: 26px 28px 24px;
-        }
-
-        .founder-main-inner {
-            max-width: 700px;
-            margin: 0 auto;
-        }
-
-        .founder-welcome h1 {
-            font-size: clamp(2rem, 3vw, 3.1rem);
-            letter-spacing: -0.02em;
-            margin-bottom: 4px;
-        }
-
-        .founder-welcome p {
-            color: var(--muted);
-            font-size: 1.02rem;
-            margin-bottom: 28px;
-        }
-
-        .founder-section {
-            margin-bottom: 20px;
-        }
-
-        .founder-section h2 {
-            font-size: 1.15rem;
-            margin-bottom: 12px;
-        }
-
-        .founder-block {
-            background: rgba(255, 255, 255, 0.9);
-            border: 1px solid rgba(220, 207, 191, 0.65);
-            border-radius: 18px;
-            padding: 18px 20px;
-            box-shadow: 0 10px 28px rgba(52, 41, 26, 0.04);
-        }
-
-        .founder-block + .founder-block {
-            margin-top: 10px;
-        }
-
-        .founder-alert {
-            border-radius: 14px;
-            padding: 14px 16px;
-            border: 1px solid rgba(220, 207, 191, 0.65);
-            background: rgba(255, 255, 255, 0.92);
-        }
-
-        .founder-alert + .founder-alert {
-            margin-top: 10px;
-        }
-
-        .founder-alert.warning {
-            border-color: rgba(154, 107, 27, 0.22);
-            background: rgba(255, 248, 238, 0.96);
-        }
-
-        .founder-alert.danger {
-            border-color: rgba(179, 34, 83, 0.20);
-            background: rgba(255, 242, 246, 0.96);
-        }
-
-        .founder-row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 16px;
-        }
-
-        .founder-meta {
-            font-size: 0.84rem;
-            color: #2fac5a;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            margin-bottom: 6px;
-        }
-
-        .founder-subtle {
-            color: var(--muted);
             font-size: 0.98rem;
         }
 
-        .founder-badge {
-            padding: 8px 14px;
-            border-radius: 10px;
-            background: #f0ece4;
-            color: #7a7267;
-            font-size: 0.95rem;
+        .os-desktop-shortcut {
+            padding: 3px 8px;
+            border-radius: 8px;
+            border: 1px solid rgba(219, 208, 198, 0.72);
+            background: rgba(255, 255, 255, 0.34);
+            font-size: 0.8rem;
+        }
+
+        .os-desktop-time {
+            font-size: 0.94rem;
+            font-weight: 500;
+            color: rgba(62, 50, 43, 0.86);
             white-space: nowrap;
         }
 
-        .founder-badge.success {
-            background: linear-gradient(135deg, #2fba5a, #93e0a5);
-            color: white;
+        .os-desktop-icons {
+            position: relative;
+            z-index: 2;
+            display: grid;
+            grid-template-columns: repeat(2, 124px);
+            gap: 34px 42px;
+            padding: 78px 0 72px 74px;
         }
 
-        .founder-badge.info {
-            background: linear-gradient(135deg, #4c91ec, #68b4ff);
-            color: white;
-        }
-        .founder-command-card {
-            background: linear-gradient(135deg, rgba(142, 28, 116, 0.08), rgba(255, 44, 53, 0.06)), rgba(255, 255, 255, 0.96);
-            border: 1px solid rgba(184, 96, 133, 0.26);
-        }
-        .founder-command-grid {
+        .os-desktop-icon {
             display: grid;
-            grid-template-columns: 1.3fr 1fr;
+            justify-items: center;
             gap: 12px;
-        }
-        .founder-mini-stack {
-            display: grid;
-            gap: 10px;
-        }
-        @media (max-width: 900px) {
-            .founder-command-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        .founder-task-top {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 16px;
-            margin-bottom: 8px;
-        }
-
-        .founder-task-label {
-            font-size: 0.83rem;
-            color: var(--rose);
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-
-        .founder-task-cta {
-            border: 0;
-            border-radius: 10px;
-            padding: 10px 16px;
-            background: linear-gradient(90deg, #8e1c74, #ff2c35);
-            color: white;
-            font-weight: 600;
+            text-decoration: none;
+            color: rgba(51, 40, 35, 0.92);
+            user-select: none;
             cursor: pointer;
         }
 
-        .founder-task-card.completed .founder-task-title {
-            text-decoration: line-through;
-            opacity: 0.75;
+        .os-desktop-icon.dragging {
+            opacity: 0.45;
+            transform: scale(0.97);
         }
 
-        .founder-task-card {
-            cursor: pointer;
+        .os-desktop-icon.drop-target .os-desktop-icon-tile {
+            transform: translateY(-3px);
+            box-shadow:
+                0 18px 34px rgba(70, 54, 42, 0.18),
+                0 0 0 2px rgba(255, 255, 255, 0.35);
         }
 
-        .founder-learning-card,
-        .founder-mentor-card {
-            cursor: pointer;
-        }
-
-        .founder-assistant-bar {
-            margin-top: 26px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            background: white;
-            border: 1px solid rgba(220, 207, 191, 0.8);
-            border-radius: 16px;
-            padding: 14px 16px;
-            box-shadow: 0 12px 24px rgba(52, 41, 26, 0.05);
-        }
-
-        .founder-assistant-icon,
-        .founder-assistant-send {
-            width: 34px;
-            height: 34px;
-            border-radius: 10px;
-            border: 1px solid rgba(220, 207, 191, 0.8);
+        .os-desktop-icon-tile {
+            width: 90px;
+            height: 90px;
+            border-radius: 24px;
             display: grid;
             place-items: center;
-            background: #fffdf9;
-            color: var(--ink);
-            flex-shrink: 0;
+            box-shadow: 0 16px 28px rgba(61, 46, 28, 0.12);
+            transition: transform 0.18s ease, box-shadow 0.18s ease;
         }
 
-        .founder-assistant-input {
-            flex: 1;
-            color: #8a8378;
+        .os-desktop-icon:hover .os-desktop-icon-tile {
+            transform: translateY(-2px);
+            box-shadow: 0 18px 34px rgba(61, 46, 28, 0.16);
         }
 
-        .founder-rightbar h3 {
-            font-size: 0.83rem;
-            letter-spacing: 0.06em;
-            text-transform: uppercase;
-            color: var(--muted);
-            margin-bottom: 12px;
+        .os-desktop-icon-label {
+            font-size: 0.88rem;
+            font-weight: 500;
+            letter-spacing: -0.01em;
         }
 
-        .notification-badge {
-            width: 20px;
-            height: 20px;
-            border-radius: 999px;
-            background: var(--rose);
-            color: white;
-            font-size: 0.76rem;
-            display: grid;
-            place-items: center;
+        .os-desktop-icon svg {
+            width: 38px;
+            height: 38px;
+            stroke: #fff;
+            fill: none;
+            stroke-width: 1.8;
+            stroke-linecap: round;
+            stroke-linejoin: round;
         }
 
-        .calendar-grid {
-            display: grid;
-            grid-template-columns: repeat(7, 1fr);
-            gap: 8px;
-            font-size: 0.84rem;
-            color: var(--muted);
-        }
+        .os-icon-lms { background: linear-gradient(180deg, #7d8dbc, #6977a1); }
+        .os-icon-inbox { background: linear-gradient(180deg, #9aa0af, #7f8597); }
+        .os-icon-settings { background: linear-gradient(180deg, #707382, #5f6272); }
+        .os-icon-atlas { background: linear-gradient(180deg, #ed4177, #df4d53); }
+        .os-icon-calendar { background: linear-gradient(180deg, #a992a1, #948195); }
+        .os-icon-bazaar { background: linear-gradient(180deg, #b69c78, #a18b69); }
+        .os-icon-files { background: linear-gradient(180deg, #8ba0b8, #7489a2); }
+        .os-icon-servio { background: linear-gradient(180deg, #8f9d8d, #798976); }
+        .os-icon-profile { background: linear-gradient(180deg, #9a8ca4, #877a93); }
 
-        .calendar-head {
-            text-align: center;
-            font-size: 0.74rem;
-            text-transform: uppercase;
-        }
-
-        .calendar-day {
-            width: 28px;
-            height: 28px;
-            margin: 0 auto;
-            border-radius: 999px;
-            display: grid;
-            place-items: center;
-            color: var(--ink);
-        }
-
-        .calendar-day.dim {
-            color: #b9b1a5;
-        }
-
-        .calendar-day.today {
-            background: #6d675f;
-            color: white;
-        }
-
-        .notification-list,
-        .tool-list {
-            display: grid;
-            gap: 10px;
-            margin-top: 14px;
-        }
-
-        .notification-item,
-        .tool-item {
-            background: rgba(255, 255, 255, 0.92);
-            border: 1px solid rgba(220, 207, 191, 0.65);
-            border-radius: 14px;
-            padding: 12px 14px;
-        }
-
-        .notification-item {
-            display: flex;
-            gap: 12px;
-            align-items: flex-start;
-        }
-
-        .notification-icon {
-            width: 22px;
-            height: 22px;
-            border-radius: 999px;
-            background: linear-gradient(135deg, #8e1c74, #ff2c35);
-            color: white;
-            display: grid;
-            place-items: center;
-            font-size: 0.75rem;
-            flex-shrink: 0;
-        }
-
-        .tool-item {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            font-weight: 600;
-        }
-
-        .tool-icon {
-            width: 28px;
-            height: 28px;
-            border-radius: 8px;
-            border: 1px solid rgba(222, 60, 109, 0.24);
-            color: #e02961;
-            display: grid;
-            place-items: center;
+        .os-desktop-footnote {
+            position: absolute;
+            right: 34px;
+            bottom: 28px;
+            z-index: 2;
+            color: rgba(106, 90, 82, 0.56);
             font-size: 0.82rem;
-        }
-
-        .founder-drawer {
-            position: fixed;
-            top: 0;
-            right: 0;
-            width: min(480px, 100%);
-            height: 100vh;
-            background: #fffdf8;
-            border-left: 1px solid rgba(220, 207, 191, 0.8);
-            box-shadow: -10px 0 30px rgba(52, 41, 26, 0.08);
-            transform: translateX(100%);
-            transition: transform 0.25s ease;
-            z-index: 40;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .founder-drawer.open {
-            transform: translateX(0);
-        }
-
-        .founder-drawer-header {
-            padding: 20px 24px 12px;
-            display: flex;
-            align-items: flex-start;
-            justify-content: space-between;
-            gap: 14px;
-        }
-
-        .founder-drawer-body {
-            padding: 0 24px 24px;
-            overflow-y: auto;
-        }
-
-        .founder-drawer-close {
-            border: 0;
-            background: transparent;
-            font-size: 1.6rem;
-            color: var(--muted);
-            cursor: pointer;
-            line-height: 1;
-        }
-
-        .drawer-eyebrow {
-            font-size: 0.8rem;
-            text-transform: uppercase;
             letter-spacing: 0.08em;
-            color: #4c91ec;
-            margin-bottom: 10px;
-        }
-
-        .drawer-eyebrow.task {
-            color: var(--rose);
-        }
-
-        .drawer-grid {
-            display: grid;
-            grid-template-columns: 100px 1fr;
-            gap: 14px 10px;
-            margin: 24px 0;
-        }
-
-        .drawer-label {
-            color: var(--muted);
-        }
-
-        .drawer-comments {
-            margin-top: 18px;
-        }
-
-        .drawer-comment {
-            display: flex;
-            gap: 12px;
-            align-items: flex-start;
-            background: white;
-            border: 1px solid rgba(220, 207, 191, 0.65);
-            border-radius: 14px;
-            padding: 14px;
-            margin-top: 12px;
-        }
-
-        .drawer-comment-box {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-top: 16px;
-            border: 1px solid rgba(220, 207, 191, 0.8);
-            border-radius: 14px;
-            padding: 12px 14px;
-            color: #8a8378;
-            background: #f4efe6;
-        }
-
-        @media (max-width: 1240px) {
-            .founder-home {
-                grid-template-columns: 220px 1fr;
-            }
-
-            .founder-rightbar {
-                display: none;
-            }
         }
 
         @media (max-width: 900px) {
-            .founder-home {
+            .os-desktop-scene {
+                padding: 18px;
+            }
+
+            .os-desktop-frame {
+                min-height: calc(100vh - 36px);
+                border-radius: 18px;
+            }
+
+            .os-desktop-bar {
                 grid-template-columns: 1fr;
             }
 
-            .founder-sidebar {
-                min-height: auto;
-                border-right: 0;
-                border-bottom: 1px solid var(--line);
+            .os-desktop-bar-left {
+                flex-wrap: wrap;
             }
 
-            .founder-sidebar-footer {
-                display: none;
-            }
-
-            .founder-main {
-                padding: 20px 16px 24px;
-            }
-
-            .founder-main-inner {
-                max-width: none;
+            .os-desktop-icons {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 28px 18px;
+                padding: 36px 20px 72px;
             }
         }
     </style>
@@ -532,527 +240,183 @@
 
 @section('content')
     @php
-        $founder = $dashboard['founder'];
-        $workspace = $dashboard['workspace'];
-        $mentor = $workspace['mentor_session'];
-        $learning = $workspace['learning_item'];
-        $tasks = $workspace['task_cards'];
-        $notifications = $workspace['notifications'];
-        $unreadNotificationCount = $workspace['unread_notification_count'];
-        $calendar = $workspace['calendar'];
-        $aiTools = $workspace['ai_tools'];
-        $syncStatus = $dashboard['sync_status'];
-        $commerceAlerts = $dashboard['commerce_alerts'] ?? [];
-        $commerceOperations = $dashboard['commerce_operations'] ?? [];
-        $automationSummary = $dashboard['automation_summary'] ?? ['active_count' => 0, 'items' => []];
-        $revenueOs = $dashboard['revenue_os'] ?? ['metrics' => [], 'daily_plan' => ['tasks' => []], 'best_channel' => null];
-        $nextBestActions = $workspace['next_best_actions'];
+        $workspace = $dashboard['workspace'] ?? [];
+        $desktopOpen = request('open', '');
+        $desktopNow = now()->timezone(config('app.timezone'));
+        $desktopClock = $desktopNow->format('D, M j   g:i A');
+        $desktopApps = [
+            [
+                'key' => 'learning-plan',
+                'label' => 'LMS',
+                'route' => route('founder.learning-plan'),
+                'class' => 'os-icon-lms',
+                'icon' => 'cap',
+            ],
+            [
+                'key' => 'inbox',
+                'label' => 'Inbox',
+                'route' => route('founder.inbox'),
+                'class' => 'os-icon-inbox',
+                'icon' => 'tray',
+            ],
+            [
+                'key' => 'settings',
+                'label' => 'Settings',
+                'route' => route('founder.settings'),
+                'class' => 'os-icon-settings',
+                'icon' => 'sun',
+            ],
+            [
+                'key' => 'ai-tools',
+                'label' => 'Atlas',
+                'route' => route('founder.ai-tools'),
+                'class' => 'os-icon-atlas',
+                'icon' => 'globe',
+            ],
+            [
+                'key' => 'activity',
+                'label' => 'Calendar',
+                'route' => route('founder.activity'),
+                'class' => 'os-icon-calendar',
+                'icon' => 'calendar',
+            ],
+            [
+                'key' => 'commerce',
+                'label' => 'Bazaar',
+                'route' => route('founder.commerce'),
+                'class' => 'os-icon-bazaar',
+                'icon' => 'bag',
+            ],
+            [
+                'key' => 'media-library',
+                'label' => 'Files',
+                'route' => route('founder.media-library'),
+                'class' => 'os-icon-files',
+                'icon' => 'file',
+            ],
+            [
+                'key' => 'website',
+                'label' => 'Servio',
+                'route' => route('website'),
+                'class' => 'os-icon-servio',
+                'icon' => 'gear',
+            ],
+            [
+                'key' => 'profile',
+                'label' => 'Profile',
+                'route' => route('founder.settings'),
+                'class' => 'os-icon-profile',
+                'icon' => 'user',
+            ],
+        ];
     @endphp
 
-    <div class="founder-home os-desktop-home" data-os-desktop-home data-os-open="{{ e((string) request('open', '')) }}">
-        <aside class="founder-sidebar">
-            @include('os.partials.founder-sidebar', [
-                'founder' => $founder,
-                'businessModel' => $company->business_model ?? 'hybrid',
-                'activeKey' => 'home',
-                'navClass' => 'founder-nav',
-                'itemClass' => 'founder-nav-item',
-                'iconClass' => 'founder-nav-icon',
-                'innerClass' => 'founder-sidebar-inner',
-                'brandClass' => 'founder-brand',
-                'footerClass' => 'founder-sidebar-footer',
-                'userClass' => 'founder-user',
-                'avatarClass' => 'founder-avatar',
-            ])
-        </aside>
-
-        <div class="os-window-host" data-os-window-host></div>
-
-        <main class="founder-main">
-            <div class="founder-main-inner">
-                <section class="founder-welcome">
-                    <h1>Welcome back {{ $workspace['first_name'] }},</h1>
-                    <p>Here’s what’s on for you for this week:</p>
-                </section>
-
-                <section class="founder-section">
-                    <h2>{{ $mentor['section_label'] }}</h2>
-                    <article class="founder-block founder-mentor-card"
-                        data-open-drawer="task"
-                        data-drawer-title="{{ e($mentor['title']) }}"
-                        data-drawer-due="{{ e($mentor['date_label']) }}"
-                        data-drawer-owner="{{ e($mentor['subtitle']) }}"
-                        data-drawer-description="{{ e($mentor['drawer_description']) }}"
-                        data-drawer-badge="{{ e($mentor['badge']) }}"
-                        data-drawer-comments='@json($notifications)'>
-                        <div class="founder-row">
-                            <div>
-                                <div class="founder-meta">{{ $mentor['date_label'] }}</div>
-                                <div style="font-size: 1.1rem; font-weight: 600;">{{ $mentor['title'] }}</div>
-                                <div class="founder-subtle" style="margin-top: 4px;">{{ $mentor['subtitle'] }}</div>
-                            </div>
-                            <div class="founder-badge {{ $mentor['badge_tone'] === 'success' ? 'success' : '' }}">{{ $mentor['badge'] }}</div>
-                        </div>
-                    </article>
-                </section>
-
-                <section class="founder-section">
-                    <h2>Learning</h2>
-                    <article class="founder-block founder-learning-card"
-                        data-open-drawer="lesson"
-                        data-drawer-title="{{ e($learning['detail_heading']) }}"
-                        data-drawer-due="{{ e($learning['detail_due']) }}"
-                        data-drawer-owner="{{ e($learning['detail_owner']) }}"
-                        data-drawer-description="{{ e($learning['detail_description']) }}"
-                        data-drawer-badge="{{ e($learning['badge']) }}"
-                        data-drawer-comments='@json($learning["comments"])'>
-                        <div class="founder-row">
-                            <div>
-                                <div class="founder-meta" style="color: #4c91ec;">THURSDAY, DEC 25 · 1:00PM</div>
-                                <div style="font-size: 1.1rem; font-weight: 600;">{{ $learning['title'] }}</div>
-                                <div class="founder-subtle" style="margin-top: 4px;">{{ $learning['subtitle'] }}</div>
-                            </div>
-                            <div class="founder-badge">{{ $learning['badge'] }}</div>
-                        </div>
-                    </article>
-                </section>
-
-                @php
-                    $guidedPath = $workspace['guided_path'] ?? [];
-                    $primaryStep = $guidedPath[0] ?? null;
-                    $secondarySteps = array_slice($guidedPath, 1, 2);
-                @endphp
-                <section class="founder-section">
-                    <h2>Start Here Today</h2>
-                    <div class="founder-command-grid">
-                        @if ($primaryStep)
-                            <article class="founder-block founder-command-card">
-                                <div class="founder-meta">Do this first</div>
-                                <div style="font-size: 1.2rem; font-weight: 700;">{{ $primaryStep['title'] }}</div>
-                                <div class="founder-subtle" style="margin-top: 8px;">{{ $primaryStep['description'] }}</div>
-                                <div style="margin-top: 16px;">
-                                    <a class="founder-badge info" href="{{ $primaryStep['href'] }}" style="text-decoration:none;">{{ $primaryStep['label'] }}</a>
-                                </div>
-                            </article>
-                        @endif
-                        <div class="founder-mini-stack">
-                            @foreach ($secondarySteps as $step)
-                                <article class="founder-block">
-                                    <div style="font-size: 1.02rem; font-weight: 600;">{{ $step['title'] }}</div>
-                                    <div class="founder-subtle" style="margin-top: 4px;">{{ $step['description'] }}</div>
-                                    <div style="margin-top: 12px;">
-                                        <a class="founder-badge" href="{{ $step['href'] }}" style="text-decoration:none;">{{ $step['label'] }}</a>
-                                    </div>
-                                </article>
-                            @endforeach
-                            <article class="founder-block">
-                                <div style="font-size: 1.02rem; font-weight: 600;">Today’s revenue focus</div>
-                                <div class="founder-subtle" style="margin-top: 4px;">{{ $workspace['daily_revenue_plan']['focus'] ?? 'Work the next lead, offer, or queue item that moves money forward.' }}</div>
-                            </article>
-                        </div>
+    <div class="os-desktop-scene" data-os-desktop-home data-os-open="{{ e((string) $desktopOpen) }}">
+        <div class="os-desktop-frame">
+            <div class="os-desktop-bar">
+                <div class="os-desktop-bar-left">
+                    <a class="os-desktop-brand" href="/dashboard/founder">
+                        <span class="os-desktop-brand-mark"></span>
+                        <span class="os-desktop-brand-name">Hatchers</span>
+                    </a>
+                    <div class="os-desktop-search">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <circle cx="11" cy="11" r="6.5"></circle>
+                            <path d="M16 16L21 21"></path>
+                        </svg>
+                        <span class="os-desktop-search-text">What would you like to do?</span>
+                        <span class="os-desktop-shortcut">⌘K</span>
                     </div>
-                </section>
-
-                <section class="founder-section">
-                    <h2>Next Best Actions</h2>
-                    @foreach ($nextBestActions as $action)
-                        <article class="founder-block">
-                            <div class="founder-row" style="align-items:flex-start;">
-                                <div>
-                                    <div style="font-size: 1.04rem; font-weight: 600;">{{ $action['title'] }}</div>
-                                    <div class="founder-subtle" style="margin-top: 4px;">{{ $action['description'] }}</div>
-                                </div>
-                                <a class="founder-badge" href="{{ $action['href'] }}" style="text-decoration:none;">{{ $action['label'] }}</a>
-                            </div>
-                        </article>
-                    @endforeach
-                </section>
-
-                @if (!empty($workspace['daily_revenue_plan']['tasks']))
-                    <section class="founder-section">
-                        <h2>Daily Revenue Plan</h2>
-                        @foreach ($workspace['daily_revenue_plan']['tasks'] as $task)
-                            <article class="founder-block">
-                                <div class="founder-row" style="align-items:flex-start;">
-                                    <div>
-                                        <div style="font-size: 1.04rem; font-weight: 600;">{{ $task['title'] }}</div>
-                                        <div class="founder-subtle" style="margin-top: 4px;">{{ $task['description'] }}</div>
-                                    </div>
-                                    <a class="founder-badge" href="{{ $task['href'] }}" style="text-decoration:none;">{{ $task['label'] }}</a>
-                                </div>
-                            </article>
-                        @endforeach
-                    </section>
-                @endif
-
-                <section class="founder-section">
-                    <h2>First 100 Progress</h2>
-                    <article class="founder-block">
-                        <div class="founder-row" style="align-items:flex-start;">
-                            <div>
-                                <div style="font-size: 1.04rem; font-weight: 600;">{{ $revenueOs['metrics']['customers_won'] ?? 0 }} / 100 customers won</div>
-                                <div class="founder-subtle" style="margin-top: 4px;">
-                                    {{ $revenueOs['metrics']['identified_leads'] ?? 0 }} leads tracked ·
-                                    {{ $revenueOs['metrics']['active_conversations'] ?? 0 }} active conversations ·
-                                    {{ $revenueOs['metrics']['follow_up_due'] ?? 0 }} follow-up due
-                                </div>
-                            </div>
-                            <a class="founder-badge" href="{{ route('founder.first-100') }}" style="text-decoration:none;">Open First 100</a>
-                        </div>
-                    </article>
-                </section>
-
-                <section class="founder-section">
-                    <h2>Tasks</h2>
-                    @foreach ($tasks as $task)
-                        <article class="founder-block founder-task-card {{ $task['completed'] ? 'completed' : '' }}"
-                            data-open-drawer="task"
-                            data-drawer-title="{{ e($task['detail_heading']) }}"
-                            data-drawer-due="{{ e($task['detail_due']) }}"
-                            data-drawer-owner="{{ e($task['detail_owner']) }}"
-                            data-drawer-description="{{ e($task['detail_description']) }}"
-                            data-drawer-badge="{{ e($task['cta'] ?: 'View task') }}"
-                            data-drawer-comments='@json($task["comments"])'>
-                            <div class="founder-task-top">
-                                <div class="founder-task-label">{{ strtoupper($task['label']) }} · {{ strtoupper($task['due']) }}</div>
-                                @if (!$task['completed'] && $task['cta'] !== '')
-                                    <button class="founder-task-cta" type="button">{{ $task['cta'] }}</button>
-                                @endif
-                            </div>
-                            <div class="founder-task-title" style="font-size: 1.08rem; font-weight: 600;">{{ $task['title'] }}</div>
-                            <div class="founder-subtle" style="margin-top: 4px;">{{ $task['description'] }}</div>
-                        </article>
-                    @endforeach
-                </section>
-
-                @if (!empty($commerceOperations['queue']))
-                    <section class="founder-section">
-                        <h2>Operational Queue</h2>
-                        @foreach ($commerceOperations['queue'] as $item)
-                            <article class="founder-block">
-                                <div class="founder-row" style="align-items:flex-start;">
-                                    <div>
-                                        <div style="font-size:1.02rem;font-weight:600;">{{ $item['title'] }}</div>
-                                        <div class="founder-subtle" style="margin-top:4px;">{{ $item['description'] }}</div>
-                                    </div>
-                                    <a class="founder-badge" href="{{ $item['href'] }}" style="text-decoration:none;">{{ $item['label'] }}</a>
-                                </div>
-                            </article>
-                        @endforeach
-                    </section>
-                @endif
-
-                @if (!empty($automationSummary['items']))
-                    <section class="founder-section">
-                        <h2>Active Reminder Rules</h2>
-                        @foreach ($automationSummary['items'] as $rule)
-                            <article class="founder-block">
-                                <div class="founder-row" style="align-items:flex-start;">
-                                    <div>
-                                        <div style="font-size:1.02rem;font-weight:600;">{{ $rule['name'] }}</div>
-                                        <div class="founder-subtle" style="margin-top:4px;">{{ ucfirst($rule['module_scope']) }} · {{ ucfirst($rule['delivery']) }} · {{ $rule['status_label'] }}</div>
-                                    </div>
-                                    <a class="founder-badge" href="{{ $rule['href'] }}" style="text-decoration:none;">{{ $rule['cta_label'] }}</a>
-                                </div>
-                            </article>
-                        @endforeach
-                    </section>
-                @endif
-
-                @if (!empty($commerceAlerts))
-                    <section class="founder-section">
-                        <h2>Commerce Alerts</h2>
-                        @foreach ($commerceAlerts as $alert)
-                            <article class="founder-alert {{ $alert['type'] ?? 'warning' }}">
-                                <div style="display:flex;justify-content:space-between;gap:14px;align-items:flex-start;">
-                                    <div>
-                                        <div style="font-size:1.02rem;font-weight:600;">{{ $alert['title'] }}</div>
-                                        <div class="founder-subtle" style="margin-top:4px;">{{ $alert['description'] }}</div>
-                                    </div>
-                                    <a class="founder-badge" href="{{ $alert['href'] }}" style="text-decoration:none;">{{ $alert['label'] }}</a>
-                                </div>
-                            </article>
-                        @endforeach
-                    </section>
-                @endif
-
-                <div id="assistant-bar" class="founder-assistant-bar">
-                    <div class="founder-assistant-icon">◔</div>
-                    <div class="founder-assistant-input">{{ $workspace['quick_prompt'] ?: 'Ask AI anything about your project...' }}</div>
-                    <div class="founder-assistant-send">↵</div>
                 </div>
+                <div class="os-desktop-time">{{ $desktopClock }}</div>
             </div>
-        </main>
 
-        <aside class="founder-rightbar">
-            <div class="founder-rightbar-inner">
-                <div class="founder-row" style="margin-bottom: 18px;">
-                    <a href="{{ route('founder.inbox') }}" style="text-decoration: none;"><h3 style="margin: 0;">Notifications</h3></a>
-                    <a href="{{ route('founder.inbox') }}" class="notification-badge" style="text-decoration: none;">{{ $unreadNotificationCount }}</a>
-                </div>
-
-                <div style="margin-bottom: 14px; color: var(--muted); font-size: 0.86rem;">{{ $calendar['month_label'] }}</div>
-                <div class="calendar-grid" style="margin-bottom: 10px;">
-                    @foreach (['S','M','T','W','T','F','S'] as $dayLabel)
-                        <div class="calendar-head">{{ $dayLabel }}</div>
-                    @endforeach
-                    @foreach ($calendar['days'] as $day)
-                        <div class="calendar-day {{ !$day['in_month'] ? 'dim' : '' }} {{ $day['is_today'] ? 'today' : '' }}">{{ $day['day'] }}</div>
-                    @endforeach
-                </div>
-
-                <div class="notification-list">
-                    @forelse ($notifications as $notification)
-                        <div class="notification-item">
-                            <div class="notification-icon">{{ strtoupper(substr($notification['kind'], 0, 1)) }}</div>
-                            <div>
-                                <div style="font-weight: 600;">{{ $notification['title'] }}</div>
-                                <div class="founder-subtle" style="margin-top: 4px;">{{ $notification['meta'] }}</div>
-                            </div>
-                        </div>
-                    @empty
-                        <div class="notification-item">
-                            <div class="notification-icon">i</div>
-                            <div>
-                                <div style="font-weight: 600;">No notifications yet</div>
-                                <div class="founder-subtle" style="margin-top: 4px;">New founder updates will appear here.</div>
-                            </div>
-                        </div>
-                    @endforelse
-                </div>
-
-                <h3 style="margin-top: 22px;"><a href="{{ route('founder.activity') }}" style="text-decoration:none;color:inherit;">Activity Center</a></h3>
-                <div class="tool-list">
-                    @foreach (array_slice($dashboard['activity_feed'], 0, 3) as $item)
-                        <div class="tool-item" style="display:block;">
-                            <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
-                                <div>{{ $item['module'] }}</div>
-                                <span class="founder-subtle">{{ $item['updated_at'] ?: 'Recently' }}</span>
-                            </div>
-                            <div class="founder-subtle" style="margin-top:4px;">{{ $item['message'] }}</div>
-                        </div>
-                    @endforeach
-                </div>
-
-                <h3 style="margin-top: 22px;"><a href="{{ route('founder.first-100') }}" style="text-decoration:none;color:inherit;">First 100</a></h3>
-                <div class="tool-list">
-                    <div class="tool-item" style="display:block;">
-                        <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
-                            <div>Customers won</div>
-                            <span class="notification-badge">{{ $revenueOs['metrics']['customers_won'] ?? 0 }}</span>
-                        </div>
-                    </div>
-                    <div class="tool-item" style="display:block;">
-                        <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
-                            <div>Follow-up due</div>
-                            <span class="notification-badge" style="background:rgba(154,107,27,0.12);color:#9a6b1b;">{{ $revenueOs['metrics']['follow_up_due'] ?? 0 }}</span>
-                        </div>
-                    </div>
-                    <div class="tool-item" style="display:block;">
-                        <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
-                            <div>Best channel</div>
-                            <span class="founder-subtle">{{ $revenueOs['best_channel']['channel_label'] ?? 'No signal yet' }}</span>
-                        </div>
-                    </div>
-                    <div class="tool-item" style="display:block;">
-                        <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
-                            <div>Priority channel today</div>
-                            <span class="founder-subtle">{{ $revenueOs['acquisition_engine']['priority_channel'] ?? 'No plan yet' }}</span>
-                        </div>
-                    </div>
-                </div>
-
-                <h3 style="margin-top: 22px;">Module Sync</h3>
-                <div class="tool-list">
-                    @foreach ($syncStatus['modules'] as $status)
-                        <div class="tool-item" style="display:block;">
-                            <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
-                                <div>{{ $status['module'] }}</div>
-                                <span class="notification-badge" style="
-                                    background:
-                                    @if ($status['tone'] === 'success') rgba(44,122,87,0.12)
-                                    @elseif ($status['tone'] === 'warning') rgba(154,107,27,0.12)
-                                    @else rgba(179,34,83,0.10)
-                                    @endif
-                                    ; color:
-                                    @if ($status['tone'] === 'success') #21643a
-                                    @elseif ($status['tone'] === 'warning') #9a6b1b
-                                    @else #b32253
-                                    @endif
-                                    ;">
-                                    {{ $status['status'] }}
-                                </span>
-                            </div>
-                            <div class="founder-subtle" style="margin-top:4px;">{{ $status['reason'] }}</div>
-                            <div class="founder-subtle" style="margin-top:4px;">{{ $status['updated_at'] ?: 'Not synced yet' }}</div>
-                        </div>
-                    @endforeach
-                </div>
-
-                @if (!empty($commerceOperations))
-                    <h3 style="margin-top: 22px;">Commerce Ops</h3>
-                    <div class="tool-list">
-                        <div class="tool-item" style="display:block;">
-                            <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
-                                <div>Pending orders</div>
-                                <span class="notification-badge" style="background:rgba(154,107,27,0.12);color:#9a6b1b;">{{ $commerceOperations['pending_orders'] ?? 0 }}</span>
-                            </div>
-                        </div>
-                        <div class="tool-item" style="display:block;">
-                            <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
-                                <div>Unpaid orders</div>
-                                <span class="notification-badge" style="background:rgba(179,34,83,0.10);color:#b32253;">{{ $commerceOperations['unpaid_orders'] ?? 0 }}</span>
-                            </div>
-                        </div>
-                        <div class="tool-item" style="display:block;">
-                            <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
-                                <div>Ready to ship</div>
-                                <span class="notification-badge" style="background:rgba(44,122,87,0.12);color:#21643a;">{{ $commerceOperations['ready_to_ship_orders'] ?? 0 }}</span>
-                            </div>
-                        </div>
-                        <div class="tool-item" style="display:block;">
-                            <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
-                                <div>Pending bookings</div>
-                                <span class="notification-badge" style="background:rgba(154,107,27,0.12);color:#9a6b1b;">{{ $commerceOperations['pending_bookings'] ?? 0 }}</span>
-                            </div>
-                        </div>
-                        <div class="tool-item" style="display:block;">
-                            <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
-                                <div>Unscheduled bookings</div>
-                                <span class="notification-badge" style="background:rgba(179,34,83,0.10);color:#b32253;">{{ $commerceOperations['unscheduled_bookings'] ?? 0 }}</span>
-                            </div>
-                        </div>
-                        <div class="tool-item" style="display:block;">
-                            <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
-                                <div>Need staff assignment</div>
-                                <span class="notification-badge" style="background:rgba(154,107,27,0.12);color:#9a6b1b;">{{ $commerceOperations['needs_staff_assignment'] ?? 0 }}</span>
-                            </div>
-                        </div>
-                    </div>
-                @endif
-
-                <h3 style="margin-top: 22px;">AI Tools</h3>
-                <div class="tool-list">
-                    @foreach ($aiTools as $tool)
-                        <div class="tool-item">
-                            <div class="tool-icon">□</div>
-                            <div>{{ $tool['title'] }}</div>
-                        </div>
-                    @endforeach
-                </div>
-
-                @if (!empty($automationSummary['active_count']))
-                    <h3 style="margin-top: 22px;"><a href="{{ route('founder.automations') }}" style="text-decoration:none;color:inherit;">Reminder Rules</a></h3>
-                    <div class="tool-list">
-                        @foreach (array_slice($automationSummary['items'], 0, 3) as $rule)
-                            <a class="tool-item" href="{{ $rule['href'] }}" style="display:block;text-decoration:none;color:inherit;">
-                                <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
-                                    <div>{{ $rule['name'] }}</div>
-                                    <span class="founder-subtle">{{ $rule['delivery'] }}</span>
-                                </div>
-                                <div class="founder-subtle" style="margin-top:4px;">{{ $rule['status_label'] }}</div>
-                            </a>
-                        @endforeach
-                    </div>
-                @endif
+            <div class="os-desktop-icons" data-os-launcher data-storage-key="hatchers-os-desktop-order-{{ $dashboard['founder']->id ?? 'guest' }}">
+                @foreach ($desktopApps as $app)
+                    <a
+                        class="os-desktop-icon"
+                        href="{{ $app['route'] }}"
+                        draggable="true"
+                        data-launcher-key="{{ $app['key'] }}"
+                        data-launcher-label="{{ $app['label'] }}"
+                        data-launcher-route="{{ $app['route'] }}"
+                    >
+                        <span class="os-desktop-icon-tile {{ $app['class'] }}">
+                            @switch($app['icon'])
+                                @case('cap')
+                                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                                        <path d="M3 9L12 4L21 9L12 14L3 9Z"></path>
+                                        <path d="M7 11V16L12 19L17 16V11"></path>
+                                    </svg>
+                                    @break
+                                @case('tray')
+                                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                                        <path d="M4 9H20L18 17H6L4 9Z"></path>
+                                        <path d="M9 13H15"></path>
+                                    </svg>
+                                    @break
+                                @case('sun')
+                                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                                        <circle cx="12" cy="12" r="3.2"></circle>
+                                        <path d="M12 4V2"></path>
+                                        <path d="M12 22V20"></path>
+                                        <path d="M4 12H2"></path>
+                                        <path d="M22 12H20"></path>
+                                        <path d="M6.3 6.3L4.9 4.9"></path>
+                                        <path d="M19.1 19.1L17.7 17.7"></path>
+                                        <path d="M17.7 6.3L19.1 4.9"></path>
+                                        <path d="M4.9 19.1L6.3 17.7"></path>
+                                    </svg>
+                                    @break
+                                @case('globe')
+                                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                                        <circle cx="12" cy="12" r="8"></circle>
+                                        <path d="M4 12H20"></path>
+                                        <path d="M12 4C14.8 6.7 14.8 17.3 12 20"></path>
+                                        <path d="M12 4C9.2 6.7 9.2 17.3 12 20"></path>
+                                    </svg>
+                                    @break
+                                @case('calendar')
+                                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                                        <rect x="4" y="6" width="16" height="14" rx="2"></rect>
+                                        <path d="M8 3V8"></path>
+                                        <path d="M16 3V8"></path>
+                                        <path d="M4 10H20"></path>
+                                    </svg>
+                                    @break
+                                @case('bag')
+                                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                                        <path d="M6 9H18L17 19H7L6 9Z"></path>
+                                        <path d="M9 9V7C9 5.3 10.3 4 12 4C13.7 4 15 5.3 15 7V9"></path>
+                                    </svg>
+                                    @break
+                                @case('file')
+                                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                                        <path d="M8 3H15L20 8V21H8C6.9 21 6 20.1 6 19V5C6 3.9 6.9 3 8 3Z"></path>
+                                        <path d="M15 3V8H20"></path>
+                                    </svg>
+                                    @break
+                                @case('gear')
+                                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                                        <circle cx="12" cy="12" r="3"></circle>
+                                        <path d="M19.4 15A1.7 1.7 0 0 0 19.7 16.8L19.8 17C20.1 17.6 20 18.3 19.5 18.7L18.7 19.5C18.3 20 17.6 20.1 17 19.8L16.8 19.7A1.7 1.7 0 0 0 15 19.4C14.4 19.6 14 20.2 14 20.8V21C14 21.6 13.6 22 13 22H11C10.4 22 10 21.6 10 21V20.8C10 20.2 9.6 19.6 9 19.4A1.7 1.7 0 0 0 7.2 19.7L7 19.8C6.4 20.1 5.7 20 5.3 19.5L4.5 18.7C4 18.3 3.9 17.6 4.2 17L4.3 16.8A1.7 1.7 0 0 0 4 15C3.8 14.4 3.2 14 2.6 14H2.4C1.8 14 1.4 13.6 1.4 13V11C1.4 10.4 1.8 10 2.4 10H2.6C3.2 10 3.8 9.6 4 9A1.7 1.7 0 0 0 3.7 7.2L3.6 7C3.3 6.4 3.4 5.7 3.9 5.3L4.7 4.5C5.1 4 5.8 3.9 6.4 4.2L6.6 4.3A1.7 1.7 0 0 0 8.4 4C9 3.8 9.4 3.2 9.4 2.6V2.4C9.4 1.8 9.8 1.4 10.4 1.4H12.4C13 1.4 13.4 1.8 13.4 2.4V2.6C13.4 3.2 13.8 3.8 14.4 4A1.7 1.7 0 0 0 16.2 3.7L16.4 3.6C17 3.3 17.7 3.4 18.1 3.9L18.9 4.7C19.4 5.1 19.5 5.8 19.2 6.4L19.1 6.6A1.7 1.7 0 0 0 19.4 8.4C19.6 9 20.2 9.4 20.8 9.4H21C21.6 9.4 22 9.8 22 10.4V12.4C22 13 21.6 13.4 21 13.4H20.8C20.2 13.4 19.6 13.8 19.4 14.4Z"></path>
+                                    </svg>
+                                    @break
+                                @case('user')
+                                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                                        <circle cx="12" cy="8" r="3.3"></circle>
+                                        <path d="M6 20C6.8 16.9 9 15.3 12 15.3C15 15.3 17.2 16.9 18 20"></path>
+                                    </svg>
+                                    @break
+                            @endswitch
+                        </span>
+                        <span class="os-desktop-icon-label">{{ $app['label'] }}</span>
+                    </a>
+                @endforeach
             </div>
-        </aside>
+
+            <div class="os-desktop-footnote">Tap an icon to open · drag to rearrange</div>
+            <div class="os-window-host" data-os-window-host></div>
+        </div>
     </div>
-
-    <aside class="founder-drawer" data-founder-drawer>
-        <div class="founder-drawer-header">
-            <div>
-                <div class="drawer-eyebrow" data-drawer-eyebrow>Lesson</div>
-                <h2 data-drawer-title style="font-size: 1.7rem; margin: 0;">Item title</h2>
-            </div>
-            <button class="founder-drawer-close" type="button" data-close-drawer>&times;</button>
-        </div>
-        <div class="founder-drawer-body">
-            <div class="founder-badge" data-drawer-badge>Open</div>
-            <div class="drawer-grid">
-                <div class="drawer-label">Due date</div>
-                <div data-drawer-due></div>
-                <div class="drawer-label">Owner</div>
-                <div data-drawer-owner></div>
-                <div class="drawer-label">Description</div>
-                <div data-drawer-description></div>
-            </div>
-
-            <div class="drawer-comments">
-                <div class="drawer-label" style="margin-bottom: 10px;">Comments</div>
-                <div data-drawer-comments></div>
-                <div class="drawer-comment-box">
-                    <div class="founder-avatar">{{ strtoupper(substr($founder->full_name, 0, 1)) }}</div>
-                    <div style="flex: 1;">Add comment...</div>
-                    <div>🔗</div>
-                    <div>↑</div>
-                </div>
-            </div>
-        </div>
-    </aside>
-@endsection
-
-@section('scripts')
-    <script>
-        (() => {
-            const drawer = document.querySelector('[data-founder-drawer]');
-            if (!drawer) return;
-
-            const closeButton = drawer.querySelector('[data-close-drawer]');
-            const title = drawer.querySelector('[data-drawer-title]');
-            const eyebrow = drawer.querySelector('[data-drawer-eyebrow]');
-            const due = drawer.querySelector('[data-drawer-due]');
-            const owner = drawer.querySelector('[data-drawer-owner]');
-            const description = drawer.querySelector('[data-drawer-description]');
-            const badge = drawer.querySelector('[data-drawer-badge]');
-            const comments = drawer.querySelector('[data-drawer-comments]');
-
-            const openDrawer = (trigger) => {
-                const type = trigger.getAttribute('data-open-drawer') || 'lesson';
-                title.textContent = trigger.getAttribute('data-drawer-title') || 'Details';
-                eyebrow.textContent = type === 'task' ? 'Task' : 'Lesson';
-                eyebrow.classList.toggle('task', type === 'task');
-                due.textContent = trigger.getAttribute('data-drawer-due') || 'This week';
-                owner.textContent = trigger.getAttribute('data-drawer-owner') || 'Hatchers Ai OS';
-                description.textContent = trigger.getAttribute('data-drawer-description') || 'No description yet.';
-                badge.textContent = trigger.getAttribute('data-drawer-badge') || 'Open';
-
-                const rawComments = trigger.getAttribute('data-drawer-comments') || '[]';
-                let parsedComments = [];
-                try {
-                    parsedComments = JSON.parse(rawComments);
-                } catch (error) {
-                    parsedComments = [];
-                }
-
-                comments.innerHTML = '';
-                parsedComments.forEach((comment) => {
-                    const node = document.createElement('div');
-                    node.className = 'drawer-comment';
-                    node.innerHTML = `
-                        <div class="founder-avatar">${(comment.author || 'U').slice(0, 1).toUpperCase()}</div>
-                        <div>
-                            <div style="font-weight: 600; margin-bottom: 4px;">${comment.author || 'Founder'}</div>
-                            <div>${comment.message || ''}</div>
-                        </div>
-                    `;
-                    comments.appendChild(node);
-                });
-
-                drawer.classList.add('open');
-            };
-
-            document.querySelectorAll('[data-open-drawer]').forEach((trigger) => {
-                trigger.addEventListener('click', (event) => {
-                    if (event.target.closest('button') && !event.target.matches('[data-open-drawer]')) {
-                        event.preventDefault();
-                    }
-                    event.preventDefault();
-                    openDrawer(trigger);
-                });
-            });
-
-            closeButton?.addEventListener('click', () => drawer.classList.remove('open'));
-        })();
-    </script>
 @endsection
