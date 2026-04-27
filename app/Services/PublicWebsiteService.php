@@ -27,10 +27,6 @@ class PublicWebsiteService
         $summary = is_array($payload['summary'] ?? null) ? $payload['summary'] : [];
         $counts = is_array($payload['key_counts'] ?? null) ? $payload['key_counts'] : [];
         $offerPreferences = $this->offerPaymentPreferences($founder);
-        $engineVendorSlug = trim((string) ($payload['username'] ?? ''));
-        if ($engineVendorSlug === '') {
-            $engineVendorSlug = trim((string) ($founder?->username ?? ''));
-        }
 
         $websiteTitle = trim((string) ($summary['website_title'] ?? ''));
         if ($websiteTitle === '') {
@@ -46,6 +42,7 @@ class PublicWebsiteService
         }
 
         $storefrontUrl = trim((string) ($summary['website_url'] ?? ''));
+        $engineVendorSlug = $this->resolveEngineVendorSlug($storefrontUrl, $payload, $founder?->username);
         $engineBaseUrl = rtrim((string) config('modules.' . $engine . '.base_url', ''), '/');
         $osBaseUrl = rtrim((string) config('app.url'), '/');
         $engineProxyUrl = '';
@@ -124,6 +121,24 @@ class PublicWebsiteService
                 ];
             })
             ->all();
+    }
+
+    private function resolveEngineVendorSlug(string $storefrontUrl, array $payload, ?string $founderUsername): string
+    {
+        $path = trim((string) parse_url($storefrontUrl, PHP_URL_PATH), '/');
+        if ($path !== '') {
+            $segments = array_values(array_filter(explode('/', $path)));
+            if (!empty($segments)) {
+                return trim((string) $segments[0]);
+            }
+        }
+
+        $payloadSlug = trim((string) ($payload['slug'] ?? $payload['vendor_slug'] ?? ''));
+        if ($payloadSlug !== '') {
+            return $payloadSlug;
+        }
+
+        return trim((string) $founderUsername);
     }
 
     private function isRecursiveOsStorefrontUrl(string $candidateUrl, string $osBaseUrl, string $websitePath): bool
