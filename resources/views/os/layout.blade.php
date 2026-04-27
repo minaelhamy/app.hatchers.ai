@@ -292,32 +292,34 @@
 
         .assistant {
             position: fixed;
-            top: 24px;
-            right: 26px;
-            bottom: 24px;
-            width: 380px;
+            top: 36px;
+            right: 34px;
+            bottom: 34px;
+            width: 420px;
             display: grid;
             grid-template-rows: auto auto auto 1fr auto;
-            gap: 14px;
-            padding: 16px;
-            border-radius: 30px;
-            border: 1px solid rgba(235, 227, 218, 0.9);
+            gap: 12px;
+            padding: 18px;
+            border-radius: 34px;
+            border: 1px solid rgba(235, 227, 218, 0.92);
             background:
-                radial-gradient(circle at top right, rgba(233, 191, 201, 0.22), transparent 0 28%),
-                linear-gradient(180deg, rgba(255, 252, 248, 0.94), rgba(250, 246, 240, 0.9));
+                radial-gradient(circle at 100% 0%, rgba(233, 191, 201, 0.18), transparent 0 24%),
+                linear-gradient(180deg, rgba(255, 252, 248, 0.96), rgba(250, 246, 240, 0.94));
             box-shadow:
-                0 24px 72px rgba(58, 41, 25, 0.14),
-                inset 0 1px 0 rgba(255, 255, 255, 0.86);
-            backdrop-filter: blur(20px);
+                0 32px 84px rgba(58, 41, 25, 0.14),
+                inset 0 1px 0 rgba(255, 255, 255, 0.92);
+            backdrop-filter: blur(22px);
             color: #1a1714;
             z-index: 40;
         }
 
         .assistant-header {
             display: flex;
-            align-items: flex-start;
+            align-items: center;
             justify-content: space-between;
             gap: 14px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid rgba(227, 216, 203, 0.72);
         }
 
         .assistant-kicker {
@@ -342,23 +344,23 @@
 
         .assistant-title {
             font-family: "Inter Tight", "Inter", "Avenir Next", sans-serif;
-            font-size: 1.5rem;
+            font-size: 1.2rem;
             font-weight: 700;
             letter-spacing: -0.04em;
             line-height: 1;
-            margin-bottom: 6px;
+            margin-bottom: 4px;
         }
 
         .assistant-subtitle {
             color: rgba(100, 84, 72, 0.8);
-            font-size: 0.93rem;
-            line-height: 1.45;
-            max-width: 28ch;
+            font-size: 0.86rem;
+            line-height: 1.42;
+            max-width: 30ch;
         }
 
         .assistant-toggle {
-            width: 42px;
-            height: 42px;
+            width: 38px;
+            height: 38px;
             border-radius: 16px;
             border: 1px solid rgba(223, 211, 197, 0.92);
             background: rgba(255, 255, 255, 0.68);
@@ -370,14 +372,14 @@
 
         .assistant-body {
             display: grid;
-            grid-template-rows: auto auto auto 1fr auto;
-            gap: 14px;
+            grid-template-rows: auto auto 1fr auto;
+            gap: 12px;
             min-height: 0;
         }
 
         .assistant.collapsed {
             grid-template-rows: auto;
-            width: 272px;
+            width: 286px;
             bottom: auto;
         }
 
@@ -387,80 +389,83 @@
 
         .assistant-snapshot {
             display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
             gap: 10px;
+            padding: 14px;
+            border-radius: 24px;
+            border: 1px solid rgba(227, 216, 203, 0.95);
+            background: linear-gradient(180deg, rgba(255,255,255,0.7), rgba(252,247,241,0.74));
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.86);
+        }
+
+        .assistant-snapshot-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+        }
+
+        .assistant-snapshot-title {
+            font-size: 0.76rem;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: rgba(122, 105, 92, 0.74);
+        }
+
+        .assistant-snapshot-focus {
+            font-family: "Inter Tight", "Inter", "Avenir Next", sans-serif;
+            font-size: 1rem;
+            font-weight: 700;
+            letter-spacing: -0.03em;
+            color: #1b1512;
+            margin-top: 4px;
+        }
+
+        .assistant-snapshot-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 8px;
         }
 
         .assistant-stat {
-            padding: 12px 13px;
-            border-radius: 20px;
+            padding: 10px 11px;
+            border-radius: 18px;
             border: 1px solid rgba(227, 216, 203, 0.95);
-            background: rgba(255, 255, 255, 0.64);
+            background: rgba(255, 255, 255, 0.76);
             box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.84);
         }
 
         .assistant-stat-label {
             display: block;
-            font-size: 0.72rem;
+            font-size: 0.66rem;
             letter-spacing: 0.1em;
             text-transform: uppercase;
             color: rgba(120, 102, 89, 0.7);
-            margin-bottom: 6px;
+            margin-bottom: 4px;
         }
 
         .assistant-stat-value {
             display: block;
             font-family: "Inter Tight", "Inter", "Avenir Next", sans-serif;
-            font-size: 1.1rem;
+            font-size: 0.98rem;
             font-weight: 700;
             letter-spacing: -0.04em;
             color: #191512;
         }
 
-        .assistant-guidance,
         .assistant-prompts,
         .assistant-composer {
             padding: 14px;
-            border-radius: 22px;
+            border-radius: 24px;
             border: 1px solid rgba(227, 216, 203, 0.95);
             background: rgba(255, 255, 255, 0.62);
             box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.82);
         }
 
-        .assistant-guidance {
-            display: grid;
-            gap: 8px;
-        }
-
-        .assistant-guidance-title,
         .assistant-prompts-title {
             font-size: 0.74rem;
             letter-spacing: 0.12em;
             text-transform: uppercase;
             color: rgba(122, 105, 92, 0.74);
-        }
-
-        .assistant-guidance-copy {
-            color: rgba(81, 67, 58, 0.84);
-            line-height: 1.52;
-            font-size: 0.92rem;
-        }
-
-        .assistant-method-list {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-        }
-
-        .assistant-method-pill {
-            display: inline-flex;
-            align-items: center;
-            padding: 7px 10px;
-            border-radius: 999px;
-            border: 1px solid rgba(226, 213, 199, 0.92);
-            background: rgba(245, 239, 231, 0.92);
-            font-size: 0.78rem;
-            color: rgba(88, 72, 63, 0.88);
         }
 
         .assistant-prompts {
@@ -495,30 +500,33 @@
         .assistant-feed {
             display: grid;
             gap: 12px;
-            min-height: 160px;
+            min-height: 220px;
             overflow-y: auto;
-            padding-right: 4px;
+            padding: 6px 6px 0 2px;
             align-content: start;
         }
 
         .assistant-bubble {
-            border-radius: 20px;
+            max-width: 90%;
+            border-radius: 24px;
             padding: 14px 16px;
-            font-size: 0.92rem;
-            line-height: 1.55;
-            border: 1px solid rgba(223, 211, 198, 0.92);
-            box-shadow: inset 0 1px 0 rgba(255,255,255,0.66);
+            font-size: 0.94rem;
+            line-height: 1.58;
+            border: 1px solid rgba(223, 211, 198, 0.88);
+            box-shadow:
+                0 10px 20px rgba(79, 60, 39, 0.04),
+                inset 0 1px 0 rgba(255,255,255,0.74);
         }
 
         .assistant-bubble.user {
-            margin-left: 28px;
+            justify-self: end;
             background: linear-gradient(180deg, rgba(31, 27, 24, 0.94), rgba(41, 34, 31, 0.94));
             color: #fffaf5;
             border-color: rgba(31, 27, 24, 0.94);
         }
 
         .assistant-bubble.atlas {
-            margin-right: 18px;
+            justify-self: start;
             background: rgba(255, 253, 249, 0.94);
             color: rgba(37, 30, 26, 0.9);
         }
@@ -543,13 +551,14 @@
 
         .assistant-textarea {
             width: 100%;
-            min-height: 96px;
+            min-height: 84px;
+            max-height: 180px;
             resize: none;
-            border-radius: 18px;
+            border-radius: 22px;
             border: 1px solid rgba(220, 207, 191, 0.9);
             background: rgba(255, 255, 255, 0.88);
             color: #1b1714;
-            padding: 14px 15px;
+            padding: 15px 16px;
             font: inherit;
             line-height: 1.5;
             box-shadow: inset 0 1px 0 rgba(255,255,255,0.76);
@@ -575,8 +584,8 @@
         .assistant-send {
             border: 0;
             border-radius: 999px;
-            padding: 12px 16px;
-            min-width: 122px;
+            padding: 12px 18px;
+            min-width: 110px;
             background: linear-gradient(180deg, #181310, #2b221d);
             color: #fff;
             font-weight: 700;
@@ -600,6 +609,7 @@
             color: rgba(88, 73, 64, 0.88);
             font-size: 0.78rem;
             border: 1px solid rgba(227, 214, 201, 0.88);
+            cursor: pointer;
         }
 
         .assistant p {
@@ -639,7 +649,7 @@
 
         .os-window-host {
             position: absolute;
-            inset: 92px 470px 56px 64px;
+            inset: 92px 510px 56px 64px;
             pointer-events: none;
             z-index: 8;
         }
@@ -1259,48 +1269,43 @@
                         <span class="assistant-kicker-mark"></span>
                         <span>Atlas Assistant</span>
                     </div>
-                    <div class="assistant-title">Founder Mentor</div>
+                    <div class="assistant-title">Chat with Atlas</div>
                     <p class="assistant-subtitle">
-                        I can see {{ $assistantContext['company_name'] }}, your tasks, learnings, orders, bookings, and current momentum inside Hatchers OS.
+                        Ask anything about your company, orders, bookings, tasks, learnings, website, or what to do next inside Hatchers OS.
                     </p>
                 </div>
                 <button class="assistant-toggle" type="button" data-assistant-toggle aria-label="Collapse assistant">−</button>
             </div>
             <div class="assistant-body">
                 <div class="assistant-snapshot">
-                    <div class="assistant-stat">
-                        <span class="assistant-stat-label">Weekly Focus</span>
-                        <span class="assistant-stat-value">{{ $assistantContext['progress'] }}%</span>
+                    <div class="assistant-snapshot-top">
+                        <div>
+                            <div class="assistant-snapshot-title">Live founder context</div>
+                            <div class="assistant-snapshot-focus">{{ $assistantContext['focus'] }}</div>
+                        </div>
                     </div>
-                    <div class="assistant-stat">
-                        <span class="assistant-stat-label">Open Tasks</span>
-                        <span class="assistant-stat-value">{{ $assistantContext['open_tasks'] }}</span>
-                    </div>
-                    <div class="assistant-stat">
-                        <span class="assistant-stat-label">Orders + Bookings</span>
-                        <span class="assistant-stat-value">{{ $assistantContext['orders'] + $assistantContext['bookings'] }}</span>
-                    </div>
-                    <div class="assistant-stat">
-                        <span class="assistant-stat-label">Revenue Tracked</span>
-                        <span class="assistant-stat-value">{{ $assistantContext['revenue'] }}</span>
-                    </div>
-                </div>
-
-                <div class="assistant-guidance">
-                    <div class="assistant-guidance-title">Mentor Mode</div>
-                    <div class="assistant-guidance-copy">
-                        I’ll guide {{ $assistantContext['founder_name'] }} with a direct-response mindset: sharper offer, tighter message, stronger urgency, cleaner follow-up, and daily action toward revenue.
-                    </div>
-                    <div class="assistant-method-list">
-                        <span class="assistant-method-pill">Offer clarity</span>
-                        <span class="assistant-method-pill">Lead capture</span>
-                        <span class="assistant-method-pill">Risk reversal</span>
-                        <span class="assistant-method-pill">Follow-up</span>
+                    <div class="assistant-snapshot-grid">
+                        <div class="assistant-stat">
+                            <span class="assistant-stat-label">Tasks</span>
+                            <span class="assistant-stat-value">{{ $assistantContext['open_tasks'] }}</span>
+                        </div>
+                        <div class="assistant-stat">
+                            <span class="assistant-stat-label">Progress</span>
+                            <span class="assistant-stat-value">{{ $assistantContext['progress'] }}%</span>
+                        </div>
+                        <div class="assistant-stat">
+                            <span class="assistant-stat-label">Flow</span>
+                            <span class="assistant-stat-value">{{ $assistantContext['orders'] + $assistantContext['bookings'] }}</span>
+                        </div>
+                        <div class="assistant-stat">
+                            <span class="assistant-stat-label">Revenue</span>
+                            <span class="assistant-stat-value">{{ $assistantContext['revenue'] }}</span>
+                        </div>
                     </div>
                 </div>
 
                 <div class="assistant-prompts">
-                    <div class="assistant-prompts-title">Start with one of these</div>
+                    <div class="assistant-prompts-title">Try one of these</div>
                     <div class="assistant-prompt-list">
                         @foreach ($assistantPrompts as $prompt)
                             <button class="assistant-prompt" type="button" data-assistant-prompt="{{ $prompt }}">{{ $prompt }}</button>
@@ -1336,17 +1341,17 @@
                     @else
                         <div class="assistant-bubble atlas">
                             <span class="assistant-bubble-title">Atlas Assistant</span>
-                            Your current focus is <strong>{{ $assistantContext['focus'] }}</strong>. Ask me for the next revenue move, an offer review, a campaign angle, or a direct action plan from your live OS data.
+                            I’m looking at <strong>{{ $assistantContext['company_name'] }}</strong> with your live Hatchers OS context. Ask me what you are stuck on, what you should focus on, or what you do not understand and I’ll coach you through it.
                         </div>
                     @endif
                 </div>
 
                 <div class="assistant-composer">
                     <form class="assistant-form" data-assistant-form>
-                        <textarea class="assistant-textarea" data-assistant-input placeholder="Ask Atlas to review your offer, unblock revenue, plan your next moves, or coach your founder sprint."></textarea>
+                        <textarea class="assistant-textarea" data-assistant-input placeholder="Message Atlas about any founder question, blocker, offer, campaign, order, booking, task, or next move."></textarea>
                         <div class="assistant-row">
-                            <div class="assistant-status" data-assistant-status>Atlas is synced with your Hatchers OS context.</div>
-                            <button class="assistant-send" data-assistant-send type="submit">Send</button>
+                            <div class="assistant-status" data-assistant-status>Atlas sees your Hatchers OS context and will respond like your founder mentor.</div>
+                            <button class="assistant-send" data-assistant-send type="submit">Ask Atlas</button>
                         </div>
                     </form>
                 </div>
@@ -1372,6 +1377,12 @@
             const setOpen = (open) => {
                 assistant.classList.toggle('collapsed', !open);
                 if (toggle) toggle.textContent = open ? '−' : '+';
+            };
+
+            const autosizeTextarea = () => {
+                if (!textarea) return;
+                textarea.style.height = 'auto';
+                textarea.style.height = `${Math.min(textarea.scrollHeight, 180)}px`;
             };
 
             const desktopOpenApp = (workspaceKey, fallbackHref = '') => {
@@ -1430,6 +1441,7 @@
                 button.addEventListener('click', () => {
                     if (!textarea) return;
                     textarea.value = button.dataset.assistantPrompt || '';
+                    autosizeTextarea();
                     textarea.focus();
                 });
             });
@@ -1447,6 +1459,7 @@
 
                 addBubble('user', message);
                 textarea.value = '';
+                autosizeTextarea();
                 if (status) status.textContent = 'Atlas is reviewing your founder context...';
                 if (sendButton) sendButton.disabled = true;
 
@@ -1485,6 +1498,8 @@
                 }
             });
 
+            textarea?.addEventListener('input', autosizeTextarea);
+            autosizeTextarea();
             setOpen(true);
         })();
     </script>
