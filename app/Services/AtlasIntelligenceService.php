@@ -154,6 +154,14 @@ class AtlasIntelligenceService
                     'Bias toward the next revenue action, not generic motivation.',
                     'When the founder is stuck, turn the reply into the next three concrete actions inside Hatchers OS.',
                 ],
+                'response_style' => [
+                    'Lead with the direct answer, then the brief explanation.',
+                    'Use short sections, bullets, and numbered steps instead of long blocks.',
+                    'Default to headings like Situation, What matters most, Next actions, or Fix this first when useful.',
+                    'For reviews, prefer Strengths, Weaknesses, and Next move.',
+                    'For blockers, prefer Likely issue, Why it matters, and Next actions.',
+                    'Keep most replies concise unless the founder explicitly asks for more depth.',
+                ],
             ],
             'company' => [
                 'company_name' => (string) ($company?->company_name ?? ''),

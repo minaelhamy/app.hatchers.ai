@@ -297,7 +297,7 @@
             bottom: 34px;
             width: 420px;
             display: grid;
-            grid-template-rows: auto auto auto 1fr auto;
+            grid-template-rows: auto minmax(0, 1fr);
             gap: 12px;
             padding: 18px;
             border-radius: 34px;
@@ -311,6 +311,7 @@
             backdrop-filter: blur(22px);
             color: #1a1714;
             z-index: 40;
+            overflow: hidden;
         }
 
         .assistant-header {
@@ -370,11 +371,102 @@
             box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
         }
 
+        .assistant-session {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 12px 14px;
+            border-radius: 20px;
+            border: 1px solid rgba(227, 216, 203, 0.95);
+            background: rgba(255,255,255,0.64);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.84);
+        }
+
+        .assistant-session-label {
+            min-width: 0;
+        }
+
+        .assistant-session-kicker {
+            font-size: 0.7rem;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: rgba(122, 105, 92, 0.72);
+            margin-bottom: 4px;
+        }
+
+        .assistant-session-title {
+            font-size: 0.92rem;
+            font-weight: 700;
+            color: #1d1713;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .assistant-session-reset {
+            border: 1px solid rgba(220, 207, 191, 0.92);
+            background: rgba(255, 253, 249, 0.9);
+            color: rgba(94, 77, 67, 0.9);
+            border-radius: 999px;
+            padding: 8px 12px;
+            font: inherit;
+            font-size: 0.8rem;
+            font-weight: 700;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+
+        .assistant-thread-list {
+            display: grid;
+            gap: 8px;
+            max-height: 150px;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+
+        .assistant-thread-item {
+            display: grid;
+            gap: 4px;
+            width: 100%;
+            text-align: left;
+            border: 1px solid rgba(227, 216, 203, 0.95);
+            background: rgba(255,255,255,0.7);
+            color: #211914;
+            border-radius: 18px;
+            padding: 11px 12px;
+            font: inherit;
+            cursor: pointer;
+        }
+
+        .assistant-thread-item.active {
+            background: rgba(247, 241, 233, 0.96);
+            border-color: rgba(208, 190, 172, 0.95);
+        }
+
+        .assistant-thread-name {
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: #1d1713;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .assistant-thread-preview {
+            font-size: 0.78rem;
+            color: rgba(110, 92, 81, 0.8);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
         .assistant-body {
             display: grid;
-            grid-template-rows: auto auto 1fr auto;
+            grid-template-rows: auto auto minmax(0, 1fr) auto;
             gap: 12px;
             min-height: 0;
+            overflow: hidden;
         }
 
         .assistant.collapsed {
@@ -471,12 +563,59 @@
         .assistant-prompts {
             display: grid;
             gap: 10px;
+            max-height: 170px;
+            overflow: hidden;
+            min-height: 0;
+            transition:
+                max-height 220ms ease,
+                opacity 180ms ease,
+                padding 180ms ease,
+                border-color 180ms ease,
+                background 180ms ease;
+        }
+
+        .assistant.has-conversation .assistant-prompts {
+            max-height: 56px;
+            padding-top: 12px;
+            padding-bottom: 12px;
+            background: rgba(255, 255, 255, 0.54);
+        }
+
+        .assistant-prompts-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .assistant-prompts-toggle {
+            border: 1px solid rgba(220, 207, 191, 0.92);
+            background: rgba(255, 253, 249, 0.9);
+            color: rgba(94, 77, 67, 0.88);
+            border-radius: 999px;
+            padding: 7px 11px;
+            font: inherit;
+            font-size: 0.76rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .assistant.has-conversation:not(.prompts-open) .assistant-prompt-list {
+            display: none;
+        }
+
+        .assistant.has-conversation.prompts-open .assistant-prompts {
+            max-height: 170px;
         }
 
         .assistant-prompt-list {
             display: flex;
             flex-wrap: wrap;
             gap: 8px;
+            max-height: 112px;
+            overflow-y: auto;
+            padding-right: 4px;
+            align-content: flex-start;
         }
 
         .assistant-prompt {
@@ -500,10 +639,11 @@
         .assistant-feed {
             display: grid;
             gap: 12px;
-            min-height: 220px;
+            min-height: 0;
             overflow-y: auto;
-            padding: 6px 6px 0 2px;
+            padding: 6px 8px 2px 2px;
             align-content: start;
+            overscroll-behavior: contain;
         }
 
         .assistant-bubble {
@@ -544,9 +684,115 @@
             color: rgba(255, 243, 232, 0.62);
         }
 
+        .assistant-bubble-content {
+            display: grid;
+            gap: 10px;
+        }
+
+        .assistant-bubble-content > * {
+            margin: 0;
+        }
+
+        .assistant-bubble-content p {
+            color: inherit;
+            line-height: 1.62;
+        }
+
+        .assistant-bubble-content strong {
+            font-weight: 700;
+        }
+
+        .assistant-bubble-content ul,
+        .assistant-bubble-content ol {
+            margin: 0;
+            padding-left: 18px;
+            display: grid;
+            gap: 7px;
+        }
+
+        .assistant-bubble-content li {
+            line-height: 1.55;
+        }
+
+        .assistant-bubble.atlas .assistant-bubble-content ul li::marker,
+        .assistant-bubble.atlas .assistant-bubble-content ol li::marker {
+            color: rgba(169, 63, 97, 0.8);
+        }
+
+        .assistant-section-title {
+            font-size: 0.76rem;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: rgba(123, 107, 95, 0.72);
+            margin-bottom: -2px;
+        }
+
+        .assistant-bubble.user .assistant-section-title {
+            color: rgba(255, 243, 232, 0.66);
+        }
+
         .assistant-form {
             display: grid;
             gap: 10px;
+        }
+
+        .assistant-plan {
+            display: grid;
+            gap: 10px;
+            padding: 14px;
+            border-radius: 24px;
+            border: 1px solid rgba(227, 216, 203, 0.95);
+            background: rgba(255,255,255,0.62);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.82);
+        }
+
+        .assistant-plan[hidden] {
+            display: none;
+        }
+
+        .assistant-plan-title {
+            font-size: 0.74rem;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: rgba(122, 105, 92, 0.74);
+        }
+
+        .assistant-plan-name {
+            font-family: "Inter Tight", "Inter", "Avenir Next", sans-serif;
+            font-size: 1rem;
+            font-weight: 700;
+            color: #1b1512;
+            letter-spacing: -0.03em;
+        }
+
+        .assistant-plan-list {
+            display: grid;
+            gap: 8px;
+            margin: 0;
+            padding: 0 0 0 18px;
+        }
+
+        .assistant-plan-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .assistant-plan-action {
+            border: 1px solid rgba(220, 207, 191, 0.92);
+            background: rgba(255, 253, 249, 0.9);
+            color: rgba(94, 77, 67, 0.92);
+            border-radius: 999px;
+            padding: 8px 12px;
+            font: inherit;
+            font-size: 0.8rem;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .assistant-composer {
+            min-height: 0;
+            flex-shrink: 0;
         }
 
         .assistant-textarea {
@@ -610,6 +856,23 @@
             font-size: 0.78rem;
             border: 1px solid rgba(227, 214, 201, 0.88);
             cursor: pointer;
+        }
+
+        .assistant-prompt-list::-webkit-scrollbar,
+        .assistant-feed::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .assistant-prompt-list::-webkit-scrollbar-thumb,
+        .assistant-feed::-webkit-scrollbar-thumb {
+            background: rgba(199, 183, 167, 0.9);
+            border-radius: 999px;
+            border: 2px solid rgba(255, 250, 244, 0.9);
+        }
+
+        .assistant-prompt-list::-webkit-scrollbar-track,
+        .assistant-feed::-webkit-scrollbar-track {
+            background: transparent;
         }
 
         .assistant p {
@@ -1180,6 +1443,12 @@
         $assistantContext = [];
         $assistantPrompts = [];
         $assistantTimeline = [];
+        $assistantSummary = [
+            'thread_key' => '',
+            'label' => 'New founder chat',
+            'pinned_plan' => [],
+        ];
+        $assistantThreads = [];
         if ($authUser?->role === 'admin') {
             $dashboardLabel = 'Admin';
         } elseif ($authUser?->role === 'mentor') {
@@ -1194,11 +1463,37 @@
             $company = $authUser->company;
             $weeklyState = $authUser->weeklyState;
             $commercialSummary = $authUser->commercialSummary;
-            $assistantThread = $authUser->conversationThreads()->where('thread_key', 'atlas-assistant')->first();
+            $assistantThread = $authUser->conversationThreads()
+                ->where('thread_key', 'like', 'atlas-assistant%')
+                ->orderByDesc('last_activity_at')
+                ->orderByDesc('updated_at')
+                ->first();
             $assistantThreadMeta = is_array($assistantThread?->meta_json) ? $assistantThread->meta_json : [];
             $assistantTimeline = collect(is_array($assistantThreadMeta['messages'] ?? null) ? $assistantThreadMeta['messages'] : [])
                 ->filter(fn ($message) => is_array($message) && !empty($message['text']))
                 ->take(-12)
+                ->values()
+                ->all();
+            $assistantSummary = [
+                'thread_key' => (string) ($assistantThread?->thread_key ?? ''),
+                'label' => (string) ($assistantThreadMeta['label'] ?? 'New founder chat'),
+                'pinned_plan' => is_array($assistantThreadMeta['pinned_plan'] ?? null) ? $assistantThreadMeta['pinned_plan'] : [],
+            ];
+            $assistantThreads = $authUser->conversationThreads()
+                ->where('thread_key', 'like', 'atlas-assistant%')
+                ->orderByDesc('last_activity_at')
+                ->orderByDesc('updated_at')
+                ->limit(8)
+                ->get()
+                ->map(function ($thread): array {
+                    $meta = is_array($thread->meta_json) ? $thread->meta_json : [];
+
+                    return [
+                        'thread_key' => (string) $thread->thread_key,
+                        'label' => (string) ($meta['label'] ?? 'Founder chat'),
+                        'latest_message' => (string) ($thread->latest_message ?? ''),
+                    ];
+                })
                 ->values()
                 ->all();
             $showDefaultAssistant = true;
@@ -1277,6 +1572,30 @@
                 <button class="assistant-toggle" type="button" data-assistant-toggle aria-label="Collapse assistant">−</button>
             </div>
             <div class="assistant-body">
+                <div class="assistant-session">
+                    <div class="assistant-session-label">
+                        <div class="assistant-session-kicker">Current chat</div>
+                        <div class="assistant-session-title" data-assistant-thread-label>{{ $assistantSummary['label'] }}</div>
+                    </div>
+                    <button class="assistant-session-reset" type="button" data-assistant-reset>New chat</button>
+                </div>
+
+                @if (!empty($assistantThreads))
+                    <div class="assistant-thread-list" data-assistant-thread-list>
+                        @foreach ($assistantThreads as $assistantThreadItem)
+                            <button
+                                class="assistant-thread-item {{ ($assistantSummary['thread_key'] ?? '') === ($assistantThreadItem['thread_key'] ?? '') ? 'active' : '' }}"
+                                type="button"
+                                data-assistant-thread-item
+                                data-thread-key="{{ (string) ($assistantThreadItem['thread_key'] ?? '') }}"
+                            >
+                                <span class="assistant-thread-name">{{ (string) ($assistantThreadItem['label'] ?? 'Founder chat') }}</span>
+                                <span class="assistant-thread-preview">{{ (string) ($assistantThreadItem['latest_message'] ?? 'Open this chat') }}</span>
+                            </button>
+                        @endforeach
+                    </div>
+                @endif
+
                 <div class="assistant-snapshot">
                     <div class="assistant-snapshot-top">
                         <div>
@@ -1304,8 +1623,25 @@
                     </div>
                 </div>
 
+                <div class="assistant-plan" data-assistant-plan @if (empty($assistantSummary['pinned_plan']['steps'] ?? [])) hidden @endif>
+                    <div class="assistant-plan-title">Pinned from Atlas</div>
+                    <div class="assistant-plan-name" data-assistant-plan-name>{{ (string) ($assistantSummary['pinned_plan']['title'] ?? "Today's plan") }}</div>
+                    <ol class="assistant-plan-list" data-assistant-plan-list>
+                        @foreach ((array) ($assistantSummary['pinned_plan']['steps'] ?? []) as $planStep)
+                            <li>{{ (string) $planStep }}</li>
+                        @endforeach
+                    </ol>
+                    <div class="assistant-plan-actions">
+                        <button class="assistant-plan-action" type="button" data-assistant-save-plan>Turn into tasks</button>
+                        <button class="assistant-plan-action" type="button" data-assistant-open-tasks>Open Tasks</button>
+                    </div>
+                </div>
+
                 <div class="assistant-prompts">
-                    <div class="assistant-prompts-title">Try one of these</div>
+                    <div class="assistant-prompts-head">
+                        <div class="assistant-prompts-title">Try one of these</div>
+                        <button class="assistant-prompts-toggle" type="button" data-assistant-prompts-toggle>Hide starters</button>
+                    </div>
                     <div class="assistant-prompt-list">
                         @foreach ($assistantPrompts as $prompt)
                             <button class="assistant-prompt" type="button" data-assistant-prompt="{{ $prompt }}">{{ $prompt }}</button>
@@ -1326,7 +1662,7 @@
                             @endphp
                             <div class="assistant-bubble {{ $timelineType === 'user' ? 'user' : 'atlas' }}">
                                 <span class="assistant-bubble-title">{{ $timelineTitle }}</span>
-                                <div>{{ (string) ($timelineMessage['text'] ?? '') }}</div>
+                                <div class="assistant-bubble-content" data-assistant-message-content data-message-type="{{ $timelineType === 'user' ? 'user' : 'atlas' }}">{{ (string) ($timelineMessage['text'] ?? '') }}</div>
                                 @foreach ($timelineActions as $timelineAction)
                                     <button
                                         class="assistant-chip"
@@ -1341,7 +1677,7 @@
                     @else
                         <div class="assistant-bubble atlas">
                             <span class="assistant-bubble-title">Atlas Assistant</span>
-                            I’m looking at <strong>{{ $assistantContext['company_name'] }}</strong> with your live Hatchers OS context. Ask me what you are stuck on, what you should focus on, or what you do not understand and I’ll coach you through it.
+                            <div class="assistant-bubble-content" data-assistant-message-content data-message-type="atlas">I’m looking at {{ $assistantContext['company_name'] }} with your live Hatchers OS context. Ask me what you are stuck on, what you should focus on, or what you do not understand and I’ll coach you through it.</div>
                         </div>
                     @endif
                 </div>
@@ -1370,19 +1706,77 @@
             const feed = assistant.querySelector('[data-assistant-feed]');
             const status = assistant.querySelector('[data-assistant-status]');
             const sendButton = assistant.querySelector('[data-assistant-send]');
+            const resetButton = assistant.querySelector('[data-assistant-reset]');
+            const threadLabel = assistant.querySelector('[data-assistant-thread-label]');
+            const threadList = assistant.querySelector('[data-assistant-thread-list]');
+            const planPanel = assistant.querySelector('[data-assistant-plan]');
+            const planName = assistant.querySelector('[data-assistant-plan-name]');
+            const planList = assistant.querySelector('[data-assistant-plan-list]');
+            const savePlanButton = assistant.querySelector('[data-assistant-save-plan]');
+            const openTasksButton = assistant.querySelector('[data-assistant-open-tasks]');
             const promptButtons = assistant.querySelectorAll('[data-assistant-prompt]');
+            const promptsToggle = assistant.querySelector('[data-assistant-prompts-toggle]');
             const existingActionButtons = assistant.querySelectorAll('[data-assistant-action]');
             const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+            let currentThreadKey = @json($assistantSummary['thread_key'] ?? '');
 
             const setOpen = (open) => {
                 assistant.classList.toggle('collapsed', !open);
                 if (toggle) toggle.textContent = open ? '−' : '+';
             };
 
+            const hasConversation = () => assistant.querySelectorAll('.assistant-bubble').length > 1;
+
+            const syncConversationMode = ({ forceOpenPrompts = false } = {}) => {
+                const activeConversation = hasConversation();
+                assistant.classList.toggle('has-conversation', activeConversation);
+
+                if (!activeConversation) {
+                    assistant.classList.remove('prompts-open');
+                } else if (forceOpenPrompts) {
+                    assistant.classList.add('prompts-open');
+                } else if (!assistant.classList.contains('prompts-open')) {
+                    assistant.classList.remove('prompts-open');
+                }
+
+                if (promptsToggle) {
+                    const promptsVisible = !activeConversation || assistant.classList.contains('prompts-open');
+                    promptsToggle.textContent = promptsVisible ? 'Hide starters' : 'Show starters';
+                }
+            };
+
             const autosizeTextarea = () => {
                 if (!textarea) return;
                 textarea.style.height = 'auto';
                 textarea.style.height = `${Math.min(textarea.scrollHeight, 180)}px`;
+            };
+
+            const setThreadLabel = (text) => {
+                if (!threadLabel) return;
+                threadLabel.textContent = text || 'Founder chat';
+            };
+
+            const setActiveThreadButton = (threadKey) => {
+                assistant.querySelectorAll('[data-assistant-thread-item]').forEach((button) => {
+                    button.classList.toggle('active', button.dataset.threadKey === threadKey);
+                });
+            };
+
+            const prependThreadButton = (threadKey, label, preview = 'New chat started') => {
+                if (!threadList || !threadKey) return;
+
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'assistant-thread-item active';
+                button.dataset.assistantThreadItem = '1';
+                button.dataset.threadKey = threadKey;
+                button.innerHTML = `<span class="assistant-thread-name"></span><span class="assistant-thread-preview"></span>`;
+                button.querySelector('.assistant-thread-name').textContent = label || 'Founder chat';
+                button.querySelector('.assistant-thread-preview').textContent = preview;
+                button.addEventListener('click', () => loadThread(threadKey));
+
+                threadList.querySelectorAll('[data-assistant-thread-item]').forEach((item) => item.classList.remove('active'));
+                threadList.prepend(button);
             };
 
             const desktopOpenApp = (workspaceKey, fallbackHref = '') => {
@@ -1398,6 +1792,129 @@
                 }
             };
 
+            const buildPinnedPlanFromText = (text, actions = []) => {
+                const steps = [];
+                const normalized = String(text || '').replace(/\r\n/g, '\n');
+
+                normalized.split('\n').forEach((line) => {
+                    const trimmed = line.trim();
+                    if (!trimmed) return;
+                    const match = trimmed.match(/^(?:\d+\.|[-*])\s+(.+)$/);
+                    if (match) {
+                        steps.push(match[1].trim());
+                    }
+                });
+
+                if (steps.length < 2 && Array.isArray(actions)) {
+                    actions.forEach((action) => {
+                        const label = String(action?.cta || action?.title || action?.label || '').trim();
+                        if (label) {
+                            steps.push(label);
+                        }
+                    });
+                }
+
+                return steps.slice(0, 3);
+            };
+
+            const setPinnedPlan = (steps, title = "Today's plan") => {
+                if (!planPanel || !planList || !planName) return;
+
+                const cleanSteps = (Array.isArray(steps) ? steps : [])
+                    .map((step) => String(step || '').trim())
+                    .filter(Boolean)
+                    .slice(0, 3);
+
+                if (!cleanSteps.length) {
+                    planPanel.hidden = true;
+                    return;
+                }
+
+                planPanel.hidden = false;
+                planName.textContent = title;
+                planList.innerHTML = cleanSteps.map((step) => `<li>${step}</li>`).join('');
+            };
+
+            const currentPinnedPlanSteps = () => {
+                if (!planList || !planPanel || planPanel.hidden) return [];
+                return Array.from(planList.querySelectorAll('li')).map((item) => item.textContent?.trim() || '').filter(Boolean);
+            };
+
+            const appendInlineFormattedText = (target, text) => {
+                const parts = String(text || '').split(/(\*\*[^*]+\*\*)/g).filter(Boolean);
+                parts.forEach((part) => {
+                    if (part.startsWith('**') && part.endsWith('**')) {
+                        const strong = document.createElement('strong');
+                        strong.textContent = part.slice(2, -2);
+                        target.appendChild(strong);
+                    } else {
+                        target.appendChild(document.createTextNode(part));
+                    }
+                });
+            };
+
+            const buildTextBlock = (line, tagName = 'p') => {
+                const element = document.createElement(tagName);
+                appendInlineFormattedText(element, line);
+                return element;
+            };
+
+            const renderAssistantContent = (container, text, type = 'atlas') => {
+                if (!container) return;
+
+                const normalized = String(text || '').replace(/\r\n/g, '\n').trim();
+                container.innerHTML = '';
+
+                if (!normalized) {
+                    return;
+                }
+
+                const blocks = normalized.split(/\n\s*\n/);
+
+                blocks.forEach((block) => {
+                    const lines = block.split('\n').map((line) => line.trim()).filter(Boolean);
+                    if (!lines.length) return;
+
+                    if (lines.every((line) => /^[-*]\s+/.test(line))) {
+                        const list = document.createElement('ul');
+                        lines.forEach((line) => {
+                            const item = document.createElement('li');
+                            appendInlineFormattedText(item, line.replace(/^[-*]\s+/, ''));
+                            list.appendChild(item);
+                        });
+                        container.appendChild(list);
+                        return;
+                    }
+
+                    if (lines.every((line) => /^\d+\.\s+/.test(line))) {
+                        const list = document.createElement('ol');
+                        lines.forEach((line) => {
+                            const item = document.createElement('li');
+                            appendInlineFormattedText(item, line.replace(/^\d+\.\s+/, ''));
+                            list.appendChild(item);
+                        });
+                        container.appendChild(list);
+                        return;
+                    }
+
+                    if (type !== 'user' && lines.length > 1 && /^[A-Za-z].{0,48}:$/.test(lines[0])) {
+                        const sectionTitle = document.createElement('div');
+                        sectionTitle.className = 'assistant-section-title';
+                        sectionTitle.textContent = lines[0].replace(/:$/, '');
+                        container.appendChild(sectionTitle);
+
+                        const bodyLines = lines.slice(1);
+                        const bodyParagraph = buildTextBlock(bodyLines.join(' '), 'p');
+                        container.appendChild(bodyParagraph);
+                        return;
+                    }
+
+                    lines.forEach((line) => {
+                        container.appendChild(buildTextBlock(line, 'p'));
+                    });
+                });
+            };
+
             const addBubble = (type, text, actions = [], options = {}) => {
                 const bubble = document.createElement('div');
                 bubble.className = `assistant-bubble ${type}`;
@@ -1408,7 +1925,10 @@
                 bubble.appendChild(title);
 
                 const content = document.createElement('div');
-                content.textContent = text;
+                content.className = 'assistant-bubble-content';
+                content.dataset.assistantMessageContent = '1';
+                content.dataset.messageType = type;
+                renderAssistantContent(content, text, type);
                 bubble.appendChild(content);
 
                 if (Array.isArray(actions) && actions.length) {
@@ -1431,6 +1951,15 @@
 
                 feed?.appendChild(bubble);
                 if (feed) feed.scrollTop = feed.scrollHeight;
+                if (type === 'user') {
+                    const trimmed = String(text || '').trim();
+                    setThreadLabel(trimmed.slice(0, 42) + (trimmed.length > 42 ? '…' : ''));
+                }
+                if (type === 'atlas') {
+                    const planSteps = buildPinnedPlanFromText(text, actions);
+                    setPinnedPlan(planSteps);
+                }
+                syncConversationMode();
             };
 
             toggle?.addEventListener('click', () => {
@@ -1446,11 +1975,169 @@
                 });
             });
 
+            promptsToggle?.addEventListener('click', () => {
+                const activeConversation = hasConversation();
+                if (!activeConversation) {
+                    return;
+                }
+
+                assistant.classList.toggle('prompts-open');
+                syncConversationMode({ forceOpenPrompts: assistant.classList.contains('prompts-open') });
+            });
+
             existingActionButtons.forEach((button) => {
                 button.addEventListener('click', () => {
                     desktopOpenApp(button.dataset.assistantWorkspace || '', button.dataset.assistantHref || '');
                 });
             });
+
+            const bindThreadButton = (button) => {
+                button.addEventListener('click', () => {
+                    loadThread(button.dataset.threadKey || '');
+                });
+            };
+
+            assistant.querySelectorAll('[data-assistant-thread-item]').forEach(bindThreadButton);
+
+            const loadThread = async (threadKey) => {
+                if (!threadKey) return;
+                if (status) status.textContent = 'Loading chat...';
+
+                try {
+                    const response = await fetch('/assistant/chat/thread', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': csrf,
+                            'Accept': 'application/json',
+                        },
+                        body: JSON.stringify({ thread_key: threadKey }),
+                    });
+
+                    const data = await response.json();
+                    if (!response.ok || !data.success) {
+                        if (status) status.textContent = 'Could not load that chat.';
+                        return;
+                    }
+
+                    currentThreadKey = data.thread_key || threadKey;
+                    if (feed) {
+                        feed.innerHTML = '';
+                    }
+
+                    (Array.isArray(data.messages) ? data.messages : []).forEach((message) => {
+                        addBubble(
+                            message.type === 'user' ? 'user' : 'atlas',
+                            message.text || '',
+                            message.actions || [],
+                            { title: message.title || (message.type === 'user' ? 'You' : 'Atlas Assistant') }
+                        );
+                    });
+
+                    setThreadLabel(data.label || 'Founder chat');
+                    setActiveThreadButton(currentThreadKey);
+                    setPinnedPlan(data.pinned_plan?.steps || [], data.pinned_plan?.title || "Today's plan");
+                    syncConversationMode();
+                    if (status) status.textContent = 'Chat loaded.';
+                } catch (error) {
+                    if (status) status.textContent = 'Could not load that chat.';
+                }
+            };
+
+            resetButton?.addEventListener('click', async () => {
+                if (sendButton) sendButton.disabled = true;
+                resetButton.disabled = true;
+                if (status) status.textContent = 'Starting a fresh chat...';
+
+                try {
+                    const response = await fetch('/assistant/chat/reset', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': csrf,
+                            'Accept': 'application/json',
+                        },
+                        body: JSON.stringify({}),
+                    });
+
+                    const data = await response.json();
+                    if (!response.ok || !data.success) {
+                        if (status) status.textContent = 'Could not reset chat right now.';
+                        return;
+                    }
+
+                    if (feed) {
+                        feed.innerHTML = '';
+                    }
+
+                    currentThreadKey = data.thread_key || '';
+                    setThreadLabel(data.label || 'New founder chat');
+                    setActiveThreadButton(currentThreadKey);
+                    prependThreadButton(currentThreadKey, data.label || 'New founder chat');
+                    setPinnedPlan([]);
+                    addBubble('atlas', data.reply || 'New chat started. Ask Atlas anything.');
+                    assistant.classList.remove('has-conversation', 'prompts-open');
+                    syncConversationMode({ forceOpenPrompts: true });
+                    if (status) status.textContent = 'Fresh chat ready.';
+                } catch (error) {
+                    if (status) status.textContent = 'Could not reset chat right now.';
+                } finally {
+                    if (sendButton) sendButton.disabled = false;
+                    resetButton.disabled = false;
+                }
+            });
+
+            savePlanButton?.addEventListener('click', async () => {
+                const steps = currentPinnedPlanSteps();
+                if (!steps.length) {
+                    if (status) status.textContent = 'There is no pinned plan to save yet.';
+                    return;
+                }
+
+                savePlanButton.disabled = true;
+                if (status) status.textContent = 'Saving this plan into your OS tasks...';
+
+                try {
+                    const response = await fetch('/assistant/chat/tasks', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': csrf,
+                            'Accept': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            thread_key: currentThreadKey,
+                            title: planName?.textContent || "Today's plan",
+                            steps,
+                        }),
+                    });
+
+                    const data = await response.json();
+                    if (!response.ok || !data.success) {
+                        if (status) status.textContent = data.error || 'Could not save tasks.';
+                        return;
+                    }
+
+                    addBubble('atlas', data.reply || 'Saved into your tasks.', data.actions || []);
+                    if (status) status.textContent = `Saved ${data.created_count || steps.length} tasks into Hatchers OS.`;
+                } catch (error) {
+                    if (status) status.textContent = 'Could not save tasks.';
+                } finally {
+                    savePlanButton.disabled = false;
+                }
+            });
+
+            openTasksButton?.addEventListener('click', () => {
+                desktopOpenApp('tasks', '/tasks');
+            });
+
+            assistant.querySelectorAll('[data-assistant-message-content]').forEach((node) => {
+                const type = node.dataset.messageType || 'atlas';
+                renderAssistantContent(node, node.textContent || '', type);
+            });
+            if (feed) {
+                feed.scrollTop = feed.scrollHeight;
+            }
 
             form?.addEventListener('submit', async (event) => {
                 event.preventDefault();
@@ -1474,6 +2161,7 @@
                         body: JSON.stringify({
                             message,
                             current_page: window.location.pathname.replace(/^\//, '') || 'dashboard',
+                            thread_key: currentThreadKey,
                         }),
                     });
 
@@ -1482,6 +2170,8 @@
                         addBubble('atlas', data.error || 'Hatchers AI could not respond right now.');
                         if (status) status.textContent = 'Atlas is temporarily unavailable.';
                     } else {
+                        currentThreadKey = data.thread_key || currentThreadKey;
+                        setActiveThreadButton(currentThreadKey);
                         addBubble('atlas', data.reply || 'Hatchers AI is here.', data.actions || []);
                         if (data.refresh) {
                             if (status) status.textContent = 'Atlas updated your workspace. Refreshing summary...';
@@ -1500,6 +2190,7 @@
 
             textarea?.addEventListener('input', autosizeTextarea);
             autosizeTextarea();
+            syncConversationMode();
             setOpen(true);
         })();
     </script>

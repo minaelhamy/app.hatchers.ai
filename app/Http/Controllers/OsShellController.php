@@ -6103,10 +6103,12 @@ class OsShellController extends Controller
         $validated = $request->validate([
             'message' => ['required', 'string', 'max:4000'],
             'current_page' => ['nullable', 'string', 'max:255'],
+            'thread_key' => ['nullable', 'string', 'max:120'],
         ]);
 
         $message = trim((string) $validated['message']);
         $currentPage = trim((string) ($validated['current_page'] ?? 'os_dashboard'));
+        $threadKey = trim((string) ($validated['thread_key'] ?? ''));
 
         $actionResult = $actionService->handle($founder, $request, $message);
         if (!empty($actionResult['handled'])) {
@@ -6130,8 +6132,9 @@ class OsShellController extends Controller
             }
 
             $mappedActions = $this->mapAssistantActionsToOs($actionResult['actions'] ?? []);
-            $timeline->record(
+            $thread = $timeline->record(
                 $founder,
+                $threadKey !== '' ? $threadKey : null,
                 $currentPage,
                 $message,
                 (string) ($actionResult['reply'] ?? ''),
@@ -6143,6 +6146,7 @@ class OsShellController extends Controller
                 'reply' => $actionResult['reply'] ?? '',
                 'actions' => $mappedActions,
                 'refresh' => !empty($actionResult['executed']),
+                'thread_key' => (string) $thread->thread_key,
             ]);
         }
 
@@ -6160,8 +6164,9 @@ class OsShellController extends Controller
         }
 
         $mappedActions = $this->mapAssistantActionsToOs($result['actions'] ?? []);
-        $timeline->record(
+        $thread = $timeline->record(
             $founder,
+            $threadKey !== '' ? $threadKey : null,
             $currentPage,
             $message,
             (string) ($result['reply'] ?? ''),
@@ -6173,6 +6178,95 @@ class OsShellController extends Controller
             'reply' => $result['reply'] ?? '',
             'actions' => $mappedActions,
             'refresh' => false,
+            'thread_key' => (string) $thread->thread_key,
+        ]);
+    }
+
+    public function assistantReset(OsAssistantTimelineService $timeline): JsonResponse
+    {
+        /** @var \App\Models\Founder $founder */
+        $founder = Auth::user();
+
+        $thread = $timeline->startNewThread($founder);
+
+        return response()->json([
+            'success' => true,
+            'label' => 'New founder chat',
+            'thread_key' => (string) $thread->thread_key,
+            'reply' => 'New chat started. Ask Atlas anything about your next move, your offer, your website, your marketing, or what is blocking growth.',
+        ]);
+    }
+
+    public function assistantThread(Request $request, OsAssistantTimelineService $timeline): JsonResponse
+    {
+        /** @var \App\Models\Founder $founder */
+        $founder = Auth::user();
+
+        $validated = $request->validate([
+            'thread_key' => ['required', 'string', 'max:120'],
+        ]);
+
+        $threadKey = trim((string) $validated['thread_key']);
+        $messages = $timeline->timeline($founder, $threadKey, 20);
+        $summary = $timeline->summary($founder, $threadKey);
+
+        return response()->json([
+            'success' => true,
+            'thread_key' => $summary['thread_key'] ?? $threadKey,
+            'label' => $summary['label'] ?? 'Founder chat',
+            'messages' => $messages,
+            'pinned_plan' => $summary['pinned_plan'] ?? [],
+        ]);
+    }
+
+    public function assistantCreateTasks(Request $request): JsonResponse
+    {
+        /** @var \App\Models\Founder $founder */
+        $founder = Auth::user();
+
+        $validated = $request->validate([
+            'thread_key' => ['nullable', 'string', 'max:120'],
+            'title' => ['nullable', 'string', 'max:120'],
+            'steps' => ['required', 'array', 'min:1', 'max:6'],
+            'steps.*' => ['required', 'string', 'max:255'],
+        ]);
+
+        $title = trim((string) ($validated['title'] ?? "Atlas plan"));
+        $steps = collect($validated['steps'])
+            ->map(fn ($step) => trim((string) $step))
+            ->filter()
+            ->take(6)
+            ->values();
+
+        if ($steps->isEmpty()) {
+            return response()->json([
+                'success' => false,
+                'error' => 'There are no usable plan steps to save.',
+            ], 422);
+        }
+
+        $created = $steps->map(function (string $step, int $index) use ($founder, $title) {
+            return FounderActionPlan::create([
+                'founder_id' => $founder->id,
+                'title' => $step,
+                'description' => 'Created from Atlas assistant plan: ' . $title,
+                'platform' => 'atlas_assistant',
+                'priority' => max(40, 82 - ($index * 6)),
+                'status' => 'pending',
+                'cta_label' => 'Open Tasks',
+                'cta_url' => route('founder.tasks'),
+            ]);
+        });
+
+        return response()->json([
+            'success' => true,
+            'created_count' => $created->count(),
+            'reply' => 'Saved this Atlas plan into your OS tasks.',
+            'actions' => [[
+                'cta' => 'Open Tasks',
+                'os_workspace_key' => 'tasks',
+                'os_href' => route('founder.tasks'),
+            ]],
         ]);
     }
 
