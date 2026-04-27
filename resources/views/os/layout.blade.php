@@ -290,332 +290,162 @@
             margin: 10px 0 6px;
         }
 
-        .assistant {
+        .assistant-window {
             position: fixed;
-            top: 36px;
-            right: 34px;
-            bottom: 34px;
-            width: 420px;
+            top: 106px;
+            right: 48px;
+            width: 430px;
+            height: min(760px, calc(100vh - 170px));
+            z-index: 44;
             display: grid;
             grid-template-rows: auto minmax(0, 1fr);
-            gap: 12px;
-            padding: 18px;
-            border-radius: 34px;
-            border: 1px solid rgba(235, 227, 218, 0.92);
-            background:
-                radial-gradient(circle at 100% 0%, rgba(233, 191, 201, 0.18), transparent 0 24%),
-                linear-gradient(180deg, rgba(255, 252, 248, 0.96), rgba(250, 246, 240, 0.94));
-            box-shadow:
-                0 32px 84px rgba(58, 41, 25, 0.14),
-                inset 0 1px 0 rgba(255, 255, 255, 0.92);
-            backdrop-filter: blur(22px);
-            color: #1a1714;
-            z-index: 40;
-            overflow: hidden;
+            pointer-events: auto;
         }
 
-        .assistant-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 14px;
-            padding-bottom: 12px;
-            border-bottom: 1px solid rgba(227, 216, 203, 0.72);
+        .assistant-window.is-hidden,
+        .assistant-window.is-minimized {
+            display: none;
         }
 
-        .assistant-kicker {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            margin-bottom: 6px;
-            font-size: 0.7rem;
-            letter-spacing: 0.16em;
-            text-transform: uppercase;
-            color: rgba(116, 98, 86, 0.74);
+        .assistant-window.is-maximized {
+            inset: 96px 44px 42px 44px;
+            width: auto;
+            height: auto;
         }
 
-        .assistant-kicker-mark {
-            width: 10px;
-            height: 10px;
-            border-radius: 999px;
-            background: linear-gradient(135deg, #ef476f, #ee6c4d);
-            box-shadow: 0 0 0 6px rgba(239, 71, 111, 0.08);
-            flex-shrink: 0;
+        .assistant-window .os-app-window {
+            width: 100%;
+            height: 100%;
+            display: grid;
+            grid-template-rows: auto minmax(0, 1fr);
         }
 
-        .assistant-title {
-            font-family: "Inter Tight", "Inter", "Avenir Next", sans-serif;
-            font-size: 1.2rem;
-            font-weight: 700;
-            letter-spacing: -0.04em;
-            line-height: 1;
-            margin-bottom: 4px;
+        .assistant-window .os-app-window-bar {
+            cursor: grab;
+            user-select: none;
         }
 
-        .assistant-subtitle {
-            color: rgba(100, 84, 72, 0.8);
-            font-size: 0.86rem;
-            line-height: 1.42;
-            max-width: 30ch;
-        }
-
-        .assistant-toggle {
-            width: 38px;
-            height: 38px;
-            border-radius: 16px;
-            border: 1px solid rgba(223, 211, 197, 0.92);
-            background: rgba(255, 255, 255, 0.68);
-            color: rgba(80, 63, 53, 0.86);
-            cursor: pointer;
-            font-weight: 700;
-            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
-        }
-
-        .assistant-session {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 12px;
-            padding: 12px 14px;
-            border-radius: 20px;
-            border: 1px solid rgba(227, 216, 203, 0.95);
-            background: rgba(255,255,255,0.64);
-            box-shadow: inset 0 1px 0 rgba(255,255,255,0.84);
-        }
-
-        .assistant-session-label {
-            min-width: 0;
-        }
-
-        .assistant-session-kicker {
-            font-size: 0.7rem;
+        .assistant-window .os-app-window-title {
+            font-size: 0.88rem;
             letter-spacing: 0.12em;
             text-transform: uppercase;
-            color: rgba(122, 105, 92, 0.72);
-            margin-bottom: 4px;
+            color: rgba(103, 87, 76, 0.72);
         }
 
-        .assistant-session-title {
-            font-size: 0.92rem;
-            font-weight: 700;
-            color: #1d1713;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+        .assistant-window-body {
+            display: grid;
+            grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+            gap: 12px;
+            padding: 14px;
+            min-height: 0;
+            background:
+                radial-gradient(circle at 100% 0%, rgba(233, 191, 201, 0.12), transparent 0 26%),
+                linear-gradient(180deg, rgba(255, 252, 248, 0.98), rgba(250, 246, 240, 0.96));
         }
 
-        .assistant-session-reset {
+        .assistant-toolbar,
+        .assistant-plan,
+        .assistant-prompts,
+        .assistant-composer {
+            padding: 12px 14px;
+            border-radius: 22px;
+            border: 1px solid rgba(227, 216, 203, 0.95);
+            background: rgba(255, 255, 255, 0.68);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.84);
+        }
+
+        .assistant-toolbar {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto auto;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .assistant-thread-select {
+            width: 100%;
+            min-width: 0;
             border: 1px solid rgba(220, 207, 191, 0.92);
-            background: rgba(255, 253, 249, 0.9);
-            color: rgba(94, 77, 67, 0.9);
+            background: rgba(255, 253, 249, 0.92);
+            color: #241c18;
+            border-radius: 999px;
+            padding: 9px 12px;
+            font: inherit;
+            font-size: 0.84rem;
+        }
+
+        .assistant-toolbar-button,
+        .assistant-plan-action,
+        .assistant-prompts-toggle,
+        .assistant-chip {
+            border: 1px solid rgba(220, 207, 191, 0.92);
+            background: rgba(255, 253, 249, 0.92);
+            color: rgba(94, 77, 67, 0.92);
             border-radius: 999px;
             padding: 8px 12px;
             font: inherit;
             font-size: 0.8rem;
             font-weight: 700;
             cursor: pointer;
-            flex-shrink: 0;
         }
 
-        .assistant-thread-list {
+        .assistant-plan {
             display: grid;
             gap: 8px;
-            max-height: 150px;
-            overflow-y: auto;
-            padding-right: 4px;
         }
 
-        .assistant-thread-item {
-            display: grid;
-            gap: 4px;
-            width: 100%;
-            text-align: left;
-            border: 1px solid rgba(227, 216, 203, 0.95);
-            background: rgba(255,255,255,0.7);
-            color: #211914;
-            border-radius: 18px;
-            padding: 11px 12px;
-            font: inherit;
-            cursor: pointer;
-        }
-
-        .assistant-thread-item.active {
-            background: rgba(247, 241, 233, 0.96);
-            border-color: rgba(208, 190, 172, 0.95);
-        }
-
-        .assistant-thread-name {
-            font-size: 0.85rem;
-            font-weight: 700;
-            color: #1d1713;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .assistant-thread-preview {
-            font-size: 0.78rem;
-            color: rgba(110, 92, 81, 0.8);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .assistant-body {
-            display: grid;
-            grid-template-rows: auto auto minmax(0, 1fr) auto;
-            gap: 12px;
-            min-height: 0;
-            overflow: hidden;
-        }
-
-        .assistant.collapsed {
-            grid-template-rows: auto;
-            width: 286px;
-            bottom: auto;
-        }
-
-        .assistant.collapsed .assistant-body {
-            display: none;
-        }
-
-        .assistant-snapshot {
-            display: grid;
-            gap: 10px;
-            padding: 14px;
-            border-radius: 24px;
-            border: 1px solid rgba(227, 216, 203, 0.95);
-            background: linear-gradient(180deg, rgba(255,255,255,0.7), rgba(252,247,241,0.74));
-            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.86);
-        }
-
-        .assistant-snapshot-top {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 14px;
-        }
-
-        .assistant-snapshot-title {
-            font-size: 0.76rem;
+        .assistant-plan-title {
+            font-size: 0.72rem;
             letter-spacing: 0.14em;
             text-transform: uppercase;
-            color: rgba(122, 105, 92, 0.74);
+            color: rgba(123, 107, 95, 0.72);
         }
 
-        .assistant-snapshot-focus {
-            font-family: "Inter Tight", "Inter", "Avenir Next", sans-serif;
-            font-size: 1rem;
-            font-weight: 700;
-            letter-spacing: -0.03em;
-            color: #1b1512;
-            margin-top: 4px;
-        }
-
-        .assistant-snapshot-grid {
-            display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
-            gap: 8px;
-        }
-
-        .assistant-stat {
-            padding: 10px 11px;
-            border-radius: 18px;
-            border: 1px solid rgba(227, 216, 203, 0.95);
-            background: rgba(255, 255, 255, 0.76);
-            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.84);
-        }
-
-        .assistant-stat-label {
-            display: block;
-            font-size: 0.66rem;
-            letter-spacing: 0.1em;
-            text-transform: uppercase;
-            color: rgba(120, 102, 89, 0.7);
-            margin-bottom: 4px;
-        }
-
-        .assistant-stat-value {
-            display: block;
-            font-family: "Inter Tight", "Inter", "Avenir Next", sans-serif;
+        .assistant-plan-name {
             font-size: 0.98rem;
             font-weight: 700;
-            letter-spacing: -0.04em;
-            color: #191512;
+            color: #2b231d;
         }
 
-        .assistant-prompts,
-        .assistant-composer {
-            padding: 14px;
-            border-radius: 24px;
-            border: 1px solid rgba(227, 216, 203, 0.95);
-            background: rgba(255, 255, 255, 0.62);
-            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.82);
-        }
-
-        .assistant-prompts-title {
-            font-size: 0.74rem;
-            letter-spacing: 0.12em;
-            text-transform: uppercase;
-            color: rgba(122, 105, 92, 0.74);
-        }
-
-        .assistant-prompts {
+        .assistant-plan-list {
+            margin: 0;
+            padding-left: 18px;
             display: grid;
-            gap: 10px;
-            max-height: 170px;
-            overflow: hidden;
-            min-height: 0;
-            transition:
-                max-height 220ms ease,
-                opacity 180ms ease,
-                padding 180ms ease,
-                border-color 180ms ease,
-                background 180ms ease;
+            gap: 6px;
+            color: rgba(77, 64, 56, 0.88);
+            line-height: 1.45;
         }
 
-        .assistant.has-conversation .assistant-prompts {
-            max-height: 56px;
-            padding-top: 12px;
-            padding-bottom: 12px;
-            background: rgba(255, 255, 255, 0.54);
+        .assistant-plan-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .assistant-prompts[hidden] {
+            display: none;
         }
 
         .assistant-prompts-head {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            gap: 12px;
+            gap: 10px;
+            margin-bottom: 8px;
         }
 
-        .assistant-prompts-toggle {
-            border: 1px solid rgba(220, 207, 191, 0.92);
-            background: rgba(255, 253, 249, 0.9);
-            color: rgba(94, 77, 67, 0.88);
-            border-radius: 999px;
-            padding: 7px 11px;
-            font: inherit;
-            font-size: 0.76rem;
-            font-weight: 600;
-            cursor: pointer;
-        }
-
-        .assistant.has-conversation:not(.prompts-open) .assistant-prompt-list {
-            display: none;
-        }
-
-        .assistant.has-conversation.prompts-open .assistant-prompts {
-            max-height: 170px;
+        .assistant-prompts-title {
+            font-size: 0.72rem;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: rgba(123, 107, 95, 0.72);
         }
 
         .assistant-prompt-list {
-            display: flex;
-            flex-wrap: wrap;
+            display: grid;
             gap: 8px;
-            max-height: 112px;
+            max-height: 168px;
             overflow-y: auto;
             padding-right: 4px;
-            align-content: flex-start;
         }
 
         .assistant-prompt {
@@ -636,12 +466,24 @@
             background: rgba(255, 255, 255, 0.96);
         }
 
+        .assistant-feed-shell {
+            min-height: 0;
+            display: grid;
+            border-radius: 24px;
+            border: 1px solid rgba(227, 216, 203, 0.95);
+            background: linear-gradient(180deg, rgba(255,255,255,0.86), rgba(255,252,248,0.92));
+            box-shadow:
+                inset 0 1px 0 rgba(255,255,255,0.84),
+                0 18px 34px rgba(70, 53, 34, 0.05);
+            overflow: hidden;
+        }
+
         .assistant-feed {
             display: grid;
             gap: 12px;
             min-height: 0;
             overflow-y: auto;
-            padding: 6px 8px 2px 2px;
+            padding: 14px 12px 12px;
             align-content: start;
             overscroll-behavior: contain;
         }
@@ -736,60 +578,6 @@
             gap: 10px;
         }
 
-        .assistant-plan {
-            display: grid;
-            gap: 10px;
-            padding: 14px;
-            border-radius: 24px;
-            border: 1px solid rgba(227, 216, 203, 0.95);
-            background: rgba(255,255,255,0.62);
-            box-shadow: inset 0 1px 0 rgba(255,255,255,0.82);
-        }
-
-        .assistant-plan[hidden] {
-            display: none;
-        }
-
-        .assistant-plan-title {
-            font-size: 0.74rem;
-            letter-spacing: 0.12em;
-            text-transform: uppercase;
-            color: rgba(122, 105, 92, 0.74);
-        }
-
-        .assistant-plan-name {
-            font-family: "Inter Tight", "Inter", "Avenir Next", sans-serif;
-            font-size: 1rem;
-            font-weight: 700;
-            color: #1b1512;
-            letter-spacing: -0.03em;
-        }
-
-        .assistant-plan-list {
-            display: grid;
-            gap: 8px;
-            margin: 0;
-            padding: 0 0 0 18px;
-        }
-
-        .assistant-plan-actions {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
-
-        .assistant-plan-action {
-            border: 1px solid rgba(220, 207, 191, 0.92);
-            background: rgba(255, 253, 249, 0.9);
-            color: rgba(94, 77, 67, 0.92);
-            border-radius: 999px;
-            padding: 8px 12px;
-            font: inherit;
-            font-size: 0.8rem;
-            font-weight: 700;
-            cursor: pointer;
-        }
-
         .assistant-composer {
             min-height: 0;
             flex-shrink: 0;
@@ -849,13 +637,40 @@
             align-items: center;
             margin-top: 8px;
             margin-right: 6px;
-            padding: 7px 10px;
-            border-radius: 999px;
-            background: rgba(244, 237, 228, 0.96);
-            color: rgba(88, 73, 64, 0.88);
-            font-size: 0.78rem;
-            border: 1px solid rgba(227, 214, 201, 0.88);
+        }
+
+        .assistant-launcher {
+            position: fixed;
+            right: 46px;
+            bottom: 34px;
+            z-index: 40;
+            width: 62px;
+            height: 62px;
+            border: 1px solid rgba(212, 198, 184, 0.9);
+            border-radius: 20px;
+            background:
+                radial-gradient(circle at 30% 24%, rgba(255,255,255,0.76), transparent 0 36%),
+                linear-gradient(180deg, rgba(255,255,255,0.82), rgba(248, 242, 236, 0.96));
+            box-shadow:
+                0 20px 34px rgba(74, 56, 37, 0.14),
+                inset 0 1px 0 rgba(255,255,255,0.88);
+            display: none;
+            align-items: center;
+            justify-content: center;
             cursor: pointer;
+            backdrop-filter: blur(18px);
+        }
+
+        .assistant-launcher.is-visible {
+            display: inline-flex;
+        }
+
+        .assistant-launcher-mark {
+            width: 22px;
+            height: 22px;
+            border-radius: 8px;
+            background: linear-gradient(180deg, #ff627b, #f24161);
+            box-shadow: 0 12px 24px rgba(242, 65, 97, 0.34);
         }
 
         .assistant-prompt-list::-webkit-scrollbar,
@@ -896,11 +711,21 @@
                 padding-right: 18px;
             }
 
-            .assistant {
+            .assistant-window {
                 position: static;
                 width: auto;
+                height: auto;
                 margin-top: 22px;
                 min-height: auto;
+            }
+
+            .assistant-window.is-maximized {
+                inset: auto;
+            }
+
+            .assistant-launcher {
+                right: 20px;
+                bottom: 20px;
             }
         }
     </style>
@@ -1557,142 +1382,107 @@
         </div>
     @endif
     @if ($showDefaultAssistant)
-        <aside class="assistant" data-os-assistant>
-            <div class="assistant-header">
-                <div>
-                    <div class="assistant-kicker">
-                        <span class="assistant-kicker-mark"></span>
-                        <span>Atlas Assistant</span>
+        <section class="assistant-window" data-os-assistant>
+            <div class="os-app-window is-active">
+                <div class="os-app-window-bar" data-assistant-drag-handle>
+                    <div class="os-app-window-dots">
+                        <button type="button" class="os-dot os-dot-close" data-assistant-close aria-label="Close Atlas"></button>
+                        <button type="button" class="os-dot os-dot-minimize" data-assistant-minimize aria-label="Minimize Atlas"></button>
+                        <button type="button" class="os-dot os-dot-expand" data-assistant-maximize aria-label="Maximize Atlas"></button>
                     </div>
-                    <div class="assistant-title">Chat with Atlas</div>
-                    <p class="assistant-subtitle">
-                        Ask anything about your company, orders, bookings, tasks, learnings, website, or what to do next inside Hatchers OS.
-                    </p>
+                    <div class="os-app-window-title" data-assistant-thread-label>{{ $assistantSummary['label'] }}</div>
+                    <div style="width: 58px;"></div>
                 </div>
-                <button class="assistant-toggle" type="button" data-assistant-toggle aria-label="Collapse assistant">−</button>
-            </div>
-            <div class="assistant-body">
-                <div class="assistant-session">
-                    <div class="assistant-session-label">
-                        <div class="assistant-session-kicker">Current chat</div>
-                        <div class="assistant-session-title" data-assistant-thread-label>{{ $assistantSummary['label'] }}</div>
+                <div class="assistant-window-body">
+                    <div class="assistant-toolbar">
+                        <select class="assistant-thread-select" data-assistant-thread-select aria-label="Choose a chat">
+                            @foreach ($assistantThreads as $assistantThreadItem)
+                                <option
+                                    value="{{ (string) ($assistantThreadItem['thread_key'] ?? '') }}"
+                                    @selected(($assistantSummary['thread_key'] ?? '') === ($assistantThreadItem['thread_key'] ?? ''))
+                                >{{ (string) ($assistantThreadItem['label'] ?? 'Founder chat') }}</option>
+                            @endforeach
+                        </select>
+                        <button class="assistant-toolbar-button" type="button" data-assistant-reset>New chat</button>
+                        <button class="assistant-toolbar-button" type="button" data-assistant-prompts-toggle>Starters</button>
                     </div>
-                    <button class="assistant-session-reset" type="button" data-assistant-reset>New chat</button>
-                </div>
 
-                @if (!empty($assistantThreads))
-                    <div class="assistant-thread-list" data-assistant-thread-list>
-                        @foreach ($assistantThreads as $assistantThreadItem)
-                            <button
-                                class="assistant-thread-item {{ ($assistantSummary['thread_key'] ?? '') === ($assistantThreadItem['thread_key'] ?? '') ? 'active' : '' }}"
-                                type="button"
-                                data-assistant-thread-item
-                                data-thread-key="{{ (string) ($assistantThreadItem['thread_key'] ?? '') }}"
-                            >
-                                <span class="assistant-thread-name">{{ (string) ($assistantThreadItem['label'] ?? 'Founder chat') }}</span>
-                                <span class="assistant-thread-preview">{{ (string) ($assistantThreadItem['latest_message'] ?? 'Open this chat') }}</span>
-                            </button>
-                        @endforeach
-                    </div>
-                @endif
-
-                <div class="assistant-snapshot">
-                    <div class="assistant-snapshot-top">
-                        <div>
-                            <div class="assistant-snapshot-title">Live founder context</div>
-                            <div class="assistant-snapshot-focus">{{ $assistantContext['focus'] }}</div>
+                    <div class="assistant-plan" data-assistant-plan @if (empty($assistantSummary['pinned_plan']['steps'] ?? [])) hidden @endif>
+                        <div class="assistant-plan-title">Pinned plan</div>
+                        <div class="assistant-plan-name" data-assistant-plan-name>{{ (string) ($assistantSummary['pinned_plan']['title'] ?? "Today's plan") }}</div>
+                        <ol class="assistant-plan-list" data-assistant-plan-list>
+                            @foreach ((array) ($assistantSummary['pinned_plan']['steps'] ?? []) as $planStep)
+                                <li>{{ (string) $planStep }}</li>
+                            @endforeach
+                        </ol>
+                        <div class="assistant-plan-actions">
+                            <button class="assistant-plan-action" type="button" data-assistant-save-plan>Turn into tasks</button>
+                            <button class="assistant-plan-action" type="button" data-assistant-open-tasks>Open Tasks</button>
                         </div>
                     </div>
-                    <div class="assistant-snapshot-grid">
-                        <div class="assistant-stat">
-                            <span class="assistant-stat-label">Tasks</span>
-                            <span class="assistant-stat-value">{{ $assistantContext['open_tasks'] }}</span>
-                        </div>
-                        <div class="assistant-stat">
-                            <span class="assistant-stat-label">Progress</span>
-                            <span class="assistant-stat-value">{{ $assistantContext['progress'] }}%</span>
-                        </div>
-                        <div class="assistant-stat">
-                            <span class="assistant-stat-label">Flow</span>
-                            <span class="assistant-stat-value">{{ $assistantContext['orders'] + $assistantContext['bookings'] }}</span>
-                        </div>
-                        <div class="assistant-stat">
-                            <span class="assistant-stat-label">Revenue</span>
-                            <span class="assistant-stat-value">{{ $assistantContext['revenue'] }}</span>
-                        </div>
-                    </div>
-                </div>
 
-                <div class="assistant-plan" data-assistant-plan @if (empty($assistantSummary['pinned_plan']['steps'] ?? [])) hidden @endif>
-                    <div class="assistant-plan-title">Pinned from Atlas</div>
-                    <div class="assistant-plan-name" data-assistant-plan-name>{{ (string) ($assistantSummary['pinned_plan']['title'] ?? "Today's plan") }}</div>
-                    <ol class="assistant-plan-list" data-assistant-plan-list>
-                        @foreach ((array) ($assistantSummary['pinned_plan']['steps'] ?? []) as $planStep)
-                            <li>{{ (string) $planStep }}</li>
-                        @endforeach
-                    </ol>
-                    <div class="assistant-plan-actions">
-                        <button class="assistant-plan-action" type="button" data-assistant-save-plan>Turn into tasks</button>
-                        <button class="assistant-plan-action" type="button" data-assistant-open-tasks>Open Tasks</button>
+                    <div class="assistant-prompts" data-assistant-prompts-block>
+                        <div class="assistant-prompts-head">
+                            <div class="assistant-prompts-title">Start quickly</div>
+                            <button class="assistant-prompts-toggle" type="button" data-assistant-prompts-toggle>Hide</button>
+                        </div>
+                        <div class="assistant-prompt-list">
+                            @foreach ($assistantPrompts as $prompt)
+                                <button class="assistant-prompt" type="button" data-assistant-prompt="{{ $prompt }}">{{ $prompt }}</button>
+                            @endforeach
+                        </div>
                     </div>
-                </div>
 
-                <div class="assistant-prompts">
-                    <div class="assistant-prompts-head">
-                        <div class="assistant-prompts-title">Try one of these</div>
-                        <button class="assistant-prompts-toggle" type="button" data-assistant-prompts-toggle>Hide starters</button>
-                    </div>
-                    <div class="assistant-prompt-list">
-                        @foreach ($assistantPrompts as $prompt)
-                            <button class="assistant-prompt" type="button" data-assistant-prompt="{{ $prompt }}">{{ $prompt }}</button>
-                        @endforeach
-                    </div>
-                </div>
-
-                <div class="assistant-feed" data-assistant-feed>
-                    @if (!empty($assistantTimeline))
-                        @foreach ($assistantTimeline as $timelineMessage)
-                            @php
-                                $timelineType = (string) ($timelineMessage['type'] ?? 'atlas');
-                                $timelineTitle = (string) ($timelineMessage['title'] ?? ($timelineType === 'user' ? 'You' : 'Atlas Assistant'));
-                                $timelineActions = collect(is_array($timelineMessage['actions'] ?? null) ? $timelineMessage['actions'] : [])
-                                    ->filter(fn ($action) => is_array($action) && !empty($action['label']))
-                                    ->values()
-                                    ->all();
-                            @endphp
-                            <div class="assistant-bubble {{ $timelineType === 'user' ? 'user' : 'atlas' }}">
-                                <span class="assistant-bubble-title">{{ $timelineTitle }}</span>
-                                <div class="assistant-bubble-content" data-assistant-message-content data-message-type="{{ $timelineType === 'user' ? 'user' : 'atlas' }}">{{ (string) ($timelineMessage['text'] ?? '') }}</div>
-                                @foreach ($timelineActions as $timelineAction)
-                                    <button
-                                        class="assistant-chip"
-                                        type="button"
-                                        data-assistant-action="1"
-                                        data-assistant-workspace="{{ (string) ($timelineAction['workspace_key'] ?? '') }}"
-                                        data-assistant-href="{{ (string) ($timelineAction['href'] ?? '') }}"
-                                    >{{ (string) ($timelineAction['label'] ?? '') }}</button>
+                    <div class="assistant-feed-shell">
+                        <div class="assistant-feed" data-assistant-feed>
+                            @if (!empty($assistantTimeline))
+                                @foreach ($assistantTimeline as $timelineMessage)
+                                    @php
+                                        $timelineType = (string) ($timelineMessage['type'] ?? 'atlas');
+                                        $timelineTitle = (string) ($timelineMessage['title'] ?? ($timelineType === 'user' ? 'You' : 'Atlas Assistant'));
+                                        $timelineActions = collect(is_array($timelineMessage['actions'] ?? null) ? $timelineMessage['actions'] : [])
+                                            ->filter(fn ($action) => is_array($action) && !empty($action['label']))
+                                            ->values()
+                                            ->all();
+                                    @endphp
+                                    <div class="assistant-bubble {{ $timelineType === 'user' ? 'user' : 'atlas' }}">
+                                        <span class="assistant-bubble-title">{{ $timelineTitle }}</span>
+                                        <div class="assistant-bubble-content" data-assistant-message-content data-message-type="{{ $timelineType === 'user' ? 'user' : 'atlas' }}">{{ (string) ($timelineMessage['text'] ?? '') }}</div>
+                                        @foreach ($timelineActions as $timelineAction)
+                                            <button
+                                                class="assistant-chip"
+                                                type="button"
+                                                data-assistant-action="1"
+                                                data-assistant-workspace="{{ (string) ($timelineAction['workspace_key'] ?? '') }}"
+                                                data-assistant-href="{{ (string) ($timelineAction['href'] ?? '') }}"
+                                            >{{ (string) ($timelineAction['label'] ?? '') }}</button>
+                                        @endforeach
+                                    </div>
                                 @endforeach
-                            </div>
-                        @endforeach
-                    @else
-                        <div class="assistant-bubble atlas">
-                            <span class="assistant-bubble-title">Atlas Assistant</span>
-                            <div class="assistant-bubble-content" data-assistant-message-content data-message-type="atlas">I’m looking at {{ $assistantContext['company_name'] }} with your live Hatchers OS context. Ask me what you are stuck on, what you should focus on, or what you do not understand and I’ll coach you through it.</div>
+                            @else
+                                <div class="assistant-bubble atlas">
+                                    <span class="assistant-bubble-title">Atlas</span>
+                                    <div class="assistant-bubble-content" data-assistant-message-content data-message-type="atlas">Ask me anything you are facing in Hatchers OS and I’ll help you work through it.</div>
+                                </div>
+                            @endif
                         </div>
-                    @endif
-                </div>
+                    </div>
 
-                <div class="assistant-composer">
-                    <form class="assistant-form" data-assistant-form>
-                        <textarea class="assistant-textarea" data-assistant-input placeholder="Message Atlas about any founder question, blocker, offer, campaign, order, booking, task, or next move."></textarea>
-                        <div class="assistant-row">
-                            <div class="assistant-status" data-assistant-status>Atlas sees your Hatchers OS context and will respond like your founder mentor.</div>
-                            <button class="assistant-send" data-assistant-send type="submit">Ask Atlas</button>
-                        </div>
-                    </form>
+                    <div class="assistant-composer">
+                        <form class="assistant-form" data-assistant-form>
+                            <textarea class="assistant-textarea" data-assistant-input placeholder="Ask Atlas anything..."></textarea>
+                            <div class="assistant-row">
+                                <div class="assistant-status" data-assistant-status>Atlas is ready.</div>
+                                <button class="assistant-send" data-assistant-send type="submit">Send</button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
             </div>
-        </aside>
+        </section>
+        <button class="assistant-launcher" type="button" data-assistant-launcher aria-label="Open Atlas">
+            <span class="assistant-launcher-mark"></span>
+        </button>
     @endif
     @yield('assistant')
     <script>
@@ -1700,7 +1490,6 @@
             const assistant = document.querySelector('[data-os-assistant]');
             if (!assistant) return;
 
-            const toggle = assistant.querySelector('[data-assistant-toggle]');
             const form = assistant.querySelector('[data-assistant-form]');
             const textarea = assistant.querySelector('[data-assistant-input]');
             const feed = assistant.querySelector('[data-assistant-feed]');
@@ -1708,7 +1497,7 @@
             const sendButton = assistant.querySelector('[data-assistant-send]');
             const resetButton = assistant.querySelector('[data-assistant-reset]');
             const threadLabel = assistant.querySelector('[data-assistant-thread-label]');
-            const threadList = assistant.querySelector('[data-assistant-thread-list]');
+            const threadSelect = assistant.querySelector('[data-assistant-thread-select]');
             const planPanel = assistant.querySelector('[data-assistant-plan]');
             const planName = assistant.querySelector('[data-assistant-plan-name]');
             const planList = assistant.querySelector('[data-assistant-plan-list]');
@@ -1716,33 +1505,121 @@
             const openTasksButton = assistant.querySelector('[data-assistant-open-tasks]');
             const promptButtons = assistant.querySelectorAll('[data-assistant-prompt]');
             const promptsToggle = assistant.querySelector('[data-assistant-prompts-toggle]');
+            const promptsBlock = assistant.querySelector('[data-assistant-prompts-block]');
             const existingActionButtons = assistant.querySelectorAll('[data-assistant-action]');
+            const launcher = document.querySelector('[data-assistant-launcher]');
+            const dragHandle = assistant.querySelector('[data-assistant-drag-handle]');
+            const closeButton = assistant.querySelector('[data-assistant-close]');
+            const minimizeButton = assistant.querySelector('[data-assistant-minimize]');
+            const maximizeButton = assistant.querySelector('[data-assistant-maximize]');
             const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+            const storageKey = 'hatchers-os-assistant-window';
             let currentThreadKey = @json($assistantSummary['thread_key'] ?? '');
+            let isPromptOpen = !feed || feed.querySelectorAll('.assistant-bubble').length <= 1;
+            let isMaximized = false;
+            let dragState = null;
+            let restoreRect = null;
 
-            const setOpen = (open) => {
-                assistant.classList.toggle('collapsed', !open);
-                if (toggle) toggle.textContent = open ? '−' : '+';
+            const readState = () => {
+                if (typeof window.localStorage === 'undefined') return null;
+                try {
+                    return JSON.parse(window.localStorage.getItem(storageKey) || 'null');
+                } catch (error) {
+                    return null;
+                }
+            };
+
+            const writeState = (state) => {
+                if (typeof window.localStorage === 'undefined') return;
+                try {
+                    window.localStorage.setItem(storageKey, JSON.stringify(state));
+                } catch (error) {
+                    // Ignore storage failures.
+                }
+            };
+
+            const saveWindowState = () => {
+                const rect = {
+                    top: assistant.style.top || '',
+                    left: assistant.style.left || '',
+                    right: assistant.style.right || '',
+                    width: assistant.style.width || '',
+                    height: assistant.style.height || '',
+                    hidden: assistant.classList.contains('is-hidden'),
+                    minimized: assistant.classList.contains('is-minimized'),
+                    maximized: assistant.classList.contains('is-maximized'),
+                };
+                writeState(rect);
+            };
+
+            const applyPromptVisibility = () => {
+                if (!promptsBlock) return;
+                promptsBlock.hidden = !isPromptOpen;
+                if (promptsToggle) {
+                    promptsToggle.textContent = isPromptOpen ? 'Hide' : 'Starters';
+                }
             };
 
             const hasConversation = () => assistant.querySelectorAll('.assistant-bubble').length > 1;
 
             const syncConversationMode = ({ forceOpenPrompts = false } = {}) => {
-                const activeConversation = hasConversation();
-                assistant.classList.toggle('has-conversation', activeConversation);
+                if (forceOpenPrompts) {
+                    isPromptOpen = true;
+                } else if (hasConversation()) {
+                    isPromptOpen = false;
+                }
+                applyPromptVisibility();
+            };
 
-                if (!activeConversation) {
-                    assistant.classList.remove('prompts-open');
-                } else if (forceOpenPrompts) {
-                    assistant.classList.add('prompts-open');
-                } else if (!assistant.classList.contains('prompts-open')) {
-                    assistant.classList.remove('prompts-open');
+            const showLauncher = (visible) => {
+                launcher?.classList.toggle('is-visible', visible);
+            };
+
+            const setVisibleState = (mode = 'open') => {
+                assistant.classList.remove('is-hidden', 'is-minimized');
+                if (mode === 'minimized') {
+                    assistant.classList.add('is-minimized');
+                    showLauncher(true);
+                } else if (mode === 'hidden') {
+                    assistant.classList.add('is-hidden');
+                    showLauncher(true);
+                } else {
+                    showLauncher(false);
+                }
+                saveWindowState();
+            };
+
+            const maximizeWindow = () => {
+                if (isMaximized) {
+                    assistant.classList.remove('is-maximized');
+                    if (restoreRect) {
+                        assistant.style.top = restoreRect.top || '';
+                        assistant.style.left = restoreRect.left || '';
+                        assistant.style.right = restoreRect.right || '';
+                        assistant.style.width = restoreRect.width || '';
+                        assistant.style.height = restoreRect.height || '';
+                    }
+                    isMaximized = false;
+                    saveWindowState();
+                    return;
                 }
 
-                if (promptsToggle) {
-                    const promptsVisible = !activeConversation || assistant.classList.contains('prompts-open');
-                    promptsToggle.textContent = promptsVisible ? 'Hide starters' : 'Show starters';
-                }
+                restoreRect = {
+                    top: assistant.style.top,
+                    left: assistant.style.left,
+                    right: assistant.style.right,
+                    width: assistant.style.width,
+                    height: assistant.style.height,
+                };
+                assistant.classList.add('is-maximized');
+                isMaximized = true;
+                saveWindowState();
+            };
+
+            const restoreWindow = () => {
+                assistant.classList.remove('is-hidden', 'is-minimized');
+                showLauncher(false);
+                saveWindowState();
             };
 
             const autosizeTextarea = () => {
@@ -1756,27 +1633,25 @@
                 threadLabel.textContent = text || 'Founder chat';
             };
 
-            const setActiveThreadButton = (threadKey) => {
-                assistant.querySelectorAll('[data-assistant-thread-item]').forEach((button) => {
-                    button.classList.toggle('active', button.dataset.threadKey === threadKey);
-                });
+            const setThreadSelection = (threadKey) => {
+                if (!threadSelect) return;
+                threadSelect.value = threadKey || '';
             };
 
             const prependThreadButton = (threadKey, label, preview = 'New chat started') => {
-                if (!threadList || !threadKey) return;
+                if (!threadSelect || !threadKey) return;
+                const existing = Array.from(threadSelect.options).find((option) => option.value === threadKey);
+                if (existing) {
+                    existing.textContent = label || 'Founder chat';
+                    threadSelect.value = threadKey;
+                    return;
+                }
 
-                const button = document.createElement('button');
-                button.type = 'button';
-                button.className = 'assistant-thread-item active';
-                button.dataset.assistantThreadItem = '1';
-                button.dataset.threadKey = threadKey;
-                button.innerHTML = `<span class="assistant-thread-name"></span><span class="assistant-thread-preview"></span>`;
-                button.querySelector('.assistant-thread-name').textContent = label || 'Founder chat';
-                button.querySelector('.assistant-thread-preview').textContent = preview;
-                button.addEventListener('click', () => loadThread(threadKey));
-
-                threadList.querySelectorAll('[data-assistant-thread-item]').forEach((item) => item.classList.remove('active'));
-                threadList.prepend(button);
+                const option = document.createElement('option');
+                option.value = threadKey;
+                option.textContent = label || 'Founder chat';
+                threadSelect.prepend(option);
+                threadSelect.value = threadKey;
             };
 
             const desktopOpenApp = (workspaceKey, fallbackHref = '') => {
@@ -1962,10 +1837,6 @@
                 syncConversationMode();
             };
 
-            toggle?.addEventListener('click', () => {
-                setOpen(assistant.classList.contains('collapsed'));
-            });
-
             promptButtons.forEach((button) => {
                 button.addEventListener('click', () => {
                     if (!textarea) return;
@@ -1976,13 +1847,8 @@
             });
 
             promptsToggle?.addEventListener('click', () => {
-                const activeConversation = hasConversation();
-                if (!activeConversation) {
-                    return;
-                }
-
-                assistant.classList.toggle('prompts-open');
-                syncConversationMode({ forceOpenPrompts: assistant.classList.contains('prompts-open') });
+                isPromptOpen = !isPromptOpen;
+                applyPromptVisibility();
             });
 
             existingActionButtons.forEach((button) => {
@@ -1990,14 +1856,6 @@
                     desktopOpenApp(button.dataset.assistantWorkspace || '', button.dataset.assistantHref || '');
                 });
             });
-
-            const bindThreadButton = (button) => {
-                button.addEventListener('click', () => {
-                    loadThread(button.dataset.threadKey || '');
-                });
-            };
-
-            assistant.querySelectorAll('[data-assistant-thread-item]').forEach(bindThreadButton);
 
             const loadThread = async (threadKey) => {
                 if (!threadKey) return;
@@ -2035,7 +1893,7 @@
                     });
 
                     setThreadLabel(data.label || 'Founder chat');
-                    setActiveThreadButton(currentThreadKey);
+                    setThreadSelection(currentThreadKey);
                     setPinnedPlan(data.pinned_plan?.steps || [], data.pinned_plan?.title || "Today's plan");
                     syncConversationMode();
                     if (status) status.textContent = 'Chat loaded.';
@@ -2043,6 +1901,12 @@
                     if (status) status.textContent = 'Could not load that chat.';
                 }
             };
+
+            threadSelect?.addEventListener('change', () => {
+                if (threadSelect.value) {
+                    loadThread(threadSelect.value);
+                }
+            });
 
             resetButton?.addEventListener('click', async () => {
                 if (sendButton) sendButton.disabled = true;
@@ -2072,11 +1936,10 @@
 
                     currentThreadKey = data.thread_key || '';
                     setThreadLabel(data.label || 'New founder chat');
-                    setActiveThreadButton(currentThreadKey);
+                    setThreadSelection(currentThreadKey);
                     prependThreadButton(currentThreadKey, data.label || 'New founder chat');
                     setPinnedPlan([]);
                     addBubble('atlas', data.reply || 'New chat started. Ask Atlas anything.');
-                    assistant.classList.remove('has-conversation', 'prompts-open');
                     syncConversationMode({ forceOpenPrompts: true });
                     if (status) status.textContent = 'Fresh chat ready.';
                 } catch (error) {
@@ -2171,7 +2034,7 @@
                         if (status) status.textContent = 'Atlas is temporarily unavailable.';
                     } else {
                         currentThreadKey = data.thread_key || currentThreadKey;
-                        setActiveThreadButton(currentThreadKey);
+                        setThreadSelection(currentThreadKey);
                         addBubble('atlas', data.reply || 'Hatchers AI is here.', data.actions || []);
                         if (data.refresh) {
                             if (status) status.textContent = 'Atlas updated your workspace. Refreshing summary...';
@@ -2188,10 +2051,75 @@
                 }
             });
 
+            closeButton?.addEventListener('click', () => {
+                setVisibleState('hidden');
+            });
+
+            minimizeButton?.addEventListener('click', () => {
+                setVisibleState('minimized');
+            });
+
+            maximizeButton?.addEventListener('click', () => {
+                maximizeWindow();
+            });
+
+            launcher?.addEventListener('click', () => {
+                restoreWindow();
+            });
+
+            dragHandle?.addEventListener('pointerdown', (event) => {
+                if (event.target.closest('button')) return;
+                if (isMaximized) return;
+
+                const rect = assistant.getBoundingClientRect();
+                dragState = {
+                    offsetX: event.clientX - rect.left,
+                    offsetY: event.clientY - rect.top,
+                };
+                assistant.style.left = `${rect.left}px`;
+                assistant.style.top = `${rect.top}px`;
+                assistant.style.right = 'auto';
+                dragHandle.setPointerCapture?.(event.pointerId);
+            });
+
+            window.addEventListener('pointermove', (event) => {
+                if (!dragState) return;
+                const left = Math.max(20, Math.min(window.innerWidth - assistant.offsetWidth - 20, event.clientX - dragState.offsetX));
+                const top = Math.max(80, Math.min(window.innerHeight - assistant.offsetHeight - 20, event.clientY - dragState.offsetY));
+                assistant.style.left = `${left}px`;
+                assistant.style.top = `${top}px`;
+                assistant.style.right = 'auto';
+            });
+
+            window.addEventListener('pointerup', () => {
+                if (!dragState) return;
+                dragState = null;
+                saveWindowState();
+            });
+
             textarea?.addEventListener('input', autosizeTextarea);
             autosizeTextarea();
+
+            const storedState = readState();
+            if (storedState) {
+                assistant.style.top = storedState.top || '';
+                assistant.style.left = storedState.left || '';
+                assistant.style.right = storedState.right || '';
+                assistant.style.width = storedState.width || '';
+                assistant.style.height = storedState.height || '';
+                if (storedState.maximized) {
+                    assistant.classList.add('is-maximized');
+                    isMaximized = true;
+                }
+                if (storedState.hidden) {
+                    setVisibleState('hidden');
+                } else if (storedState.minimized) {
+                    setVisibleState('minimized');
+                }
+            }
+
             syncConversationMode();
-            setOpen(true);
+            applyPromptVisibility();
         })();
     </script>
     <script>
