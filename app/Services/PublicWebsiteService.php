@@ -10,6 +10,13 @@ class PublicWebsiteService
     {
         $founder = $company->founder;
         $company->loadMissing('websiteGenerationRuns');
+        $websitePath = trim((string) ($company->website_path ?? ''), '/');
+        if ($websitePath === '') {
+            $websitePath = strtolower((string) str($company->company_name ?: ($founder?->full_name ?? 'your-business'))->slug('-'));
+        }
+        if ($websitePath === '') {
+            $websitePath = 'your-business';
+        }
         $snapshots = $founder?->moduleSnapshots?->keyBy('module') ?? collect();
         $latestDraft = $company->websiteGenerationRuns()->latest('id')->first();
         $draftOutput = is_array($latestDraft?->output_json) ? $latestDraft->output_json : [];
@@ -38,7 +45,7 @@ class PublicWebsiteService
             'title' => $websiteTitle,
             'business_model' => $businessModel,
             'engine' => $engine,
-            'path' => trim((string) ($company->website_path ?? ''), '/'),
+            'path' => $websitePath,
             'logo_url' => !empty($company->company_logo_path) ? asset('storage/' . ltrim((string) $company->company_logo_path, '/')) : null,
             'theme' => (string) ($summary['theme_template'] ?? ''),
             'hero' => $this->buildHero($company, $founder?->full_name ?? '', $businessModel, $counts, $currency, $draftOutput),
