@@ -41,12 +41,22 @@ class PublicWebsiteService
             $currency = 'USD';
         }
 
+        $storefrontUrl = trim((string) ($summary['website_url'] ?? ''));
+        $storefrontHost = parse_url($storefrontUrl, PHP_URL_HOST);
+        $osHost = parse_url((string) config('app.url'), PHP_URL_HOST) ?: 'app.hatchers.ai';
+        $usesEngineStorefront = $storefrontUrl !== ''
+            && is_string($storefrontHost)
+            && $storefrontHost !== ''
+            && strcasecmp($storefrontHost, $osHost) !== 0;
+
         return [
             'title' => $websiteTitle,
             'business_model' => $businessModel,
             'engine' => $engine,
             'path' => $websitePath,
             'logo_url' => !empty($company->company_logo_path) ? asset('storage/' . ltrim((string) $company->company_logo_path, '/')) : null,
+            'source_storefront_url' => $storefrontUrl,
+            'uses_engine_storefront' => $usesEngineStorefront,
             'theme' => (string) ($summary['theme_template'] ?? ''),
             'hero' => $this->buildHero($company, $founder?->full_name ?? '', $businessModel, $counts, $currency, $draftOutput),
             'metrics' => $this->buildMetrics($businessModel, $counts, (float) ($summary['gross_revenue'] ?? 0), $currency),

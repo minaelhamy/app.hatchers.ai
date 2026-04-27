@@ -7,6 +7,11 @@
     <style>
         .page.public-website-page { padding: 0; background: #f7f3eb; }
         .site-shell { min-height: 100vh; }
+        .engine-shell { min-height: 100vh; background:#f7f3eb; display:grid; grid-template-rows:auto 1fr; }
+        .engine-bar { padding:14px 20px; border-bottom:1px solid rgba(220,207,191,0.65); background:rgba(255,252,247,0.96); display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap; }
+        .engine-bar-copy { color:#625848; font-size:0.96rem; }
+        .engine-frame-wrap { min-height:calc(100vh - 70px); }
+        .engine-frame { width:100%; min-height:calc(100vh - 70px); border:0; display:block; background:#fff; }
         .site-hero { padding: 32px 24px 18px; background: linear-gradient(180deg, rgba(255,252,247,0.98), rgba(247,243,235,0.95)); border-bottom: 1px solid rgba(220,207,191,0.65); }
         .site-wrap { width: min(1100px, calc(100vw - 40px)); margin: 0 auto; }
         .site-eyebrow { font-size: 0.82rem; letter-spacing: 0.14em; color: #7d6b56; margin-bottom: 14px; }
@@ -183,6 +188,8 @@
 @section('content')
     @php
         $siteTitle = $site['title'];
+        $engineStorefrontUrl = $site['source_storefront_url'] ?? '';
+        $usesEngineStorefront = (bool) ($site['uses_engine_storefront'] ?? false);
         $hero = $site['hero'];
         $metrics = $site['metrics'];
         $offers = $site['offers'];
@@ -197,6 +204,26 @@
         $sourceContext = $sourceContext ?? ['src' => '', 'promo' => '', 'offer' => ''];
     @endphp
 
+    @if ($usesEngineStorefront && $engineStorefrontUrl !== '')
+        <div class="engine-shell">
+            <div class="engine-bar">
+                <div>
+                    <strong>{{ $siteTitle }}</strong>
+                    <div class="engine-bar-copy">This website is using the real {{ strtoupper($site['engine']) }} storefront template and features, published through Hatchers OS.</div>
+                </div>
+                <div class="engine-bar-copy">{{ preg_replace('#^https?://#', '', $engineStorefrontUrl) }}</div>
+            </div>
+            <div class="engine-frame-wrap">
+                <iframe
+                    class="engine-frame"
+                    src="{{ $engineStorefrontUrl }}"
+                    title="{{ $siteTitle }}"
+                    loading="eager"
+                    referrerpolicy="no-referrer-when-downgrade"
+                ></iframe>
+            </div>
+        </div>
+    @else
     <div class="site-shell">
         <section class="site-hero">
             <div class="site-wrap">
@@ -580,4 +607,5 @@
             </div>
         </footer>
     </div>
+    @endif
 @endsection
