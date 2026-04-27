@@ -455,18 +455,35 @@
             border: 1px solid rgba(206, 194, 180, 0.72);
             background: rgba(255, 251, 245, 0.96);
             box-shadow:
-                0 28px 90px rgba(55, 41, 24, 0.18),
+                0 28px 90px rgba(55, 41, 24, 0.16),
                 inset 0 1px 0 rgba(255, 255, 255, 0.9);
             backdrop-filter: blur(16px);
             pointer-events: auto;
             min-width: 360px;
             min-height: 280px;
+            transition: box-shadow 0.22s ease, transform 0.22s ease;
+        }
+
+        .os-app-window.is-entering {
+            animation: os-window-enter 0.26s cubic-bezier(0.22, 1, 0.36, 1);
         }
 
         .os-app-window.active {
             box-shadow:
-                0 34px 110px rgba(55, 41, 24, 0.24),
+                0 36px 110px rgba(55, 41, 24, 0.22),
                 inset 0 1px 0 rgba(255, 255, 255, 0.92);
+            transform: translateY(-1px);
+        }
+
+        @keyframes os-window-enter {
+            from {
+                opacity: 0;
+                transform: translateY(10px) scale(0.985);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
         }
 
         .os-app-window-bar,
@@ -476,8 +493,13 @@
             justify-content: space-between;
             gap: 16px;
             padding: 14px 18px;
-            background: rgba(255, 250, 245, 0.92);
+            background: rgba(255, 250, 245, 0.9);
             border-bottom: 1px solid rgba(214, 201, 184, 0.68);
+            cursor: grab;
+        }
+
+        .os-app-window-bar:active {
+            cursor: grabbing;
         }
 
         .os-app-window-dots,
@@ -501,6 +523,11 @@
             font: inherit;
         }
 
+        .os-app-window-dot:hover {
+            filter: brightness(0.96);
+            transform: scale(1.04);
+        }
+
         .os-app-window-dots .close,
         .os-inline-window-dots span:nth-child(1) { background: #ff7965; }
         .os-app-window-dots .minimize,
@@ -513,9 +540,10 @@
             flex: 1;
             min-width: 0;
             text-align: center;
-            font-size: 0.92rem;
+            font-family: "Inter Tight", "Inter", "Avenir Next", sans-serif;
+            font-size: 0.9rem;
             font-weight: 700;
-            letter-spacing: 0.01em;
+            letter-spacing: 0;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -671,6 +699,214 @@
             background: rgba(255, 251, 245, 0.96) !important;
             border: 1px solid rgba(214, 201, 184, 0.72) !important;
             box-shadow: 0 18px 60px rgba(71, 52, 31, 0.08) !important;
+        }
+
+        body.os-embed-mode .founder-main-inner,
+        body.os-embed-mode .workspace-main-inner,
+        body.os-embed-mode .tracker-main-inner,
+        body.os-embed-mode .marketing-main-inner,
+        body.os-embed-mode .settings-main-inner,
+        body.os-embed-mode .learning-main-inner,
+        body.os-embed-mode .notifications-main-inner,
+        body.os-embed-mode .tools-main-inner,
+        body.os-embed-mode .media-main-inner,
+        body.os-embed-mode .activity-main-inner,
+        body.os-embed-mode .wallet-main-inner,
+        body.os-embed-mode .commerce-main-inner,
+        body.os-embed-mode .ops-main-inner,
+        body.os-embed-mode .tasks-main-inner,
+        body.os-embed-mode .analytics-main-inner,
+        body.os-embed-mode .atlas-frame-main-inner {
+            position: relative;
+            overflow: hidden;
+        }
+
+        body.os-embed-mode .founder-main-inner::before,
+        body.os-embed-mode .workspace-main-inner::before,
+        body.os-embed-mode .tracker-main-inner::before,
+        body.os-embed-mode .marketing-main-inner::before,
+        body.os-embed-mode .settings-main-inner::before,
+        body.os-embed-mode .learning-main-inner::before,
+        body.os-embed-mode .notifications-main-inner::before,
+        body.os-embed-mode .tools-main-inner::before,
+        body.os-embed-mode .media-main-inner::before,
+        body.os-embed-mode .activity-main-inner::before,
+        body.os-embed-mode .wallet-main-inner::before,
+        body.os-embed-mode .commerce-main-inner::before,
+        body.os-embed-mode .ops-main-inner::before,
+        body.os-embed-mode .tasks-main-inner::before,
+        body.os-embed-mode .analytics-main-inner::before,
+        body.os-embed-mode .atlas-frame-main-inner::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background:
+                radial-gradient(circle at 92% 6%, rgba(234, 197, 201, 0.14), transparent 0 20%),
+                radial-gradient(circle at 8% 100%, rgba(233, 224, 214, 0.18), transparent 0 18%);
+            pointer-events: none;
+        }
+
+        body.os-embed-mode .founder-main-inner > *,
+        body.os-embed-mode .workspace-main-inner > *,
+        body.os-embed-mode .tracker-main-inner > *,
+        body.os-embed-mode .marketing-main-inner > *,
+        body.os-embed-mode .settings-main-inner > *,
+        body.os-embed-mode .learning-main-inner > *,
+        body.os-embed-mode .notifications-main-inner > *,
+        body.os-embed-mode .tools-main-inner > *,
+        body.os-embed-mode .media-main-inner > *,
+        body.os-embed-mode .activity-main-inner > *,
+        body.os-embed-mode .wallet-main-inner > *,
+        body.os-embed-mode .commerce-main-inner > *,
+        body.os-embed-mode .ops-main-inner > *,
+        body.os-embed-mode .tasks-main-inner > *,
+        body.os-embed-mode .analytics-main-inner > *,
+        body.os-embed-mode .atlas-frame-main-inner > * {
+            position: relative;
+            z-index: 1;
+        }
+
+        body.os-embed-mode .workspace-main-inner h1,
+        body.os-embed-mode .learning-main-inner h1,
+        body.os-embed-mode .tools-main-inner h1,
+        body.os-embed-mode .commerce-main-inner h1,
+        body.os-embed-mode .tracker-main-inner h1,
+        body.os-embed-mode .marketing-main-inner h1,
+        body.os-embed-mode .settings-main-inner h1,
+        body.os-embed-mode .tasks-main-inner h1,
+        body.os-embed-mode .analytics-main-inner h1,
+        body.os-embed-mode .wallet-main-inner h1,
+        body.os-embed-mode .activity-main-inner h1,
+        body.os-embed-mode .media-main-inner h1 {
+            font-family: "Inter Tight", "Inter", "Avenir Next", sans-serif !important;
+            font-weight: 700 !important;
+            letter-spacing: -0.03em !important;
+            line-height: 1.02 !important;
+            margin-bottom: 8px !important;
+            color: #191513 !important;
+        }
+
+        body.os-embed-mode .workspace-main-inner h2,
+        body.os-embed-mode .learning-main-inner h2,
+        body.os-embed-mode .tools-main-inner h2,
+        body.os-embed-mode .commerce-main-inner h2,
+        body.os-embed-mode .tracker-main-inner h2,
+        body.os-embed-mode .marketing-main-inner h2,
+        body.os-embed-mode .settings-main-inner h2,
+        body.os-embed-mode .tasks-main-inner h2,
+        body.os-embed-mode .analytics-main-inner h2,
+        body.os-embed-mode .wallet-main-inner h2,
+        body.os-embed-mode .activity-main-inner h2,
+        body.os-embed-mode .media-main-inner h2 {
+            font-family: "Inter Tight", "Inter", "Avenir Next", sans-serif !important;
+            font-weight: 700 !important;
+            letter-spacing: -0.02em !important;
+            color: #201916 !important;
+        }
+
+        body.os-embed-mode .workspace-main-inner p,
+        body.os-embed-mode .learning-main-inner p,
+        body.os-embed-mode .tools-main-inner p,
+        body.os-embed-mode .commerce-main-inner p,
+        body.os-embed-mode .tracker-main-inner p,
+        body.os-embed-mode .marketing-main-inner p,
+        body.os-embed-mode .settings-main-inner p,
+        body.os-embed-mode .tasks-main-inner p,
+        body.os-embed-mode .analytics-main-inner p,
+        body.os-embed-mode .wallet-main-inner p,
+        body.os-embed-mode .activity-main-inner p,
+        body.os-embed-mode .media-main-inner p {
+            color: rgba(98, 84, 74, 0.9) !important;
+        }
+
+        body.os-embed-mode .workspace-stage-tab,
+        body.os-embed-mode .commerce-view-tab,
+        body.os-embed-mode .btn,
+        body.os-embed-mode .learning-status,
+        body.os-embed-mode .commerce-cta,
+        body.os-embed-mode .commerce-secondary,
+        body.os-embed-mode .tool-card-cta,
+        body.os-embed-mode .tool-card-secondary {
+            border-radius: 999px !important;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);
+            transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+        }
+
+        body.os-embed-mode .workspace-stage-tab:hover,
+        body.os-embed-mode .commerce-view-tab:hover,
+        body.os-embed-mode .btn:hover,
+        body.os-embed-mode .learning-status:hover,
+        body.os-embed-mode .commerce-cta:hover,
+        body.os-embed-mode .commerce-secondary:hover,
+        body.os-embed-mode .tool-card-cta:hover,
+        body.os-embed-mode .tool-card-secondary:hover {
+            transform: translateY(-1px);
+        }
+
+        body.os-embed-mode .workspace-stage-tab.active,
+        body.os-embed-mode .commerce-view-tab.active {
+            background: #ece6db !important;
+            border-color: rgba(215, 201, 184, 0.95) !important;
+            color: #211a16 !important;
+        }
+
+        body.os-embed-mode .card,
+        body.os-embed-mode .stack-item,
+        body.os-embed-mode .workspace-rail-item,
+        body.os-embed-mode .learning-card,
+        body.os-embed-mode .tool-card,
+        body.os-embed-mode .tools-highlight,
+        body.os-embed-mode .commerce-card,
+        body.os-embed-mode .commerce-metric,
+        body.os-embed-mode .rail-item,
+        body.os-embed-mode .mini-note,
+        body.os-embed-mode .drawer-comment,
+        body.os-embed-mode .learning-banner,
+        body.os-embed-mode .commerce-banner,
+        body.os-embed-mode .workspace-stage-helper,
+        body.os-embed-mode .commerce-helper {
+            background: rgba(255, 253, 249, 0.94) !important;
+            border: 1px solid rgba(220, 207, 191, 0.72) !important;
+            box-shadow:
+                0 12px 32px rgba(52, 41, 26, 0.045),
+                inset 0 1px 0 rgba(255, 255, 255, 0.5) !important;
+        }
+
+        body.os-embed-mode .learning-card,
+        body.os-embed-mode .tool-card,
+        body.os-embed-mode .commerce-card {
+            border-radius: 20px !important;
+        }
+
+        body.os-embed-mode .workspace-stage-helper,
+        body.os-embed-mode .commerce-helper,
+        body.os-embed-mode .learning-banner,
+        body.os-embed-mode .commerce-banner {
+            border-radius: 18px !important;
+        }
+
+        body.os-embed-mode .workspace-main-inner input,
+        body.os-embed-mode .workspace-main-inner textarea,
+        body.os-embed-mode .workspace-main-inner select,
+        body.os-embed-mode .commerce-main-inner input,
+        body.os-embed-mode .commerce-main-inner textarea,
+        body.os-embed-mode .commerce-main-inner select {
+            border-radius: 14px !important;
+            border: 1px solid rgba(220, 207, 191, 0.88) !important;
+            background: rgba(255, 255, 255, 0.9) !important;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+        }
+
+        body.os-embed-mode .workspace-main-inner .pill,
+        body.os-embed-mode .workspace-main-inner .learning-badge,
+        body.os-embed-mode .workspace-main-inner .drawer-badge,
+        body.os-embed-mode .tools-main-inner .highlight-badge,
+        body.os-embed-mode .commerce-main-inner .commerce-chip {
+            border-radius: 999px !important;
+            background: #f1ebe3 !important;
+            color: #74695f !important;
+            border: 1px solid rgba(220, 207, 191, 0.7);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.55);
         }
 
         body.os-embed-mode .assistant {
@@ -995,7 +1231,7 @@
     <script>
         (() => {
             const page = document.querySelector('.page.founder-home-page');
-            if (!page) return;
+            if (!page || document.body.classList.contains('os-embed-mode')) return;
 
             const selectors = [
                 '.founder-main-inner',
@@ -1042,6 +1278,7 @@
 
             const launcherNodes = Array.from(document.querySelectorAll('[data-launcher-route]'));
             const routeMap = {};
+            const geometryStorageKey = 'hatchers-os-window-geometry';
             launcherNodes.forEach((node) => {
                 const key = node.dataset.launcherKey;
                 if (!key || routeMap[key]) return;
@@ -1049,12 +1286,92 @@
                     key,
                     label: node.dataset.launcherLabel || key,
                     route: node.dataset.launcherRoute || '/',
-                    icon: node.dataset.launcherIcon || key.slice(0, 2).toUpperCase(),
+                    icon: node.dataset.launcherIcon || 'file',
+                    className: node.dataset.launcherClass || '',
                 };
             });
 
             let zIndex = 20;
             const windows = new Map();
+            const appPresets = {
+                'ai-tools': { width: 980, height: 680 },
+                'website': { width: 1040, height: 700 },
+                'commerce': { width: 940, height: 660 },
+                'marketing': { width: 900, height: 640 },
+                'media-library': { width: 920, height: 660 },
+                'analytics': { width: 900, height: 620 },
+                'learning-plan': { width: 760, height: 600 },
+                'first-100': { width: 900, height: 650 },
+                'inbox': { width: 760, height: 560 },
+                'search': { width: 760, height: 520 },
+                'tasks': { width: 800, height: 600 },
+                'wallet': { width: 760, height: 560 },
+                'orders': { width: 900, height: 640 },
+                'bookings': { width: 900, height: 640 },
+                'settings': { width: 860, height: 620 },
+                'automations': { width: 860, height: 620 },
+                'activity': { width: 820, height: 600 },
+            };
+
+            const readGeometryState = () => {
+                if (typeof window.localStorage === 'undefined') return {};
+                try {
+                    const raw = window.localStorage.getItem(geometryStorageKey);
+                    return raw ? JSON.parse(raw) : {};
+                } catch (error) {
+                    return {};
+                }
+            };
+
+            const writeGeometryState = (state) => {
+                if (typeof window.localStorage === 'undefined') return;
+                try {
+                    window.localStorage.setItem(geometryStorageKey, JSON.stringify(state));
+                } catch (error) {
+                    // Ignore storage failures.
+                }
+            };
+
+            const iconMarkup = (icon) => {
+                switch (icon) {
+                    case 'cap':
+                        return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9L12 4L21 9L12 14L3 9Z"></path><path d="M7 11V16L12 19L17 16V11"></path></svg>`;
+                    case 'tray':
+                        return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9H20L18 17H6L4 9Z"></path><path d="M9 13H15"></path></svg>`;
+                    case 'spark':
+                        return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3L13.8 8.2L19 10L13.8 11.8L12 17L10.2 11.8L5 10L10.2 8.2L12 3Z"></path><path d="M18.5 3.5L19.2 5.3L21 6L19.2 6.7L18.5 8.5L17.8 6.7L16 6L17.8 5.3L18.5 3.5Z"></path></svg>`;
+                    case 'globe':
+                        return `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"></circle><path d="M4 12H20"></path><path d="M12 4C14.8 6.7 14.8 17.3 12 20"></path><path d="M12 4C9.2 6.7 9.2 17.3 12 20"></path></svg>`;
+                    case 'pulse':
+                        return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12H7L9.5 7L13.5 17L16 12H21"></path></svg>`;
+                    case 'bag':
+                        return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9H18L17 19H7L6 9Z"></path><path d="M9 9V7C9 5.3 10.3 4 12 4C13.7 4 15 5.3 15 7V9"></path></svg>`;
+                    case 'image':
+                        return `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2"></rect><circle cx="9" cy="10" r="1.5"></circle><path d="M7 17L11.5 12.5L14.5 15.5L17 13L20 17"></path></svg>`;
+                    case 'window':
+                        return `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2"></rect><path d="M4 9H20"></path><path d="M8 7H8.01"></path><path d="M11 7H11.01"></path></svg>`;
+                    case 'checklist':
+                        return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7H18"></path><path d="M9 12H18"></path><path d="M9 17H18"></path><path d="M5 7L6.2 8.2L8 6.4"></path><path d="M5 12L6.2 13.2L8 11.4"></path><path d="M5 17L6.2 18.2L8 16.4"></path></svg>`;
+                    case 'target':
+                        return `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7"></circle><circle cx="12" cy="12" r="3.5"></circle><path d="M12 2V5"></path><path d="M22 12H19"></path></svg>`;
+                    case 'megaphone':
+                        return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12V9.5C4 8.7 4.7 8 5.5 8H8L16 5V19L8 16H5.5C4.7 16 4 15.3 4 14.5V12Z"></path><path d="M8 16L9.5 20"></path><path d="M18.5 9.5C19.5 10.2 20 11 20 12C20 13 19.5 13.8 18.5 14.5"></path></svg>`;
+                    case 'search':
+                        return `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"></circle><path d="M20 20L16.5 16.5"></path></svg>`;
+                    case 'gear':
+                        return `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15A1.7 1.7 0 0 0 19.7 16.8L19.8 17C20.1 17.6 20 18.3 19.5 18.7L18.7 19.5C18.3 20 17.6 20.1 17 19.8L16.8 19.7A1.7 1.7 0 0 0 15 19.4C14.4 19.6 14 20.2 14 20.8V21C14 21.6 13.6 22 13 22H11C10.4 22 10 21.6 10 21V20.8C10 20.2 9.6 19.6 9 19.4A1.7 1.7 0 0 0 7.2 19.7L7 19.8C6.4 20.1 5.7 20 5.3 19.5L4.5 18.7C4 18.3 3.9 17.6 4.2 17L4.3 16.8A1.7 1.7 0 0 0 4 15C3.8 14.4 3.2 14 2.6 14H2.4C1.8 14 1.4 13.6 1.4 13V11C1.4 10.4 1.8 10 2.4 10H2.6C3.2 10 3.8 9.6 4 9A1.7 1.7 0 0 0 3.7 7.2L3.6 7C3.3 6.4 3.4 5.7 3.9 5.3L4.7 4.5C5.1 4 5.8 3.9 6.4 4.2L6.6 4.3A1.7 1.7 0 0 0 8.4 4C9 3.8 9.4 3.2 9.4 2.6V2.4C9.4 1.8 9.8 1.4 10.4 1.4H12.4C13 1.4 13.4 1.8 13.4 2.4V2.6C13.4 3.2 13.8 3.8 14.4 4A1.7 1.7 0 0 0 16.2 3.7L16.4 3.6C17 3.3 17.7 3.4 18.1 3.9L18.9 4.7C19.4 5.1 19.5 5.8 19.2 6.4L19.1 6.6A1.7 1.7 0 0 0 19.4 8.4C19.6 9 20.2 9.4 20.8 9.4H21C21.6 9.4 22 9.8 22 10.4V12.4C22 13 21.6 13.4 21 13.4H20.8C20.2 13.4 19.6 13.8 19.4 14.4Z"></path></svg>`;
+                    case 'chart':
+                        return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19V10"></path><path d="M12 19V6"></path><path d="M19 19V13"></path><path d="M4 19H20"></path></svg>`;
+                    case 'wallet':
+                        return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7.5C5 6.7 5.7 6 6.5 6H17.5C18.3 6 19 6.7 19 7.5V9H14.5C13.1 9 12 10.1 12 11.5C12 12.9 13.1 14 14.5 14H19V16.5C19 17.3 18.3 18 17.5 18H6.5C5.7 18 5 17.3 5 16.5V7.5Z"></path><path d="M19 9V14H14.5C13.7 14 13 13.3 13 12.5V10.5C13 9.7 13.7 9 14.5 9H19Z"></path></svg>`;
+                    case 'box':
+                        return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8L12 4L20 8L12 12L4 8Z"></path><path d="M4 8V16L12 20L20 16V8"></path><path d="M12 12V20"></path></svg>`;
+                    case 'calendar-check':
+                        return `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="6" width="16" height="14" rx="2"></rect><path d="M8 3V8"></path><path d="M16 3V8"></path><path d="M4 10H20"></path><path d="M9 15L11.2 17.2L15.5 12.9"></path></svg>`;
+                    default:
+                        return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H15L20 8V21H8C6.9 21 6 20.1 6 19V5C6 3.9 6.9 3 8 3Z"></path><path d="M15 3V8H20"></path></svg>`;
+                }
+            };
 
             const withEmbedParam = (url) => {
                 try {
@@ -1075,7 +1392,7 @@
                     button.type = 'button';
                     button.className = `os-desktop-dock-item ${entry.minimized ? 'minimized' : ''} ${entry.el.classList.contains('active') && !entry.minimized ? 'active' : ''}`;
                     button.title = entry.app.label;
-                    button.textContent = entry.app.label.slice(0, 2).toUpperCase();
+                    button.innerHTML = `<span class="os-dock-icon-tile ${entry.app.className || ''}">${iconMarkup(entry.app.icon)}</span>`;
                     button.addEventListener('click', () => {
                         if (entry.minimized) {
                             entry.minimized = false;
@@ -1106,14 +1423,67 @@
                 renderDock();
             };
 
+            const getWindowPreset = (app) => {
+                const preset = appPresets[app.key] || {};
+                const maxWidth = Math.max(420, host.clientWidth - 48);
+                const maxHeight = Math.max(320, host.clientHeight - 48);
+                const saved = readGeometryState()[app.key] || {};
+                return {
+                    width: Math.min(saved.width || preset.width || 820, maxWidth),
+                    height: Math.min(saved.height || preset.height || 600, maxHeight),
+                };
+            };
+
+            const getLaunchPosition = (app, sourceNode = null) => {
+                const preset = getWindowPreset(app);
+                const count = windows.size;
+                const col = count % 4;
+                const row = Math.floor(count / 4);
+                const maxX = Math.max(16, host.clientWidth - preset.width - 18);
+                const maxY = Math.max(16, host.clientHeight - preset.height - 18);
+
+                let nextX = 72 + (col * 54);
+                let nextY = 88 + (row * 42);
+                const saved = readGeometryState()[app.key] || null;
+
+                if (saved && Number.isFinite(saved.left) && Number.isFinite(saved.top)) {
+                    nextX = saved.left;
+                    nextY = saved.top;
+                } else if (sourceNode) {
+                    const hostRect = host.getBoundingClientRect();
+                    const sourceRect = sourceNode.getBoundingClientRect();
+                    const sourceCenterX = sourceRect.left + (sourceRect.width / 2) - hostRect.left;
+                    const sourceTopY = sourceRect.top - hostRect.top;
+                    nextX = sourceCenterX - Math.min(170, preset.width / 2.4);
+                    nextY = Math.max(24, sourceTopY - 28 + (row * 10));
+                }
+
+                return {
+                    x: Math.min(Math.max(16, nextX), maxX),
+                    y: Math.min(Math.max(16, nextY), maxY),
+                };
+            };
+
+            const persistWindowGeometry = (entry) => {
+                const state = readGeometryState();
+                state[entry.app.key] = {
+                    left: parseFloat(entry.el.style.left || '0'),
+                    top: parseFloat(entry.el.style.top || '0'),
+                    width: parseFloat(entry.el.style.width || '0'),
+                    height: parseFloat(entry.el.style.height || '0'),
+                };
+                writeGeometryState(state);
+            };
+
             const buildWindow = (app, startX, startY) => {
+                const preset = getWindowPreset(app);
                 const win = document.createElement('section');
-                win.className = 'os-app-window active';
+                win.className = 'os-app-window active is-entering';
                 win.dataset.windowKey = app.key;
                 win.style.left = `${startX}px`;
                 win.style.top = `${startY}px`;
-                win.style.width = '560px';
-                win.style.height = '520px';
+                win.style.width = `${preset.width}px`;
+                win.style.height = `${preset.height}px`;
                 win.style.zIndex = String(++zIndex);
                 win.innerHTML = `
                     <div class="os-app-window-bar" data-window-drag>
@@ -1128,8 +1498,10 @@
                     <iframe class="os-app-window-frame" title="${app.label}" src="${withEmbedParam(app.route)}"></iframe>
                 `;
                 host.appendChild(win);
+                window.setTimeout(() => win.classList.remove('is-entering'), 280);
 
                 const close = () => {
+                    persistWindowGeometry(entry);
                     win.remove();
                     windows.delete(app.key);
                     renderDock();
@@ -1169,7 +1541,9 @@
                         win.style.width = entry.previous.width;
                         win.style.height = entry.previous.height;
                         entry.maximized = false;
+                        entry.previous = null;
                     }
+                    persistWindowGeometry(entry);
                     focusWindow(app.key);
                 });
                 win.addEventListener('mousedown', () => focusWindow(app.key));
@@ -1202,6 +1576,9 @@
                 });
 
                 window.addEventListener('mouseup', () => {
+                    if (dragging) {
+                        persistWindowGeometry(entry);
+                    }
                     dragging = false;
                     document.body.style.userSelect = '';
                 });
@@ -1211,7 +1588,7 @@
                 renderDock();
             };
 
-            const openApp = (key) => {
+            const openApp = (key, sourceNode = null) => {
                 const app = routeMap[key];
                 if (!app) return;
                 if (windows.has(key)) {
@@ -1219,8 +1596,8 @@
                     return;
                 }
 
-                const count = windows.size;
-                buildWindow(app, 72 + (count * 42), 88 + (count * 34));
+                const launch = getLaunchPosition(app, sourceNode);
+                buildWindow(app, launch.x, launch.y);
             };
 
             launcherNodes.forEach((node) => {
@@ -1228,7 +1605,7 @@
                     if (node.dataset.dragMoved === '1') return;
                     event.preventDefault();
                     const key = node.dataset.launcherKey;
-                    if (key) openApp(key);
+                    if (key) openApp(key, node);
                 });
 
                 node.addEventListener('contextmenu', (event) => {
