@@ -487,19 +487,25 @@
             gap: 7px;
         }
 
-        .os-app-window-dots span,
+        .os-app-window-dot,
         .os-inline-window-dots span {
-            width: 10px;
-            height: 10px;
+            width: 12px;
+            height: 12px;
             border-radius: 999px;
-            display: inline-block;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            border: 0;
+            cursor: pointer;
+            font: inherit;
         }
 
-        .os-app-window-dots span:nth-child(1),
+        .os-app-window-dots .close,
         .os-inline-window-dots span:nth-child(1) { background: #ff7965; }
-        .os-app-window-dots span:nth-child(2),
+        .os-app-window-dots .minimize,
         .os-inline-window-dots span:nth-child(2) { background: #f6c85e; }
-        .os-app-window-dots span:nth-child(3),
+        .os-app-window-dots .maximize,
         .os-inline-window-dots span:nth-child(3) { background: #68c06a; }
 
         .os-app-window-title,
@@ -537,6 +543,10 @@
             border: 0;
             background: #fffdf8;
             display: block;
+        }
+
+        .os-app-window.is-minimized {
+            display: none;
         }
 
         .os-inline-window-bar {
@@ -1027,6 +1037,7 @@
         (() => {
             const desktop = document.querySelector('[data-os-desktop-home]');
             const host = document.querySelector('[data-os-window-host]');
+            const dock = document.querySelector('[data-os-desktop-dock]');
             if (!desktop || !host) return;
 
             const launcherNodes = Array.from(document.querySelectorAll('[data-launcher-route]'));
@@ -1055,6 +1066,34 @@
                 }
             };
 
+            const renderDock = () => {
+                if (!dock) return;
+                dock.innerHTML = '';
+
+                Array.from(windows.values()).forEach((entry) => {
+                    const button = document.createElement('button');
+                    button.type = 'button';
+                    button.className = `os-desktop-dock-item ${entry.minimized ? 'minimized' : ''} ${entry.el.classList.contains('active') && !entry.minimized ? 'active' : ''}`;
+                    button.title = entry.app.label;
+                    button.textContent = entry.app.label.slice(0, 2).toUpperCase();
+                    button.addEventListener('click', () => {
+                        if (entry.minimized) {
+                            entry.minimized = false;
+                            entry.el.classList.remove('is-minimized');
+                            focusWindow(entry.app.key);
+                        } else {
+                            focusWindow(entry.app.key);
+                        }
+                        renderDock();
+                    });
+                    button.addEventListener('contextmenu', (event) => {
+                        event.preventDefault();
+                        entry.close();
+                    });
+                    dock.appendChild(button);
+                });
+            };
+
             const focusWindow = (key) => {
                 const active = windows.get(key);
                 if (!active) return;
@@ -1062,6 +1101,9 @@
                 zIndex += 1;
                 active.el.style.zIndex = String(zIndex);
                 active.el.classList.add('active');
+                active.minimized = false;
+                active.el.classList.remove('is-minimized');
+                renderDock();
             };
 
             const buildWindow = (app, startX, startY) => {
@@ -1075,11 +1117,13 @@
                 win.style.zIndex = String(++zIndex);
                 win.innerHTML = `
                     <div class="os-app-window-bar" data-window-drag>
-                        <div class="os-app-window-dots"><span></span><span></span><span></span></div>
-                        <div class="os-app-window-title">${app.label}</div>
-                        <div class="os-app-window-actions">
-                            <button class="os-app-window-close" type="button" aria-label="Close ${app.label}">×</button>
+                        <div class="os-app-window-dots">
+                            <button class="os-app-window-dot close" type="button" aria-label="Close ${app.label}"></button>
+                            <button class="os-app-window-dot minimize" type="button" aria-label="Minimize ${app.label}"></button>
+                            <button class="os-app-window-dot maximize" type="button" aria-label="Maximize ${app.label}"></button>
                         </div>
+                        <div class="os-app-window-title">${app.label}</div>
+                        <div class="os-app-window-actions"></div>
                     </div>
                     <iframe class="os-app-window-frame" title="${app.label}" src="${withEmbedParam(app.route)}"></iframe>
                 `;
@@ -1088,9 +1132,46 @@
                 const close = () => {
                     win.remove();
                     windows.delete(app.key);
+                    renderDock();
                 };
 
-                win.querySelector('.os-app-window-close')?.addEventListener('click', close);
+                const entry = {
+                    app,
+                    el: win,
+                    minimized: false,
+                    maximized: false,
+                    previous: null,
+                    close,
+                };
+
+                win.querySelector('.os-app-window-dot.close')?.addEventListener('click', close);
+                win.querySelector('.os-app-window-dot.minimize')?.addEventListener('click', () => {
+                    entry.minimized = true;
+                    win.classList.add('is-minimized');
+                    renderDock();
+                });
+                win.querySelector('.os-app-window-dot.maximize')?.addEventListener('click', () => {
+                    if (!entry.maximized) {
+                        entry.previous = {
+                            left: win.style.left,
+                            top: win.style.top,
+                            width: win.style.width,
+                            height: win.style.height,
+                        };
+                        win.style.left = '16px';
+                        win.style.top = '16px';
+                        win.style.width = `${Math.max(420, host.clientWidth - 32)}px`;
+                        win.style.height = `${Math.max(320, host.clientHeight - 32)}px`;
+                        entry.maximized = true;
+                    } else if (entry.previous) {
+                        win.style.left = entry.previous.left;
+                        win.style.top = entry.previous.top;
+                        win.style.width = entry.previous.width;
+                        win.style.height = entry.previous.height;
+                        entry.maximized = false;
+                    }
+                    focusWindow(app.key);
+                });
                 win.addEventListener('mousedown', () => focusWindow(app.key));
 
                 const dragHandle = win.querySelector('[data-window-drag]');
@@ -1101,6 +1182,7 @@
                 let baseY = 0;
 
                 dragHandle?.addEventListener('mousedown', (event) => {
+                    if (entry.maximized) return;
                     dragging = true;
                     focusWindow(app.key);
                     originX = event.clientX;
@@ -1124,8 +1206,9 @@
                     document.body.style.userSelect = '';
                 });
 
-                windows.set(app.key, { el: win, close });
+                windows.set(app.key, entry);
                 focusWindow(app.key);
+                renderDock();
             };
 
             const openApp = (key) => {

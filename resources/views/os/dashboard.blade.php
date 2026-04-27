@@ -133,7 +133,7 @@
             position: relative;
             z-index: 2;
             display: grid;
-            grid-template-columns: repeat(2, 124px);
+            grid-template-columns: repeat(3, 124px);
             gap: 34px 42px;
             padding: 78px 0 72px 74px;
         }
@@ -211,6 +211,71 @@
             letter-spacing: 0.08em;
         }
 
+        .os-desktop-dock {
+            position: absolute;
+            left: 50%;
+            bottom: 18px;
+            transform: translateX(-50%);
+            z-index: 9;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 14px;
+            border-radius: 20px;
+            background: rgba(255, 248, 242, 0.52);
+            border: 1px solid rgba(232, 221, 211, 0.9);
+            box-shadow:
+                0 16px 32px rgba(66, 51, 39, 0.12),
+                inset 0 1px 0 rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(16px);
+        }
+
+        .os-desktop-dock:empty {
+            display: none;
+        }
+
+        .os-desktop-dock-item {
+            width: 48px;
+            height: 48px;
+            border-radius: 16px;
+            border: 1px solid rgba(229, 219, 208, 0.9);
+            background: rgba(255, 255, 255, 0.76);
+            box-shadow: 0 10px 18px rgba(66, 51, 39, 0.08);
+            display: grid;
+            place-items: center;
+            cursor: pointer;
+            position: relative;
+            transition: transform 0.18s ease, box-shadow 0.18s ease;
+        }
+
+        .os-desktop-dock-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 14px 22px rgba(66, 51, 39, 0.14);
+        }
+
+        .os-desktop-dock-item.minimized::after,
+        .os-desktop-dock-item.active::after {
+            content: "";
+            position: absolute;
+            bottom: -8px;
+            left: 50%;
+            width: 8px;
+            height: 8px;
+            margin-left: -4px;
+            border-radius: 999px;
+            background: rgba(81, 65, 55, 0.6);
+        }
+
+        .os-desktop-dock-item svg {
+            width: 24px;
+            height: 24px;
+            stroke: #fff;
+            fill: none;
+            stroke-width: 1.8;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
         @media (max-width: 900px) {
             .os-desktop-scene {
                 padding: 18px;
@@ -244,10 +309,13 @@
         $desktopOpen = request('open', '');
         $desktopNow = now()->timezone(config('app.timezone'));
         $desktopClock = $desktopNow->format('D, M j   g:i A');
+        $businessModel = strtolower((string) ($dashboard['company']->business_model ?? 'hybrid'));
+        $supportsProducts = in_array($businessModel, ['product', 'hybrid'], true);
+        $supportsServices = in_array($businessModel, ['service', 'hybrid'], true);
         $desktopApps = [
             [
                 'key' => 'learning-plan',
-                'label' => 'LMS',
+                'label' => 'Learning Hub',
                 'route' => route('founder.learning-plan'),
                 'class' => 'os-icon-lms',
                 'icon' => 'cap',
@@ -261,54 +329,116 @@
             ],
             [
                 'key' => 'settings',
-                'label' => 'Settings',
+                'label' => 'Brand Studio',
                 'route' => route('founder.settings'),
                 'class' => 'os-icon-settings',
                 'icon' => 'sun',
             ],
             [
                 'key' => 'ai-tools',
-                'label' => 'Atlas',
+                'label' => 'AI Studio',
                 'route' => route('founder.ai-tools'),
                 'class' => 'os-icon-atlas',
                 'icon' => 'globe',
             ],
             [
                 'key' => 'activity',
-                'label' => 'Calendar',
+                'label' => 'Activity',
                 'route' => route('founder.activity'),
                 'class' => 'os-icon-calendar',
                 'icon' => 'calendar',
             ],
             [
                 'key' => 'commerce',
-                'label' => 'Bazaar',
+                'label' => 'Commerce',
                 'route' => route('founder.commerce'),
                 'class' => 'os-icon-bazaar',
                 'icon' => 'bag',
             ],
             [
                 'key' => 'media-library',
-                'label' => 'Files',
+                'label' => 'Media Library',
                 'route' => route('founder.media-library'),
                 'class' => 'os-icon-files',
                 'icon' => 'file',
             ],
             [
                 'key' => 'website',
-                'label' => 'Servio',
+                'label' => 'Website Studio',
                 'route' => route('website'),
                 'class' => 'os-icon-servio',
                 'icon' => 'gear',
             ],
             [
-                'key' => 'profile',
-                'label' => 'Profile',
-                'route' => route('founder.settings'),
+                'key' => 'tasks',
+                'label' => 'Tasks',
+                'route' => route('founder.tasks'),
                 'class' => 'os-icon-profile',
                 'icon' => 'user',
             ],
+            [
+                'key' => 'first-100',
+                'label' => 'First 100',
+                'route' => route('founder.first-100'),
+                'class' => 'os-icon-atlas',
+                'icon' => 'globe',
+            ],
+            [
+                'key' => 'marketing',
+                'label' => 'Marketing',
+                'route' => route('founder.marketing'),
+                'class' => 'os-icon-calendar',
+                'icon' => 'calendar',
+            ],
+            [
+                'key' => 'search',
+                'label' => 'Search',
+                'route' => route('founder.search'),
+                'class' => 'os-icon-inbox',
+                'icon' => 'tray',
+            ],
+            [
+                'key' => 'automations',
+                'label' => 'Automations',
+                'route' => route('founder.automations'),
+                'class' => 'os-icon-settings',
+                'icon' => 'gear',
+            ],
+            [
+                'key' => 'analytics',
+                'label' => 'Analytics',
+                'route' => route('founder.analytics'),
+                'class' => 'os-icon-bazaar',
+                'icon' => 'bag',
+            ],
+            [
+                'key' => 'wallet',
+                'label' => 'Wallet',
+                'route' => route('founder.commerce.wallet'),
+                'class' => 'os-icon-servio',
+                'icon' => 'file',
+            ],
         ];
+
+        if ($supportsProducts) {
+            $desktopApps[] = [
+                'key' => 'orders',
+                'label' => 'Orders',
+                'route' => route('founder.commerce.orders'),
+                'class' => 'os-icon-bazaar',
+                'icon' => 'bag',
+            ];
+        }
+
+        if ($supportsServices) {
+            $desktopApps[] = [
+                'key' => 'bookings',
+                'label' => 'Bookings',
+                'route' => route('founder.commerce.bookings'),
+                'class' => 'os-icon-calendar',
+                'icon' => 'calendar',
+            ];
+        }
     @endphp
 
     <div class="os-desktop-scene" data-os-desktop-home data-os-open="{{ e((string) $desktopOpen) }}">
@@ -416,6 +546,7 @@
             </div>
 
             <div class="os-desktop-footnote">Tap an icon to open · drag to rearrange</div>
+            <div class="os-desktop-dock" data-os-desktop-dock></div>
             <div class="os-window-host" data-os-window-host></div>
         </div>
     </div>
