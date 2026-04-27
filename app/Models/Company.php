@@ -28,6 +28,7 @@ class Company extends Model
         'website_engine',
         'website_path',
         'website_url',
+        'engine_public_url',
         'custom_domain',
         'custom_domain_status',
         'company_brief',

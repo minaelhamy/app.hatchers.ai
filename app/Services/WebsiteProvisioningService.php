@@ -70,6 +70,8 @@ class WebsiteProvisioningService
         if (!$this->bridgeConfigured($engine)) {
             return [
                 'ok' => true,
+                'engine' => $engine,
+                'public_url' => $this->fallbackPublicUrl($founder, (string) ($input['website_path'] ?? '')),
                 'data' => [
                     'public_url' => $this->fallbackPublicUrl($founder, (string) ($input['website_path'] ?? '')),
                 ],
@@ -97,6 +99,7 @@ class WebsiteProvisioningService
             'ok' => true,
             'engine' => $engine,
             'public_url' => (string) ($response['data']['public_url'] ?? ''),
+            'data' => $response['data'] ?? [],
         ];
     }
 
@@ -113,6 +116,8 @@ class WebsiteProvisioningService
         if (!$this->bridgeConfigured($engine)) {
             return [
                 'ok' => true,
+                'engine' => $engine,
+                'public_url' => $this->fallbackPublicUrl($founder, (string) ($founder->company?->website_path ?? '')),
                 'data' => [
                     'public_url' => $this->fallbackPublicUrl($founder, (string) ($founder->company?->website_path ?? '')),
                 ],
@@ -120,12 +125,23 @@ class WebsiteProvisioningService
             ];
         }
 
-        return $this->postToEngine($engine, [
+        $response = $this->postToEngine($engine, [
             'category' => 'website',
             'operation' => 'publish',
             'username' => $founder->username,
             'email' => $founder->email,
         ]);
+
+        if (!$response['ok']) {
+            return $response;
+        }
+
+        return [
+            'ok' => true,
+            'engine' => $engine,
+            'public_url' => (string) ($response['data']['public_url'] ?? ''),
+            'data' => $response['data'] ?? [],
+        ];
     }
 
     public function createStarterRecord(Founder $founder, array $input): array

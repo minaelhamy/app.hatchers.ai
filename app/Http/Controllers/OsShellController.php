@@ -3867,6 +3867,9 @@ class OsShellController extends Controller
             $company->website_generation_status = 'ready_for_review';
             $company->website_path = trim(strtolower((string) $validated['website_path']), '/');
             $company->website_url = $this->buildCompanyWebsiteUrl($company, $validated['website_engine']);
+            if (!empty($result['public_url']) && !$this->isOsHostedWebsiteUrl((string) $result['public_url'])) {
+                $company->engine_public_url = (string) $result['public_url'];
+            }
             $company->save();
         }
 
@@ -3907,6 +3910,9 @@ class OsShellController extends Controller
             $company->website_generation_status = 'published';
             $company->launch_stage = 'website_live';
             $company->website_url = $this->buildCompanyWebsiteUrl($company, $validated['website_engine']);
+            if (!empty($result['public_url']) && !$this->isOsHostedWebsiteUrl((string) $result['public_url'])) {
+                $company->engine_public_url = (string) $result['public_url'];
+            }
             $company->save();
         }
 
@@ -7831,6 +7837,19 @@ class OsShellController extends Controller
         }
 
         return 'https://' . $host . ($path !== '' ? '/' . $path : '');
+    }
+
+    private function isOsHostedWebsiteUrl(string $url): bool
+    {
+        $url = trim($url);
+        if ($url === '') {
+            return false;
+        }
+
+        $host = strtolower((string) parse_url($url, PHP_URL_HOST));
+        $osHost = strtolower((string) parse_url((string) config('app.url'), PHP_URL_HOST));
+
+        return $host !== '' && $osHost !== '' && $host === $osHost;
     }
 
     private function resolveWebsiteEngineForBusinessModel(string $engine, string $businessModel): string

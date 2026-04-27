@@ -42,6 +42,9 @@ class PublicWebsiteService
         }
 
         $storefrontUrl = trim((string) ($summary['website_url'] ?? ''));
+        if ($storefrontUrl === '') {
+            $storefrontUrl = trim((string) ($company->engine_public_url ?? ''));
+        }
         $engineVendorSlug = $this->resolveEngineVendorSlug($storefrontUrl, $payload, $founder?->username);
         $engineBaseUrl = rtrim((string) config('modules.' . $engine . '.base_url', ''), '/');
         $osBaseUrl = rtrim((string) config('app.url'), '/');
