@@ -3899,6 +3899,9 @@ class OsShellController extends Controller
         }
 
         if (!empty($company)) {
+            if (blank($company->website_path)) {
+                $company->website_path = trim(strtolower((string) str($company->company_name ?: ($founder->full_name ?? 'your-business'))->slug('-')), '/');
+            }
             $company->website_engine = $validated['website_engine'];
             $company->website_status = 'live';
             $company->website_generation_status = 'published';
@@ -6980,7 +6983,7 @@ class OsShellController extends Controller
             return null;
         }
 
-        return Company::query()
+        $company = Company::query()
             ->where('website_status', 'live')
             ->with('founder')
             ->get()
@@ -6992,6 +6995,14 @@ class OsShellController extends Controller
 
                 return $path === $normalizedPath;
             });
+
+        if ($company && blank($company->website_path)) {
+            $company->website_path = $normalizedPath;
+            $company->website_url = $this->buildCompanyWebsiteUrl($company, (string) ($company->website_engine ?? ''));
+            $company->save();
+        }
+
+        return $company;
     }
 
     private function resolvePublicWebsiteRootCompany(string $websiteRoot): ?Company
