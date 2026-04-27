@@ -7017,6 +7017,24 @@ class OsShellController extends Controller
             ]);
         }
 
+        if ($this->isRecursiveStorefrontTarget($engineProxyUrl, $websiteRoot)) {
+            Log::warning('Skipped recursive storefront proxy target.', [
+                'company_id' => $company->id,
+                'website_root' => $websiteRoot,
+                'target' => $engineProxyUrl,
+            ]);
+
+            return view('os.public-website', [
+                'pageTitle' => (string) ($company->company_name ?: 'Business Website'),
+                'site' => $site,
+                'sourceContext' => [
+                    'src' => trim((string) $request->query('src', '')),
+                    'promo' => trim((string) $request->query('promo', '')),
+                    'offer' => trim((string) $request->query('offer', '')),
+                ],
+            ]);
+        }
+
         $targetUrl = rtrim($engineProxyUrl, '/');
         $proxyPath = trim($proxyPath, '/');
         if ($proxyPath !== '') {
@@ -7218,6 +7236,19 @@ class OsShellController extends Controller
         }
 
         return implode('; ', $pairs);
+    }
+
+    private function isRecursiveStorefrontTarget(string $targetUrl, string $websiteRoot): bool
+    {
+        $targetUrl = rtrim(trim($targetUrl), '/');
+        $osBaseUrl = rtrim((string) config('app.url'), '/');
+        $websiteRoot = trim($websiteRoot, '/');
+
+        if ($targetUrl === '' || $osBaseUrl === '') {
+            return false;
+        }
+
+        return $targetUrl === $osBaseUrl || ($websiteRoot !== '' && $targetUrl === $osBaseUrl . '/' . $websiteRoot);
     }
 
     private function resolvePublicWebsiteOffer(array $site, string $type, string $title): ?array

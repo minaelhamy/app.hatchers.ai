@@ -28,6 +28,9 @@ class PublicWebsiteService
         $counts = is_array($payload['key_counts'] ?? null) ? $payload['key_counts'] : [];
         $offerPreferences = $this->offerPaymentPreferences($founder);
         $engineVendorSlug = trim((string) ($payload['username'] ?? ''));
+        if ($engineVendorSlug === '') {
+            $engineVendorSlug = trim((string) ($founder?->username ?? ''));
+        }
 
         $websiteTitle = trim((string) ($summary['website_title'] ?? ''));
         if ($websiteTitle === '') {
@@ -44,9 +47,18 @@ class PublicWebsiteService
 
         $storefrontUrl = trim((string) ($summary['website_url'] ?? ''));
         $engineBaseUrl = rtrim((string) config('modules.' . $engine . '.base_url', ''), '/');
-        $engineProxyUrl = $engineBaseUrl !== '' && $engineVendorSlug !== ''
-            ? $engineBaseUrl . '/' . ltrim($engineVendorSlug, '/')
-            : $storefrontUrl;
+        $osBaseUrl = rtrim((string) config('app.url'), '/');
+        $engineProxyUrl = '';
+
+        if ($storefrontUrl !== '' && !$this->isRecursiveOsStorefrontUrl($storefrontUrl, $osBaseUrl, $websitePath)) {
+            $engineProxyUrl = $storefrontUrl;
+        } elseif ($engineBaseUrl !== '' && $engineVendorSlug !== '') {
+            $candidateProxyUrl = $engineBaseUrl . '/' . ltrim($engineVendorSlug, '/');
+            if (!$this->isRecursiveOsStorefrontUrl($candidateProxyUrl, $osBaseUrl, $websitePath)) {
+                $engineProxyUrl = $candidateProxyUrl;
+            }
+        }
+
         $usesEngineStorefront = $engineProxyUrl !== '';
 
         return [
@@ -112,6 +124,23 @@ class PublicWebsiteService
                 ];
             })
             ->all();
+    }
+
+    private function isRecursiveOsStorefrontUrl(string $candidateUrl, string $osBaseUrl, string $websitePath): bool
+    {
+        $candidateUrl = rtrim(trim($candidateUrl), '/');
+        $osBaseUrl = rtrim(trim($osBaseUrl), '/');
+        $websitePath = trim($websitePath, '/');
+
+        if ($candidateUrl === '' || $osBaseUrl === '') {
+            return false;
+        }
+
+        if ($candidateUrl === $osBaseUrl) {
+            return true;
+        }
+
+        return $websitePath !== '' && $candidateUrl === $osBaseUrl . '/' . $websitePath;
     }
 
     private function buildHero(Company $company, string $founderName, string $businessModel, array $counts, string $currency, array $draftOutput = []): array

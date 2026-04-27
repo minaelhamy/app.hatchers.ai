@@ -246,7 +246,7 @@
                                     <div class="marketing-pipeline-item">
                                         <div class="marketing-pipeline-head">
                                             <div>
-                                                <div class="marketing-card-title">{{ $requestItem->title }}</div>
+                                                <div class="marketing-card-title">{{ $requestItem['title'] ?? 'Content request' }}</div>
                                                 <div class="marketing-note">{{ $requestItem['brief'] }}</div>
                                             </div>
                                             <span class="marketing-status {{ $requestItem['status'] }}">{{ ucfirst($requestItem['status']) }}</span>
