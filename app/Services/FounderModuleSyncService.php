@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Founder;
+use App\Models\Company;
 use GuzzleHttp\Client;
 use Throwable;
 
@@ -134,6 +135,8 @@ class FounderModuleSyncService
                 ];
             }
 
+            $this->persistWebsiteTargetFromSync($founder, $module, $data);
+
             return ['ok' => true];
         } catch (Throwable $exception) {
             return [
@@ -156,5 +159,32 @@ class FounderModuleSyncService
     private function syncTargets(string $target): array
     {
         return $target === 'all' ? ['atlas', 'bazaar', 'servio'] : [$target];
+    }
+
+    private function persistWebsiteTargetFromSync(Founder $founder, string $module, array $data): void
+    {
+        if (!in_array($module, ['bazaar', 'servio'], true)) {
+            return;
+        }
+
+        $company = $founder->company;
+        if (!$company instanceof Company) {
+            return;
+        }
+
+        $slug = trim((string) ($data['slug'] ?? ''));
+        if ($slug === '') {
+            return;
+        }
+
+        $baseUrl = rtrim((string) config('modules.' . $module . '.base_url'), '/');
+        if ($baseUrl === '') {
+            return;
+        }
+
+        if ((string) ($company->website_engine ?? '') === $module || blank($company->engine_public_url)) {
+            $company->engine_public_url = $baseUrl . '/' . ltrim($slug, '/');
+            $company->save();
+        }
     }
 }
