@@ -6,6 +6,7 @@ return [
     'debug' => (bool) env('APP_DEBUG', false),
     'url' => env('APP_URL', 'https://app.hatchers.ai'),
     'timezone' => env('APP_TIMEZONE', 'Africa/Cairo'),
+    'disable_auth_verification' => (bool) env('HATCHERS_DISABLE_AUTH_VERIFICATION', true),
     'locale' => env('APP_LOCALE', 'en'),
     'fallback_locale' => env('APP_FALLBACK_LOCALE', 'en'),
     'faker_locale' => env('APP_FAKER_LOCALE', 'en_US'),

@@ -292,65 +292,248 @@
 
         .assistant {
             position: fixed;
-            right: 28px;
+            top: 24px;
+            right: 26px;
             bottom: 24px;
-            width: 310px;
-            background: rgba(18, 18, 18, 0.96);
-            color: #fff;
-            border-radius: 24px;
-            padding: 18px;
-            box-shadow: 0 28px 70px rgba(0, 0, 0, 0.28);
+            width: 380px;
+            display: grid;
+            grid-template-rows: auto auto auto 1fr auto;
+            gap: 14px;
+            padding: 16px;
+            border-radius: 30px;
+            border: 1px solid rgba(235, 227, 218, 0.9);
+            background:
+                radial-gradient(circle at top right, rgba(233, 191, 201, 0.22), transparent 0 28%),
+                linear-gradient(180deg, rgba(255, 252, 248, 0.94), rgba(250, 246, 240, 0.9));
+            box-shadow:
+                0 24px 72px rgba(58, 41, 25, 0.14),
+                inset 0 1px 0 rgba(255, 255, 255, 0.86);
+            backdrop-filter: blur(20px);
+            color: #1a1714;
+            z-index: 40;
         }
 
         .assistant-header {
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             justify-content: space-between;
-            gap: 12px;
-            margin-bottom: 8px;
+            gap: 14px;
+        }
+
+        .assistant-kicker {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+            font-size: 0.7rem;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+            color: rgba(116, 98, 86, 0.74);
+        }
+
+        .assistant-kicker-mark {
+            width: 10px;
+            height: 10px;
+            border-radius: 999px;
+            background: linear-gradient(135deg, #ef476f, #ee6c4d);
+            box-shadow: 0 0 0 6px rgba(239, 71, 111, 0.08);
+            flex-shrink: 0;
+        }
+
+        .assistant-title {
+            font-family: "Inter Tight", "Inter", "Avenir Next", sans-serif;
+            font-size: 1.5rem;
+            font-weight: 700;
+            letter-spacing: -0.04em;
+            line-height: 1;
+            margin-bottom: 6px;
+        }
+
+        .assistant-subtitle {
+            color: rgba(100, 84, 72, 0.8);
+            font-size: 0.93rem;
+            line-height: 1.45;
+            max-width: 28ch;
         }
 
         .assistant-toggle {
             width: 42px;
             height: 42px;
-            border-radius: 999px;
-            border: 1px solid rgba(255, 255, 255, 0.14);
-            background: rgba(255, 255, 255, 0.1);
-            color: #fff;
+            border-radius: 16px;
+            border: 1px solid rgba(223, 211, 197, 0.92);
+            background: rgba(255, 255, 255, 0.68);
+            color: rgba(80, 63, 53, 0.86);
             cursor: pointer;
             font-weight: 700;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
         }
 
         .assistant-body {
-            display: none;
-            gap: 12px;
+            display: grid;
+            grid-template-rows: auto auto auto 1fr auto;
+            gap: 14px;
+            min-height: 0;
         }
 
-        .assistant.open .assistant-body {
+        .assistant.collapsed {
+            grid-template-rows: auto;
+            width: 272px;
+            bottom: auto;
+        }
+
+        .assistant.collapsed .assistant-body {
+            display: none;
+        }
+
+        .assistant-snapshot {
             display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+        }
+
+        .assistant-stat {
+            padding: 12px 13px;
+            border-radius: 20px;
+            border: 1px solid rgba(227, 216, 203, 0.95);
+            background: rgba(255, 255, 255, 0.64);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.84);
+        }
+
+        .assistant-stat-label {
+            display: block;
+            font-size: 0.72rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: rgba(120, 102, 89, 0.7);
+            margin-bottom: 6px;
+        }
+
+        .assistant-stat-value {
+            display: block;
+            font-family: "Inter Tight", "Inter", "Avenir Next", sans-serif;
+            font-size: 1.1rem;
+            font-weight: 700;
+            letter-spacing: -0.04em;
+            color: #191512;
+        }
+
+        .assistant-guidance,
+        .assistant-prompts,
+        .assistant-composer {
+            padding: 14px;
+            border-radius: 22px;
+            border: 1px solid rgba(227, 216, 203, 0.95);
+            background: rgba(255, 255, 255, 0.62);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.82);
+        }
+
+        .assistant-guidance {
+            display: grid;
+            gap: 8px;
+        }
+
+        .assistant-guidance-title,
+        .assistant-prompts-title {
+            font-size: 0.74rem;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: rgba(122, 105, 92, 0.74);
+        }
+
+        .assistant-guidance-copy {
+            color: rgba(81, 67, 58, 0.84);
+            line-height: 1.52;
+            font-size: 0.92rem;
+        }
+
+        .assistant-method-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .assistant-method-pill {
+            display: inline-flex;
+            align-items: center;
+            padding: 7px 10px;
+            border-radius: 999px;
+            border: 1px solid rgba(226, 213, 199, 0.92);
+            background: rgba(245, 239, 231, 0.92);
+            font-size: 0.78rem;
+            color: rgba(88, 72, 63, 0.88);
+        }
+
+        .assistant-prompts {
+            display: grid;
+            gap: 10px;
+        }
+
+        .assistant-prompt-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .assistant-prompt {
+            border: 1px solid rgba(220, 207, 191, 0.9);
+            background: rgba(255, 253, 249, 0.9);
+            color: #2a231e;
+            border-radius: 999px;
+            padding: 9px 12px;
+            font: inherit;
+            font-size: 0.82rem;
+            cursor: pointer;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.74);
+            transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+        }
+
+        .assistant-prompt:hover {
+            transform: translateY(-1px);
+            background: rgba(255, 255, 255, 0.96);
         }
 
         .assistant-feed {
             display: grid;
-            gap: 10px;
-            max-height: 280px;
+            gap: 12px;
+            min-height: 160px;
             overflow-y: auto;
-            padding-right: 2px;
+            padding-right: 4px;
+            align-content: start;
         }
 
         .assistant-bubble {
-            border-radius: 16px;
-            padding: 12px 14px;
-            font-size: 0.93rem;
-            line-height: 1.45;
+            border-radius: 20px;
+            padding: 14px 16px;
+            font-size: 0.92rem;
+            line-height: 1.55;
+            border: 1px solid rgba(223, 211, 198, 0.92);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.66);
         }
 
         .assistant-bubble.user {
-            background: rgba(255, 255, 255, 0.12);
+            margin-left: 28px;
+            background: linear-gradient(180deg, rgba(31, 27, 24, 0.94), rgba(41, 34, 31, 0.94));
+            color: #fffaf5;
+            border-color: rgba(31, 27, 24, 0.94);
         }
 
         .assistant-bubble.atlas {
-            background: rgba(216, 199, 171, 0.18);
+            margin-right: 18px;
+            background: rgba(255, 253, 249, 0.94);
+            color: rgba(37, 30, 26, 0.9);
+        }
+
+        .assistant-bubble-title {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 0.74rem;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: rgba(123, 107, 95, 0.72);
+        }
+
+        .assistant-bubble.user .assistant-bubble-title {
+            color: rgba(255, 243, 232, 0.62);
         }
 
         .assistant-form {
@@ -360,18 +543,20 @@
 
         .assistant-textarea {
             width: 100%;
-            min-height: 88px;
-            resize: vertical;
-            border-radius: 16px;
-            border: 1px solid rgba(255, 255, 255, 0.12);
-            background: rgba(255, 255, 255, 0.08);
-            color: #fff;
-            padding: 12px 14px;
+            min-height: 96px;
+            resize: none;
+            border-radius: 18px;
+            border: 1px solid rgba(220, 207, 191, 0.9);
+            background: rgba(255, 255, 255, 0.88);
+            color: #1b1714;
+            padding: 14px 15px;
             font: inherit;
+            line-height: 1.5;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.76);
         }
 
         .assistant-textarea::placeholder {
-            color: rgba(255, 255, 255, 0.5);
+            color: rgba(121, 104, 92, 0.58);
         }
 
         .assistant-row {
@@ -382,34 +567,44 @@
         }
 
         .assistant-status {
-            font-size: 0.82rem;
-            color: rgba(255, 255, 255, 0.68);
+            font-size: 0.8rem;
+            color: rgba(114, 96, 84, 0.72);
+            line-height: 1.4;
         }
 
         .assistant-send {
             border: 0;
             border-radius: 999px;
-            padding: 11px 16px;
-            background: #f2e7d5;
-            color: #111;
+            padding: 12px 16px;
+            min-width: 122px;
+            background: linear-gradient(180deg, #181310, #2b221d);
+            color: #fff;
             font-weight: 700;
             cursor: pointer;
+            box-shadow: 0 12px 28px rgba(35, 28, 23, 0.16);
+        }
+
+        .assistant-send:disabled {
+            opacity: 0.62;
+            cursor: wait;
         }
 
         .assistant-chip {
-            display: inline-block;
+            display: inline-flex;
+            align-items: center;
             margin-top: 8px;
             margin-right: 6px;
-            padding: 6px 10px;
+            padding: 7px 10px;
             border-radius: 999px;
-            background: rgba(255, 255, 255, 0.08);
-            color: rgba(255, 255, 255, 0.84);
+            background: rgba(244, 237, 228, 0.96);
+            color: rgba(88, 73, 64, 0.88);
             font-size: 0.78rem;
+            border: 1px solid rgba(227, 214, 201, 0.88);
         }
 
         .assistant p {
-            color: rgba(255, 255, 255, 0.76);
-            line-height: 1.45;
+            color: rgba(94, 79, 69, 0.84);
+            line-height: 1.5;
         }
 
         @media (max-width: 1180px) {
@@ -432,6 +627,7 @@
                 position: static;
                 width: auto;
                 margin-top: 22px;
+                min-height: auto;
             }
         }
     </style>
@@ -443,7 +639,7 @@
 
         .os-window-host {
             position: absolute;
-            inset: 92px 64px 56px 64px;
+            inset: 92px 470px 56px 64px;
             pointer-events: none;
             z-index: 8;
         }
@@ -970,10 +1166,49 @@
         $authUser = auth()->user();
         $hideTopbar = trim($__env->yieldContent('hide_topbar')) === '1';
         $dashboardLabel = 'Dashboard';
+        $showDefaultAssistant = false;
+        $assistantContext = [];
+        $assistantPrompts = [];
+        $assistantTimeline = [];
         if ($authUser?->role === 'admin') {
             $dashboardLabel = 'Admin';
         } elseif ($authUser?->role === 'mentor') {
             $dashboardLabel = 'Mentor';
+        } elseif ($authUser?->role === 'founder' && trim($__env->yieldContent('page_class')) === 'founder-home-page' && !$osEmbedMode) {
+            $authUser->loadMissing([
+                'company.intelligence',
+                'weeklyState',
+                'commercialSummary',
+            ]);
+
+            $company = $authUser->company;
+            $weeklyState = $authUser->weeklyState;
+            $commercialSummary = $authUser->commercialSummary;
+            $assistantThread = $authUser->conversationThreads()->where('thread_key', 'atlas-assistant')->first();
+            $assistantThreadMeta = is_array($assistantThread?->meta_json) ? $assistantThread->meta_json : [];
+            $assistantTimeline = collect(is_array($assistantThreadMeta['messages'] ?? null) ? $assistantThreadMeta['messages'] : [])
+                ->filter(fn ($message) => is_array($message) && !empty($message['text']))
+                ->take(-12)
+                ->values()
+                ->all();
+            $showDefaultAssistant = true;
+            $assistantContext = [
+                'founder_name' => (string) ($authUser->full_name ?: $authUser->username ?: 'Founder'),
+                'company_name' => (string) ($company?->company_name ?: 'your company'),
+                'focus' => (string) ($weeklyState?->weekly_focus ?: 'Clarify the next revenue move'),
+                'open_tasks' => (int) ($weeklyState?->open_tasks ?? 0),
+                'progress' => (int) ($weeklyState?->weekly_progress_percent ?? 0),
+                'orders' => (int) ($commercialSummary?->order_count ?? 0),
+                'bookings' => (int) ($commercialSummary?->booking_count ?? 0),
+                'revenue' => strtoupper((string) ($commercialSummary?->currency ?? 'USD')) . ' ' . number_format((float) ($commercialSummary?->gross_revenue ?? 0), 0),
+            ];
+            $assistantPrompts = [
+                'What should I focus on today to move revenue fastest?',
+                'Review my offer and tell me what is weak.',
+                'What is blocking conversions right now in my OS?',
+                'Give me the next three actions using Sell Like Crazy thinking.',
+                'How do I get my first 3 paying customers this week?',
+            ];
         }
     @endphp
     <div class="shell">
@@ -1016,6 +1251,108 @@
             </div>
         </div>
     @endif
+    @if ($showDefaultAssistant)
+        <aside class="assistant" data-os-assistant>
+            <div class="assistant-header">
+                <div>
+                    <div class="assistant-kicker">
+                        <span class="assistant-kicker-mark"></span>
+                        <span>Atlas Assistant</span>
+                    </div>
+                    <div class="assistant-title">Founder Mentor</div>
+                    <p class="assistant-subtitle">
+                        I can see {{ $assistantContext['company_name'] }}, your tasks, learnings, orders, bookings, and current momentum inside Hatchers OS.
+                    </p>
+                </div>
+                <button class="assistant-toggle" type="button" data-assistant-toggle aria-label="Collapse assistant">−</button>
+            </div>
+            <div class="assistant-body">
+                <div class="assistant-snapshot">
+                    <div class="assistant-stat">
+                        <span class="assistant-stat-label">Weekly Focus</span>
+                        <span class="assistant-stat-value">{{ $assistantContext['progress'] }}%</span>
+                    </div>
+                    <div class="assistant-stat">
+                        <span class="assistant-stat-label">Open Tasks</span>
+                        <span class="assistant-stat-value">{{ $assistantContext['open_tasks'] }}</span>
+                    </div>
+                    <div class="assistant-stat">
+                        <span class="assistant-stat-label">Orders + Bookings</span>
+                        <span class="assistant-stat-value">{{ $assistantContext['orders'] + $assistantContext['bookings'] }}</span>
+                    </div>
+                    <div class="assistant-stat">
+                        <span class="assistant-stat-label">Revenue Tracked</span>
+                        <span class="assistant-stat-value">{{ $assistantContext['revenue'] }}</span>
+                    </div>
+                </div>
+
+                <div class="assistant-guidance">
+                    <div class="assistant-guidance-title">Mentor Mode</div>
+                    <div class="assistant-guidance-copy">
+                        I’ll guide {{ $assistantContext['founder_name'] }} with a direct-response mindset: sharper offer, tighter message, stronger urgency, cleaner follow-up, and daily action toward revenue.
+                    </div>
+                    <div class="assistant-method-list">
+                        <span class="assistant-method-pill">Offer clarity</span>
+                        <span class="assistant-method-pill">Lead capture</span>
+                        <span class="assistant-method-pill">Risk reversal</span>
+                        <span class="assistant-method-pill">Follow-up</span>
+                    </div>
+                </div>
+
+                <div class="assistant-prompts">
+                    <div class="assistant-prompts-title">Start with one of these</div>
+                    <div class="assistant-prompt-list">
+                        @foreach ($assistantPrompts as $prompt)
+                            <button class="assistant-prompt" type="button" data-assistant-prompt="{{ $prompt }}">{{ $prompt }}</button>
+                        @endforeach
+                    </div>
+                </div>
+
+                <div class="assistant-feed" data-assistant-feed>
+                    @if (!empty($assistantTimeline))
+                        @foreach ($assistantTimeline as $timelineMessage)
+                            @php
+                                $timelineType = (string) ($timelineMessage['type'] ?? 'atlas');
+                                $timelineTitle = (string) ($timelineMessage['title'] ?? ($timelineType === 'user' ? 'You' : 'Atlas Assistant'));
+                                $timelineActions = collect(is_array($timelineMessage['actions'] ?? null) ? $timelineMessage['actions'] : [])
+                                    ->filter(fn ($action) => is_array($action) && !empty($action['label']))
+                                    ->values()
+                                    ->all();
+                            @endphp
+                            <div class="assistant-bubble {{ $timelineType === 'user' ? 'user' : 'atlas' }}">
+                                <span class="assistant-bubble-title">{{ $timelineTitle }}</span>
+                                <div>{{ (string) ($timelineMessage['text'] ?? '') }}</div>
+                                @foreach ($timelineActions as $timelineAction)
+                                    <button
+                                        class="assistant-chip"
+                                        type="button"
+                                        data-assistant-action="1"
+                                        data-assistant-workspace="{{ (string) ($timelineAction['workspace_key'] ?? '') }}"
+                                        data-assistant-href="{{ (string) ($timelineAction['href'] ?? '') }}"
+                                    >{{ (string) ($timelineAction['label'] ?? '') }}</button>
+                                @endforeach
+                            </div>
+                        @endforeach
+                    @else
+                        <div class="assistant-bubble atlas">
+                            <span class="assistant-bubble-title">Atlas Assistant</span>
+                            Your current focus is <strong>{{ $assistantContext['focus'] }}</strong>. Ask me for the next revenue move, an offer review, a campaign angle, or a direct action plan from your live OS data.
+                        </div>
+                    @endif
+                </div>
+
+                <div class="assistant-composer">
+                    <form class="assistant-form" data-assistant-form>
+                        <textarea class="assistant-textarea" data-assistant-input placeholder="Ask Atlas to review your offer, unblock revenue, plan your next moves, or coach your founder sprint."></textarea>
+                        <div class="assistant-row">
+                            <div class="assistant-status" data-assistant-status>Atlas is synced with your Hatchers OS context.</div>
+                            <button class="assistant-send" data-assistant-send type="submit">Send</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </aside>
+    @endif
     @yield('assistant')
     <script>
         (() => {
@@ -1028,16 +1365,36 @@
             const feed = assistant.querySelector('[data-assistant-feed]');
             const status = assistant.querySelector('[data-assistant-status]');
             const sendButton = assistant.querySelector('[data-assistant-send]');
+            const promptButtons = assistant.querySelectorAll('[data-assistant-prompt]');
+            const existingActionButtons = assistant.querySelectorAll('[data-assistant-action]');
             const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 
             const setOpen = (open) => {
-                assistant.classList.toggle('open', open);
+                assistant.classList.toggle('collapsed', !open);
                 if (toggle) toggle.textContent = open ? '−' : '+';
             };
 
-            const addBubble = (type, text, actions = []) => {
+            const desktopOpenApp = (workspaceKey, fallbackHref = '') => {
+                if (workspaceKey) {
+                    window.dispatchEvent(new CustomEvent('hatchers:open-app', {
+                        detail: { key: workspaceKey, href: fallbackHref || '' },
+                    }));
+                    return;
+                }
+
+                if (fallbackHref) {
+                    window.location.href = fallbackHref;
+                }
+            };
+
+            const addBubble = (type, text, actions = [], options = {}) => {
                 const bubble = document.createElement('div');
                 bubble.className = `assistant-bubble ${type}`;
+
+                const title = document.createElement('span');
+                title.className = 'assistant-bubble-title';
+                title.textContent = options.title || (type === 'user' ? 'You' : 'Atlas Assistant');
+                bubble.appendChild(title);
 
                 const content = document.createElement('div');
                 content.textContent = text;
@@ -1045,11 +1402,18 @@
 
                 if (Array.isArray(actions) && actions.length) {
                     actions.slice(0, 3).forEach((action) => {
-                        const label = action.title || action.cta || action.platform || '';
+                        const label = action.cta || action.title || action.platform || '';
                         if (!label) return;
-                        const chip = document.createElement('span');
+                        const chip = document.createElement('button');
+                        chip.type = 'button';
                         chip.className = 'assistant-chip';
                         chip.textContent = label;
+                        chip.dataset.assistantAction = '1';
+                        chip.dataset.assistantWorkspace = action.os_workspace_key || '';
+                        chip.dataset.assistantHref = action.os_href || '';
+                        chip.addEventListener('click', () => {
+                            desktopOpenApp(chip.dataset.assistantWorkspace, chip.dataset.assistantHref);
+                        });
                         bubble.appendChild(chip);
                     });
                 }
@@ -1059,7 +1423,21 @@
             };
 
             toggle?.addEventListener('click', () => {
-                setOpen(!assistant.classList.contains('open'));
+                setOpen(assistant.classList.contains('collapsed'));
+            });
+
+            promptButtons.forEach((button) => {
+                button.addEventListener('click', () => {
+                    if (!textarea) return;
+                    textarea.value = button.dataset.assistantPrompt || '';
+                    textarea.focus();
+                });
+            });
+
+            existingActionButtons.forEach((button) => {
+                button.addEventListener('click', () => {
+                    desktopOpenApp(button.dataset.assistantWorkspace || '', button.dataset.assistantHref || '');
+                });
             });
 
             form?.addEventListener('submit', async (event) => {
@@ -1069,7 +1447,7 @@
 
                 addBubble('user', message);
                 textarea.value = '';
-                if (status) status.textContent = 'Hatchers AI is thinking...';
+                if (status) status.textContent = 'Atlas is reviewing your founder context...';
                 if (sendButton) sendButton.disabled = true;
 
                 try {
@@ -1089,14 +1467,14 @@
                     const data = await response.json();
                     if (!response.ok || !data.success) {
                         addBubble('atlas', data.error || 'Hatchers AI could not respond right now.');
-                        if (status) status.textContent = 'Hatchers AI is temporarily unavailable.';
+                        if (status) status.textContent = 'Atlas is temporarily unavailable.';
                     } else {
                         addBubble('atlas', data.reply || 'Hatchers AI is here.', data.actions || []);
                         if (data.refresh) {
-                            if (status) status.textContent = 'Hatchers AI updated your workspace. Refreshing summary...';
+                            if (status) status.textContent = 'Atlas updated your workspace. Refreshing summary...';
                             window.setTimeout(() => window.location.reload(), 900);
                         } else if (status) {
-                            status.textContent = 'Hatchers AI is synced with your OS context.';
+                            status.textContent = 'Atlas is synced with your OS context.';
                         }
                     }
                 } catch (error) {
@@ -1107,7 +1485,7 @@
                 }
             });
 
-            setOpen(false);
+            setOpen(true);
         })();
     </script>
     <script>
@@ -1599,6 +1977,19 @@
                 const launch = getLaunchPosition(app, sourceNode);
                 buildWindow(app, launch.x, launch.y);
             };
+
+            window.addEventListener('hatchers:open-app', (event) => {
+                const key = event.detail?.key || '';
+                if (key && routeMap[key]) {
+                    openApp(key);
+                    return;
+                }
+
+                const href = event.detail?.href || '';
+                if (href) {
+                    window.location.href = href;
+                }
+            });
 
             launcherNodes.forEach((node) => {
                 node.addEventListener('click', (event) => {

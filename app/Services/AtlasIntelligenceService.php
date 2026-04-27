@@ -128,16 +128,33 @@ class AtlasIntelligenceService
         $weeklyState = $founder->weeklyState;
         $commercialSummary = $founder->commercialSummary;
         $snapshots = $founder->moduleSnapshots->keyBy('module');
+        $orders = (int) ($commercialSummary?->order_count ?? 0);
+        $bookings = (int) ($commercialSummary?->booking_count ?? 0);
+        $openTasks = (int) ($weeklyState?->open_tasks ?? 0);
+        $completedTasks = (int) ($weeklyState?->completed_tasks ?? 0);
+        $progress = (int) ($weeklyState?->weekly_progress_percent ?? 0);
+        $revenue = (float) ($commercialSummary?->gross_revenue ?? 0);
+        $currency = (string) ($commercialSummary?->currency ?? 'USD');
 
         $payload = [
             'app' => 'os',
             'role' => $founder->role ?: 'founder',
             'current_page' => $currentPage,
             'message' => $message,
+            'assistant_mode' => 'founder_mentor',
             'name' => $founder->full_name,
             'username' => $founder->username,
             'email' => $founder->email,
             'company_brief' => (string) ($company?->company_brief ?? ''),
+            'mentor_brief' => [
+                'positioning' => 'Act as the founder mentor inside Hatchers OS. Give clear, direct-response advice grounded in the founder’s real OS data.',
+                'methodology' => [
+                    'Use Sell Like Crazy style principles in paraphrased form only.',
+                    'Prioritize sharper offers, better hooks, stronger urgency, risk reversal, lead capture, and persistent follow-up.',
+                    'Bias toward the next revenue action, not generic motivation.',
+                    'When the founder is stuck, turn the reply into the next three concrete actions inside Hatchers OS.',
+                ],
+            ],
             'company' => [
                 'company_name' => (string) ($company?->company_name ?? ''),
                 'business_model' => (string) ($company?->business_model ?? ''),
@@ -157,8 +174,8 @@ class AtlasIntelligenceService
                 ],
                 'execution' => [
                     'weekly_focus' => (string) ($weeklyState?->weekly_focus ?? ''),
-                    'open_tasks' => (int) ($weeklyState?->open_tasks ?? 0),
-                    'completed_tasks' => (int) ($weeklyState?->completed_tasks ?? 0),
+                    'open_tasks' => $openTasks,
+                    'completed_tasks' => $completedTasks,
                     'open_milestones' => (int) ($weeklyState?->open_milestones ?? 0),
                     'completed_milestones' => (int) ($weeklyState?->completed_milestones ?? 0),
                 ],
@@ -166,20 +183,31 @@ class AtlasIntelligenceService
                     'business_model' => (string) ($commercialSummary?->business_model ?? ''),
                     'product_count' => (int) ($commercialSummary?->product_count ?? 0),
                     'service_count' => (int) ($commercialSummary?->service_count ?? 0),
-                    'order_count' => (int) ($commercialSummary?->order_count ?? 0),
-                    'booking_count' => (int) ($commercialSummary?->booking_count ?? 0),
+                    'order_count' => $orders,
+                    'booking_count' => $bookings,
                     'customer_count' => (int) ($commercialSummary?->customer_count ?? 0),
-                    'gross_revenue' => (float) ($commercialSummary?->gross_revenue ?? 0),
-                    'currency' => (string) ($commercialSummary?->currency ?? 'USD'),
+                    'gross_revenue' => $revenue,
+                    'currency' => $currency,
                 ],
             ],
             'snapshot' => [
                 'workspace' => 'Hatchers OS unified founder workspace',
-                'weekly_progress_percent' => (int) ($weeklyState?->weekly_progress_percent ?? 0),
+                'weekly_progress_percent' => $progress,
                 'next_meeting_at' => optional($weeklyState?->next_meeting_at)?->toIso8601String(),
+                'founder_status' => [
+                    'current_focus' => (string) ($weeklyState?->weekly_focus ?? ''),
+                    'orders_and_bookings' => $orders + $bookings,
+                    'revenue' => strtoupper($currency) . ' ' . number_format($revenue, 0),
+                    'execution_summary' => sprintf(
+                        '%d open tasks, %d completed tasks, weekly progress %d%%.',
+                        $openTasks,
+                        $completedTasks,
+                        $progress
+                    ),
+                ],
                 'module_snapshot' => $this->condenseSnapshots($snapshots),
             ],
-            'sync_summary' => 'Founder is chatting from the unified Hatchers OS dashboard.',
+            'sync_summary' => 'Founder is chatting from the unified Hatchers OS dashboard and wants practical coaching based on live company, task, learning, order, and booking data.',
         ];
 
         $json = json_encode($payload);

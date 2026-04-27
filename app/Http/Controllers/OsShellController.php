@@ -39,6 +39,7 @@ use App\Services\IdentitySyncService;
 use App\Services\LmsIdentityBridgeService;
 use App\Services\MentorDashboardService;
 use App\Services\OsAssistantActionService;
+use App\Services\OsAssistantTimelineService;
 use App\Services\OsOperationsLogService;
 use App\Services\OsStripeService;
 use App\Services\OsWalletService;
@@ -104,6 +105,10 @@ class OsShellController extends Controller
 
     public function verifyEmailNotice(Request $request)
     {
+        if ($this->authVerificationDisabled()) {
+            return redirect()->route('login')->with('success', 'Verification is disabled for test mode. You can log in directly.');
+        }
+
         return view('os.verify-email', [
             'pageTitle' => 'Verify Founder Email',
             'email' => (string) ($request->query('email', session('verification_email', ''))),
@@ -112,6 +117,10 @@ class OsShellController extends Controller
 
     public function verifyEmail(Request $request): RedirectResponse
     {
+        if ($this->authVerificationDisabled()) {
+            return redirect()->route('login')->with('success', 'Verification is disabled for test mode. You can log in directly.');
+        }
+
         $validated = $request->validate([
             'email' => ['required', 'email'],
             'code' => ['required', 'digits:6'],
@@ -157,6 +166,10 @@ class OsShellController extends Controller
 
     public function resendEmailVerification(Request $request): RedirectResponse
     {
+        if ($this->authVerificationDisabled()) {
+            return redirect()->route('login')->with('success', 'Verification is disabled for test mode. No email code is needed.');
+        }
+
         $validated = $request->validate([
             'email' => ['required', 'email'],
         ]);
@@ -178,6 +191,10 @@ class OsShellController extends Controller
 
     public function verifyLoginNotice(Request $request)
     {
+        if ($this->authVerificationDisabled()) {
+            return redirect()->route('login')->with('success', 'Verification is disabled for test mode. Sign in directly from the login form.');
+        }
+
         $pendingFounderId = (int) $request->session()->get('pending_login_founder_id', 0);
         $founder = $pendingFounderId > 0 ? Founder::query()->find($pendingFounderId) : null;
 
@@ -193,6 +210,10 @@ class OsShellController extends Controller
 
     public function verifyLogin(Request $request): RedirectResponse
     {
+        if ($this->authVerificationDisabled()) {
+            return redirect()->route('login')->with('success', 'Verification is disabled for test mode. Sign in directly from the login form.');
+        }
+
         $validated = $request->validate([
             'code' => ['required', 'digits:6'],
         ]);
@@ -227,6 +248,10 @@ class OsShellController extends Controller
 
     public function resendLoginVerification(Request $request): RedirectResponse
     {
+        if ($this->authVerificationDisabled()) {
+            return redirect()->route('login')->with('success', 'Verification is disabled for test mode. No sign-in code is needed.');
+        }
+
         $pendingFounderId = (int) $request->session()->get('pending_login_founder_id', 0);
         $founder = $pendingFounderId > 0 ? Founder::query()->find($pendingFounderId) : null;
 
@@ -5945,6 +5970,21 @@ class OsShellController extends Controller
         }
 
         $founder = Founder::query()->where('email', $validated['email'])->first();
+        if ($founder && $this->authVerificationDisabled()) {
+            $founder->forceFill([
+                'email_verified_at' => $founder->email_verified_at ?: now(),
+                'email_verification_token' => null,
+                'email_verification_expires_at' => null,
+                'login_verification_token' => null,
+                'login_verification_expires_at' => null,
+            ])->save();
+
+            return redirect()->route('login')->with(
+                'success',
+                'Your founder workspace has been created under the ' . $plan['name'] . ' plan. Verification is disabled for test mode, so you can log in immediately.'
+            );
+        }
+
         if ($founder) {
             $this->issueEmailVerification($founder);
             $request->session()->put('verification_email', $founder->email);
@@ -5991,7 +6031,7 @@ class OsShellController extends Controller
                     ->onlyInput('login');
             }
 
-            if ($founder->isFounder() && !$founder->hasVerifiedEmail()) {
+            if ($founder->isFounder() && !$this->authVerificationDisabled() && !$founder->hasVerifiedEmail()) {
                 $this->issueEmailVerification($founder);
                 $request->session()->put('verification_email', $founder->email);
 
@@ -6008,6 +6048,22 @@ class OsShellController extends Controller
             return back()
                 ->withErrors(['login' => 'Hatchers OS could not complete login right now. Please try again in a moment.'])
                 ->onlyInput('login');
+        }
+
+        if ($founder->isFounder() && $this->authVerificationDisabled()) {
+            $founder->forceFill([
+                'email_verified_at' => $founder->email_verified_at ?: now(),
+                'email_verification_token' => null,
+                'email_verification_expires_at' => null,
+                'login_verification_token' => null,
+                'login_verification_expires_at' => null,
+            ])->save();
+
+            Auth::login($founder, true);
+            $request->session()->forget('pending_login_founder_id');
+            $request->session()->regenerate();
+
+            return redirect()->route('dashboard');
         }
 
         if ($founder->isFounder()) {
@@ -6037,7 +6093,8 @@ class OsShellController extends Controller
     public function assistantChat(
         Request $request,
         AtlasIntelligenceService $atlas,
-        OsAssistantActionService $actionService
+        OsAssistantActionService $actionService,
+        OsAssistantTimelineService $timeline
     ): JsonResponse
     {
         /** @var \App\Models\Founder $founder */
@@ -6072,10 +6129,19 @@ class OsShellController extends Controller
                 ]);
             }
 
+            $mappedActions = $this->mapAssistantActionsToOs($actionResult['actions'] ?? []);
+            $timeline->record(
+                $founder,
+                $currentPage,
+                $message,
+                (string) ($actionResult['reply'] ?? ''),
+                $mappedActions
+            );
+
             return response()->json([
                 'success' => true,
                 'reply' => $actionResult['reply'] ?? '',
-                'actions' => $actionResult['actions'] ?? [],
+                'actions' => $mappedActions,
                 'refresh' => !empty($actionResult['executed']),
             ]);
         }
@@ -6093,12 +6159,104 @@ class OsShellController extends Controller
             ], 502);
         }
 
+        $mappedActions = $this->mapAssistantActionsToOs($result['actions'] ?? []);
+        $timeline->record(
+            $founder,
+            $currentPage,
+            $message,
+            (string) ($result['reply'] ?? ''),
+            $mappedActions
+        );
+
         return response()->json([
             'success' => true,
             'reply' => $result['reply'] ?? '',
-            'actions' => $result['actions'] ?? [],
+            'actions' => $mappedActions,
             'refresh' => false,
         ]);
+    }
+
+    private function mapAssistantActionsToOs(array $actions): array
+    {
+        return collect($actions)
+            ->filter(fn ($action) => is_array($action))
+            ->map(function (array $action): array {
+                [$workspaceKey, $href] = $this->resolveAssistantWorkspaceTarget($action);
+
+                if ($workspaceKey !== null) {
+                    $action['os_workspace_key'] = $workspaceKey;
+                }
+
+                if ($href !== null) {
+                    $action['os_href'] = $href;
+                }
+
+                return $action;
+            })
+            ->values()
+            ->all();
+    }
+
+    private function resolveAssistantWorkspaceTarget(array $action): array
+    {
+        $title = strtolower(trim((string) ($action['title'] ?? '')));
+        $reason = strtolower(trim((string) ($action['reason'] ?? '')));
+        $cta = strtolower(trim((string) ($action['cta'] ?? '')));
+        $platform = strtolower(trim((string) ($action['platform'] ?? '')));
+        $haystack = trim($title . ' ' . $reason . ' ' . $cta . ' ' . $platform);
+
+        $targets = [
+            [
+                'keywords' => ['company intelligence', 'positioning', 'audience', 'icp', 'offer'],
+                'key' => 'settings',
+                'href' => route('founder.settings'),
+            ],
+            [
+                'keywords' => ['campaign', 'marketing assets', 'content', 'social'],
+                'key' => 'marketing',
+                'href' => route('founder.marketing'),
+            ],
+            [
+                'keywords' => ['learning', 'lesson', 'mentor', 'execution sprint', 'milestone', 'lms'],
+                'key' => 'learning-plan',
+                'href' => route('founder.learning-plan'),
+            ],
+            [
+                'keywords' => ['task', 'weekly progress', 'weekly traction'],
+                'key' => 'tasks',
+                'href' => route('founder.tasks'),
+            ],
+            [
+                'keywords' => ['product', 'store', 'bazaar', 'order'],
+                'key' => 'commerce',
+                'href' => route('founder.commerce'),
+            ],
+            [
+                'keywords' => ['service', 'booking', 'servio'],
+                'key' => 'website',
+                'href' => route('website'),
+            ],
+            [
+                'keywords' => ['builder path', 'website', 'launch-ready', 'theme'],
+                'key' => 'website',
+                'href' => route('website'),
+            ],
+            [
+                'keywords' => ['atlas', 'ai', 'assistant', 'campaign angle'],
+                'key' => 'ai-tools',
+                'href' => route('founder.ai-tools'),
+            ],
+        ];
+
+        foreach ($targets as $target) {
+            foreach ($target['keywords'] as $keyword) {
+                if (str_contains($haystack, $keyword)) {
+                    return [$target['key'], $target['href']];
+                }
+            }
+        }
+
+        return [null, null];
     }
 
     private function applyFounderExecutionStatus(
@@ -8442,6 +8600,11 @@ class OsShellController extends Controller
         $plans = $this->founderSignupPlans();
 
         return $plans[$planCode] ?? null;
+    }
+
+    private function authVerificationDisabled(): bool
+    {
+        return (bool) config('app.disable_auth_verification', false);
     }
 
     private function issueEmailVerification(Founder $founder): void
