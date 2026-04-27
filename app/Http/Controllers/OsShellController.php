@@ -31,6 +31,7 @@ use App\Models\VerticalBlueprintVersion;
 use App\Services\AdminDashboardService;
 use App\Services\AdminOperationsService;
 use App\Services\AtlasIntelligenceService;
+use App\Services\AtlasWorkspaceService;
 use App\Services\FounderModuleSyncService;
 use App\Services\FounderDashboardService;
 use App\Services\FounderRevenueOsService;
@@ -1709,6 +1710,29 @@ class OsShellController extends Controller
 
     public function founderAiTools(
         FounderDashboardService $founderDashboardService,
+        WorkspaceLaunchService $workspaceLaunchService,
+        AtlasWorkspaceService $atlasWorkspaceService
+    ) {
+        /** @var \App\Models\Founder $user */
+        $user = Auth::user();
+        if (!$user->isFounder()) {
+            return redirect()->route('dashboard');
+        }
+
+        $dashboard = $founderDashboardService->build($user);
+        $atlasWorkspace = $atlasWorkspaceService->summary($user, $dashboard['atlas'] ?? []);
+
+        return view('os.ai-tools', [
+            'pageTitle' => 'AI Tools',
+            'dashboard' => $dashboard,
+            'launchCards' => $workspaceLaunchService->launchCards($user),
+            'atlasWorkspace' => $atlasWorkspace,
+        ]);
+    }
+
+    public function founderAtlasWorkspace(
+        Request $request,
+        FounderDashboardService $founderDashboardService,
         WorkspaceLaunchService $workspaceLaunchService
     ) {
         /** @var \App\Models\Founder $user */
@@ -1717,11 +1741,129 @@ class OsShellController extends Controller
             return redirect()->route('dashboard');
         }
 
-        return view('os.ai-tools', [
-            'pageTitle' => 'AI Tools',
+        $target = $this->sanitizeAtlasWorkspaceTarget((string) $request->query('target', '/dashboard'));
+        $launchUrl = $workspaceLaunchService->buildLaunchUrlForTarget($user, 'atlas', $target);
+        if ($launchUrl === null) {
+            return redirect()->route('founder.ai-tools')->with('error', 'Atlas workspace launch is not configured yet.');
+        }
+
+        return view('os.atlas-workspace', [
+            'pageTitle' => (string) $request->query('title', 'Atlas Workspace'),
             'dashboard' => $founderDashboardService->build($user),
-            'launchCards' => $workspaceLaunchService->launchCards($user),
+            'workspaceLabel' => (string) $request->query('title', 'Atlas Workspace'),
+            'launchUrl' => $launchUrl,
+            'proxyUrl' => route('founder.ai-tools.proxy', ['proxyPath' => '']) . '?target=' . rawurlencode($target),
+            'target' => $target,
         ]);
+    }
+
+    public function founderAtlasWorkspaceProxy(
+        Request $request,
+        WorkspaceLaunchService $workspaceLaunchService
+    ) {
+        /** @var \App\Models\Founder $user */
+        $user = Auth::user();
+        if (!$user->isFounder()) {
+            return redirect()->route('dashboard');
+        }
+
+        $proxyPath = trim((string) $request->route('proxyPath', ''), '/');
+        $target = $this->sanitizeAtlasWorkspaceTarget((string) $request->query('target', '/dashboard'));
+        $atlasBaseUrl = rtrim((string) config('modules.atlas.base_url'), '/');
+        if ($atlasBaseUrl === '') {
+            return redirect()->route('founder.ai-tools')->with('error', 'Atlas workspace is not configured yet.');
+        }
+
+        $cookiePrefix = 'hatchers_atlas_workspace_';
+        $upstreamCookieHeader = $this->upstreamWorkspaceCookieHeader($request, $cookiePrefix);
+
+        if ($proxyPath === '') {
+            $targetUrl = $upstreamCookieHeader !== ''
+                ? $atlasBaseUrl . $target
+                : $workspaceLaunchService->buildLaunchUrlForTarget($user, 'atlas', $target);
+        } else {
+            $targetUrl = $atlasBaseUrl . '/' . $proxyPath;
+        }
+
+        if (!$targetUrl) {
+            return redirect()->route('founder.ai-tools')->with('error', 'Atlas workspace launch is not configured yet.');
+        }
+
+        $forwardHeaders = array_filter([
+            'Accept' => $request->header('Accept'),
+            'Accept-Language' => $request->header('Accept-Language'),
+            'User-Agent' => $request->userAgent(),
+            'Referer' => $request->header('Referer'),
+            'X-Requested-With' => $request->header('X-Requested-With'),
+        ], static fn ($value) => filled($value));
+
+        if ($upstreamCookieHeader !== '') {
+            $forwardHeaders['Cookie'] = $upstreamCookieHeader;
+        }
+
+        $method = strtoupper($request->method());
+        $options = [
+            'allow_redirects' => false,
+            'query' => $this->atlasProxyQuery($request, $proxyPath === ''),
+        ];
+
+        $client = Http::withHeaders($forwardHeaders)->withOptions($options);
+        if (!in_array($method, ['GET', 'HEAD'], true)) {
+            $contentType = strtolower((string) $request->header('Content-Type', ''));
+            if (str_contains($contentType, 'application/json')) {
+                $options['body'] = $request->getContent();
+                $forwardHeaders['Content-Type'] = $request->header('Content-Type');
+                $client = Http::withHeaders($forwardHeaders)->withOptions($options);
+            } else {
+                $client = Http::withHeaders($forwardHeaders)->withOptions($options)->asForm();
+                $options['form_params'] = $request->except(['_token']);
+            }
+        }
+
+        $upstream = $client->send($method, $targetUrl, $options);
+        $status = $upstream->status();
+        $contentType = strtolower((string) $upstream->header('Content-Type', 'text/html; charset=UTF-8'));
+
+        if ($status >= 300 && $status < 400 && filled($upstream->header('Location'))) {
+            $location = $this->rewriteAtlasUrlToOsPath((string) $upstream->header('Location'), $atlasBaseUrl);
+            return redirect()->away($location, $status);
+        }
+
+        $body = $upstream->body();
+        if (str_contains($contentType, 'text/html')) {
+            $body = $this->rewriteAtlasHtmlForOs($body, $atlasBaseUrl);
+        } elseif (
+            str_contains($contentType, 'javascript')
+            || str_contains($contentType, 'json')
+            || str_contains($contentType, 'css')
+            || str_contains($contentType, 'svg')
+        ) {
+            $body = $this->rewriteAtlasTextForOs($body, $atlasBaseUrl);
+        }
+
+        $response = response($body, $status);
+
+        foreach ($upstream->headers() as $header => $values) {
+            $headerName = (string) $header;
+            if (in_array(strtolower($headerName), ['content-length', 'transfer-encoding', 'content-encoding', 'set-cookie', 'x-frame-options'], true)) {
+                continue;
+            }
+
+            if (strtolower($headerName) === 'content-security-policy') {
+                continue;
+            }
+
+            foreach ((array) $values as $value) {
+                $response->headers->set($headerName, $value, false);
+            }
+        }
+
+        $setCookieHeaders = $upstream->headers()['Set-Cookie'] ?? [];
+        foreach ((array) $setCookieHeaders as $cookieLine) {
+            $response->headers->setCookie($this->rewriteAtlasWorkspaceCookie((string) $cookieLine, $request, $cookiePrefix));
+        }
+
+        return $response;
     }
 
     public function founderSearch(Request $request, FounderDashboardService $founderDashboardService)
@@ -1745,7 +1887,8 @@ class OsShellController extends Controller
 
     public function founderMediaLibrary(
         FounderDashboardService $founderDashboardService,
-        WebsiteWorkspaceService $websiteWorkspaceService
+        WebsiteWorkspaceService $websiteWorkspaceService,
+        AtlasWorkspaceService $atlasWorkspaceService
     ) {
         /** @var \App\Models\Founder $user */
         $user = Auth::user();
@@ -1754,12 +1897,14 @@ class OsShellController extends Controller
         }
 
         $dashboard = $founderDashboardService->build($user);
+        $atlasWorkspace = $atlasWorkspaceService->summary($user, $dashboard['atlas'] ?? []);
 
         return view('os.media-library', [
             'pageTitle' => 'Media Library',
             'dashboard' => $dashboard,
             'website' => $websiteWorkspaceService->build($user),
             'assets' => $this->buildFounderMediaAssets($user, $dashboard),
+            'atlasWorkspace' => $atlasWorkspace,
         ]);
     }
 
@@ -7268,6 +7413,130 @@ class OsShellController extends Controller
         return $targetUrl === $osBaseUrl || ($websiteRoot !== '' && $targetUrl === $osBaseUrl . '/' . $websiteRoot);
     }
 
+    private function atlasProxyQuery(Request $request, bool $excludeWorkspaceMeta = false): array
+    {
+        $query = $request->query();
+        if ($excludeWorkspaceMeta) {
+            unset($query['target'], $query['title']);
+        }
+
+        return $query;
+    }
+
+    private function rewriteAtlasHtmlForOs(string $html, string $atlasBaseUrl): string
+    {
+        $rewritten = $this->rewriteAtlasTextForOs($html, $atlasBaseUrl);
+        $prefix = '/ai-studio/proxy';
+
+        $rewritten = preg_replace('/\b(href|src|action)=([\"\'])\/(?!\/)/i', '$1=$2' . $prefix . '/', $rewritten) ?? $rewritten;
+        $rewritten = preg_replace('/url\(([\"\']?)\/(?!\/)/i', 'url($1' . $prefix . '/', $rewritten) ?? $rewritten;
+
+        return $rewritten;
+    }
+
+    private function rewriteAtlasTextForOs(string $content, string $atlasBaseUrl): string
+    {
+        $proxyBase = rtrim((string) config('app.url'), '/') . '/ai-studio/proxy';
+        $normalizedAtlasUrl = rtrim($atlasBaseUrl, '/');
+        $escapedAtlasUrl = str_replace('/', '\\/', $normalizedAtlasUrl);
+        $escapedProxyBase = str_replace('/', '\\/', $proxyBase);
+
+        $rewritten = str_replace(
+            [$normalizedAtlasUrl, $escapedAtlasUrl],
+            [$proxyBase, $escapedProxyBase],
+            $content
+        );
+
+        $patterns = [
+            '/([="\':(,\s])\/(?!\/)/' => '$1/ai-studio/proxy/',
+            '/(url\([\"\']?)\/(?!\/)/i' => '$1/ai-studio/proxy/',
+        ];
+
+        foreach ($patterns as $pattern => $replacement) {
+            $candidate = preg_replace($pattern, $replacement, $rewritten);
+            if (is_string($candidate)) {
+                $rewritten = $candidate;
+            }
+        }
+
+        return $rewritten;
+    }
+
+    private function rewriteAtlasUrlToOsPath(string $url, string $atlasBaseUrl): string
+    {
+        $rewritten = $this->rewriteAtlasTextForOs($url, $atlasBaseUrl);
+        $trimmed = trim($rewritten);
+
+        if (preg_match('/^https?:\/\//i', $trimmed)) {
+            return $trimmed;
+        }
+
+        if (str_starts_with($trimmed, '/')) {
+            return rtrim((string) config('app.url'), '/') . $trimmed;
+        }
+
+        return rtrim((string) config('app.url'), '/') . '/ai-studio/proxy/' . ltrim($trimmed, '/');
+    }
+
+    private function rewriteAtlasWorkspaceCookie(string $cookieLine, Request $request, string $cookiePrefix): Cookie
+    {
+        $parts = array_map('trim', explode(';', $cookieLine));
+        $nameValue = array_shift($parts) ?: '=';
+        [$name, $value] = array_pad(explode('=', $nameValue, 2), 2, '');
+        $name = $cookiePrefix . $name;
+
+        $expires = 0;
+        $path = '/ai-studio/proxy';
+        $secure = $request->isSecure();
+        $httpOnly = true;
+        $sameSite = null;
+
+        foreach ($parts as $part) {
+            [$attribute, $attributeValue] = array_pad(explode('=', $part, 2), 2, '');
+            $attribute = strtolower(trim($attribute));
+            $attributeValue = trim($attributeValue);
+
+            if ($attribute === 'expires' && $attributeValue !== '') {
+                $timestamp = strtotime($attributeValue);
+                if ($timestamp !== false) {
+                    $expires = $timestamp;
+                }
+            } elseif ($attribute === 'path' && $attributeValue !== '') {
+                $path = '/ai-studio/proxy';
+            } elseif ($attribute === 'secure') {
+                $secure = true;
+            } elseif ($attribute === 'httponly') {
+                $httpOnly = true;
+            } elseif ($attribute === 'samesite' && $attributeValue !== '') {
+                $sameSite = $attributeValue;
+            }
+        }
+
+        $minutes = $expires > 0 ? max(0, (int) ceil(($expires - time()) / 60)) : 0;
+
+        return Cookie::create($name, $value, $minutes, $path, null, $secure, $httpOnly, false, $sameSite);
+    }
+
+    private function upstreamWorkspaceCookieHeader(Request $request, string $cookiePrefix): string
+    {
+        $pairs = [];
+
+        foreach ($request->cookies->all() as $name => $value) {
+            if (!str_starts_with((string) $name, $cookiePrefix)) {
+                continue;
+            }
+
+            $upstreamName = substr((string) $name, strlen($cookiePrefix));
+            if ($upstreamName === '') {
+                continue;
+            }
+
+            $pairs[] = $upstreamName . '=' . rawurlencode((string) $value);
+        }
+
+        return implode('; ', $pairs);
+    }
+
     private function resolvePublicWebsiteOffer(array $site, string $type, string $title): ?array
     {
         return collect($site['offers'] ?? [])
@@ -7754,6 +8023,34 @@ class OsShellController extends Controller
             'servio' => 'Open Servio',
             default => 'Open Atlas',
         };
+    }
+
+    private function sanitizeAtlasWorkspaceTarget(string $target): string
+    {
+        $target = trim($target);
+        if ($target === '' || !str_starts_with($target, '/')) {
+            return '/dashboard';
+        }
+
+        foreach ([
+            '/dashboard',
+            '/company-intelligence',
+            '/ai-chat',
+            '/ai-chat-bots',
+            '/ai-images',
+            '/ai-images/campaign',
+            '/ai-images/campaign-detail',
+            '/ai-images/grid',
+            '/all-images',
+            '/all-documents',
+            '/document',
+        ] as $allowedPrefix) {
+            if (str_starts_with($target, $allowedPrefix)) {
+                return $target;
+            }
+        }
+
+        return '/dashboard';
     }
 
     private function moveCampaignInAtlasSnapshot(Founder $founder, string $title, string $fromKey, string $toKey): void

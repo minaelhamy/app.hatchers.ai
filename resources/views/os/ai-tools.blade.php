@@ -54,6 +54,11 @@
         $company = $dashboard['company'] ?? null;
         $primaryGoal = $dashboard['atlas']['primary_growth_goal'] ?? '';
         $recentCampaigns = $dashboard['atlas']['recent_campaigns'] ?? [];
+        $atlasWorkspace = $atlasWorkspace ?? [];
+        $atlasConversations = $atlasWorkspace['conversations'] ?? [];
+        $atlasRecentCampaigns = $atlasWorkspace['recent_campaigns'] ?? $recentCampaigns;
+        $atlasArchivedCampaigns = $atlasWorkspace['archived_campaigns'] ?? [];
+        $atlasMediaOutputs = $atlasWorkspace['media_outputs'] ?? [];
         $moduleCards = $dashboard['module_cards'] ?? [];
         $logoUrl = !empty($company?->company_logo_path) ? asset('storage/' . ltrim((string) $company->company_logo_path, '/')) : null;
     @endphp
@@ -111,7 +116,7 @@
                             <div class="tool-card-row">
                                 <div>
                                     <div class="tool-card-title">Campaign Studio</div>
-                                    <div class="tool-card-copy">Create campaigns, queue content, review drafts, and keep campaign history inside the OS.</div>
+                                    <div class="tool-card-copy">Browse the real Atlas campaign list, open campaign detail, and continue campaign work without leaving the OS shell.</div>
                                 </div>
                                 <div class="tool-card-icon">✦</div>
                             </div>
@@ -121,22 +126,101 @@
                             <div class="tool-card-row">
                                 <div>
                                     <div class="tool-card-title">AI Agents</div>
-                                    <div class="tool-card-copy">Use guided AI help for tasks, offers, messaging, website updates, and next-best actions.</div>
+                                    <div class="tool-card-copy">See real Atlas conversation threads, reopen any thread, and continue agent work inside Hatchers OS.</div>
                                 </div>
                                 <div class="tool-card-icon">◇</div>
                             </div>
-                            <a class="tool-card-secondary" href="/dashboard/founder">Open Founder Home</a>
+                            <a class="tool-card-secondary" href="{{ route('founder.ai-tools.open', ['target' => '/ai-chat', 'title' => 'Atlas Agents']) }}">Open Atlas Agents</a>
                         </div>
                         <div class="tool-card">
                             <div class="tool-card-row">
                                 <div>
                                     <div class="tool-card-title">Media Library</div>
-                                    <div class="tool-card-copy">Review generated campaign assets, drafts, and website visuals in one shared OS library.</div>
+                                    <div class="tool-card-copy">Review generated Atlas media outputs and documents alongside OS-managed assets.</div>
                                 </div>
                                 <div class="tool-card-icon">▥</div>
                             </div>
                             <a class="tool-card-secondary" href="{{ route('founder.media-library') }}">Open Media Library</a>
                         </div>
+                    </div>
+                </section>
+
+                <section class="tools-section">
+                    <h2>Atlas Conversations</h2>
+                    <div class="tools-grid">
+                        @forelse (array_slice($atlasConversations, 0, 6) as $conversation)
+                            @php
+                                $conversationId = (string) ($conversation['id'] ?? '');
+                                $chatTarget = '/ai-chat';
+                                if ($conversationId !== '' && $conversationId !== 'default') {
+                                    $chatTarget = '/ai-chat';
+                                }
+                            @endphp
+                            <div class="tool-card">
+                                <div class="tool-card-title">{{ $conversation['title'] ?? 'Conversation' }}</div>
+                                <div class="tool-card-copy">{{ $conversation['last_message'] ?? 'Continue this Atlas thread from inside the OS.' }}</div>
+                                <div class="highlight-badge">{{ !empty($conversation['updated_at']) ? \Illuminate\Support\Carbon::parse($conversation['updated_at'])->diffForHumans() : 'Updated recently' }}</div>
+                                <a class="tool-card-cta" href="{{ route('founder.ai-tools.open', ['target' => $chatTarget, 'title' => 'Atlas Agents']) }}">Continue conversation</a>
+                            </div>
+                        @empty
+                            <div class="tool-card">
+                                <div class="tool-card-title">No Atlas conversations yet</div>
+                                <div class="tool-card-copy">Start your first agent thread and it will appear here for quick continuation inside the OS.</div>
+                                <a class="tool-card-cta" href="{{ route('founder.ai-tools.open', ['target' => '/ai-chat', 'title' => 'Atlas Agents']) }}">Start Atlas chat</a>
+                            </div>
+                        @endforelse
+                    </div>
+                </section>
+
+                <section class="tools-section">
+                    <h2>Atlas Campaigns</h2>
+                    <div class="tools-grid">
+                        @forelse (array_slice($atlasRecentCampaigns, 0, 6) as $campaign)
+                            @php
+                                $targetPath = (string) ($campaign['target_path'] ?? '/ai-images/campaign');
+                            @endphp
+                            <div class="tool-card">
+                                <div class="tool-card-title">{{ $campaign['title'] ?? 'Campaign' }}</div>
+                                <div class="tool-card-copy">{{ $campaign['description'] ?? 'Open this campaign in Atlas Campaign Studio.' }}</div>
+                                <div class="highlight-badge">{{ (int) ($campaign['generated_posts_count'] ?? 0) }} linked posts</div>
+                                <a class="tool-card-cta" href="{{ route('founder.ai-tools.open', ['target' => $targetPath, 'title' => 'Campaign Studio']) }}">Open campaign</a>
+                            </div>
+                        @empty
+                            <div class="tool-card">
+                                <div class="tool-card-title">No campaigns yet</div>
+                                <div class="tool-card-copy">Create your first Atlas campaign and it will show up here with a direct OS launch back into the real workspace.</div>
+                                <a class="tool-card-cta" href="{{ route('founder.ai-tools.open', ['target' => '/ai-images/campaign', 'title' => 'Campaign Studio']) }}">Open Campaign Studio</a>
+                            </div>
+                        @endforelse
+                    </div>
+                </section>
+
+                <section class="tools-section">
+                    <h2>Atlas Media Outputs</h2>
+                    <div class="tools-grid">
+                        @forelse (array_slice($atlasMediaOutputs, 0, 4) as $asset)
+                            <div class="tool-card">
+                                <div class="tool-card-row">
+                                    <div>
+                                        <div class="tool-card-title">{{ $asset['title'] ?? 'Media output' }}</div>
+                                        <div class="tool-card-copy">{{ ucfirst($asset['post_type'] ?? 'post') }}{{ !empty($asset['campaign_title']) ? ' for ' . $asset['campaign_title'] : '' }}</div>
+                                    </div>
+                                    <div class="tool-card-icon">▥</div>
+                                </div>
+                                @if (!empty($asset['preview_image']))
+                                    <div style="margin-top:12px;">
+                                        <img src="{{ $asset['preview_image'] }}" alt="{{ $asset['title'] ?? 'Media output' }}" style="width:100%;max-height:180px;object-fit:cover;border-radius:14px;border:1px solid var(--line);display:block;">
+                                    </div>
+                                @endif
+                                <a class="tool-card-secondary" href="{{ route('founder.media-library') }}">Review in Media Library</a>
+                            </div>
+                        @empty
+                            <div class="tool-card">
+                                <div class="tool-card-title">No generated media yet</div>
+                                <div class="tool-card-copy">Atlas image and campaign outputs will appear here as soon as you generate them.</div>
+                                <a class="tool-card-secondary" href="{{ route('founder.ai-tools.open', ['target' => '/all-images', 'title' => 'Atlas Media']) }}">Open Atlas media</a>
+                            </div>
+                        @endforelse
                     </div>
                 </section>
 
@@ -203,7 +287,7 @@
             <div class="tools-rightbar-inner">
                 <h3>Recent Campaigns</h3>
                 <div class="rail-list">
-                    @forelse (array_slice($recentCampaigns, 0, 3) as $campaign)
+                    @forelse (array_slice($atlasRecentCampaigns, 0, 3) as $campaign)
                         <div class="rail-item">
                             <div style="font-weight:600;">{{ $campaign['title'] ?? 'Campaign' }}</div>
                             <div style="margin-top:4px;color:var(--muted);">{{ $campaign['description'] ?? 'Saved in Campaign Studio.' }}</div>
@@ -216,8 +300,23 @@
                     @endforelse
                 </div>
 
+                <h3 style="margin-top:22px;">Archived Campaigns</h3>
+                <div class="rail-list">
+                    @forelse (array_slice($atlasArchivedCampaigns, 0, 2) as $campaign)
+                        <div class="rail-item">
+                            <div style="font-weight:600;">{{ $campaign['title'] ?? 'Campaign' }}</div>
+                            <div style="margin-top:4px;color:var(--muted);">{{ (int) ($campaign['generated_posts_count'] ?? 0) }} linked posts</div>
+                        </div>
+                    @empty
+                        <div class="rail-item">
+                            <div style="font-weight:600;">No archived campaigns</div>
+                            <div style="margin-top:4px;color:var(--muted);">Archived Atlas campaigns will surface here when you start cycling through campaigns.</div>
+                        </div>
+                    @endforelse
+                </div>
+
                 <h3 style="margin-top:22px;">Use This Page For</h3>
-                <div class="mini-note">Start here when you need brand context, campaign generation, AI assistance, or generated media. This should feel like one OS-native control center.</div>
+                <div class="mini-note">Start here when you need brand context, Atlas campaign history, chat continuation, or generated media. This page is now the OS-native launch surface for real Atlas work.</div>
             </div>
         </aside>
     </div>

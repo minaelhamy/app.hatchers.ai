@@ -54,6 +54,10 @@ Route::middleware('auth')->group(function () {
     Route::get('/tasks', [OsShellController::class, 'founderTasks'])->name('founder.tasks');
     Route::post('/tasks/{actionPlan}/status', [OsShellController::class, 'founderUpdateTaskStatus'])->name('founder.tasks.status');
     Route::get('/legacy-tools', [OsShellController::class, 'founderLegacyTools'])->name('founder.legacy-tools');
+    Route::get('/ai-studio/open', [OsShellController::class, 'founderAtlasWorkspace'])->name('founder.ai-tools.open');
+    Route::match(['GET', 'POST'], '/ai-studio/proxy/{proxyPath?}', [OsShellController::class, 'founderAtlasWorkspaceProxy'])
+        ->where('proxyPath', '.*')
+        ->name('founder.ai-tools.proxy');
     Route::get('/commerce', [OsShellController::class, 'founderCommerce'])->name('founder.commerce');
     Route::get('/commerce/wallet', [OsShellController::class, 'founderWallet'])->name('founder.commerce.wallet');
     Route::get('/commerce/wallet/export', [OsShellController::class, 'founderWalletExport'])->name('founder.commerce.wallet.export');

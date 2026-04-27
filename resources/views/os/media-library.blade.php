@@ -36,6 +36,9 @@
     @php
         $founder = $dashboard['founder'];
         $allThemes = collect($website['theme_options'] ?? [])->flatten(1)->values()->all();
+        $atlasWorkspace = $atlasWorkspace ?? [];
+        $atlasMediaOutputs = $atlasWorkspace['media_outputs'] ?? [];
+        $atlasDocuments = $atlasWorkspace['documents'] ?? [];
     @endphp
 
     <div class="media-shell">
@@ -58,11 +61,56 @@
         <main class="media-main">
             <div class="media-main-inner">
                 <h1>Media Library</h1>
-                <p>Review the images, campaign drafts, and website assets your business is generating inside Hatchers OS.</p>
+                <p>Review Atlas-generated images, campaign outputs, documents, and website visuals from one OS-native library.</p>
 
                 <section class="media-grid">
                     <div class="media-card">
-                        <h2>Asset Feed</h2>
+                        <h2>Atlas Media Outputs</h2>
+                        <div class="stack" style="margin-top:14px;">
+                            @forelse ($atlasMediaOutputs as $asset)
+                                <div class="stack-item">
+                                    <div class="pill">{{ ucfirst($asset['post_type'] ?? 'post') }}</div>
+                                    <strong style="display:block;margin-top:10px;">{{ $asset['title'] ?? 'Media output' }}</strong>
+                                    @if (!empty($asset['preview_image']))
+                                        <div style="margin-top:10px;">
+                                            <img src="{{ $asset['preview_image'] }}" alt="{{ $asset['title'] ?? 'Media output' }}" style="width:100%;max-height:180px;object-fit:cover;border-radius:14px;border:1px solid var(--line);display:block;">
+                                        </div>
+                                    @endif
+                                    <div class="muted" style="margin-top:6px;">{{ !empty($asset['campaign_title']) ? 'Campaign: ' . $asset['campaign_title'] : 'Saved from Atlas media generation.' }}</div>
+                                    <a href="{{ route('founder.ai-tools.open', ['target' => $asset['target_path'] ?? '/all-images', 'title' => 'Atlas Media']) }}" style="display:inline-block;margin-top:10px;">Open in Atlas</a>
+                                </div>
+                            @empty
+                                <div class="stack-item">
+                                    <strong>No Atlas media yet</strong><br>
+                                    <span class="muted">As you generate images and campaign outputs in Atlas, they will appear here inside the OS.</span>
+                                </div>
+                            @endforelse
+                        </div>
+                    </div>
+
+                    <div class="media-card">
+                        <h2>Atlas Documents</h2>
+                        <div class="stack" style="margin-top:14px;">
+                            @forelse ($atlasDocuments as $document)
+                                <div class="stack-item">
+                                    <strong>{{ $document['title'] ?? 'Document' }}</strong><br>
+                                    <span class="muted">{{ $document['content'] ?? 'Saved Atlas document.' }}</span>
+                                    <div class="muted" style="margin-top:6px;">Template: {{ $document['template'] ?? 'Atlas' }}</div>
+                                    <a href="{{ route('founder.ai-tools.open', ['target' => $document['target_path'] ?? '/all-documents', 'title' => 'Atlas Documents']) }}" style="display:inline-block;margin-top:10px;">Open document</a>
+                                </div>
+                            @empty
+                                <div class="stack-item">
+                                    <strong>No Atlas documents yet</strong><br>
+                                    <span class="muted">Atlas documents, drafts, and generated writing outputs will appear here as you create them.</span>
+                                </div>
+                            @endforelse
+                        </div>
+                    </div>
+                </section>
+
+                <section class="media-grid" style="margin-top:12px;">
+                    <div class="media-card">
+                        <h2>OS Asset Feed</h2>
                         <div class="stack" style="margin-top:14px;">
                             @forelse ($assets as $asset)
                                 <div class="stack-item">
@@ -73,8 +121,8 @@
                                 </div>
                             @empty
                                 <div class="stack-item">
-                                    <strong>No assets yet</strong><br>
-                                    <span class="muted">As you generate campaigns, content drafts, and offers in the OS, they will appear here.</span>
+                                    <strong>No OS assets yet</strong><br>
+                                    <span class="muted">As you generate campaigns, drafts, and offers in OS, they will also appear here.</span>
                                 </div>
                             @endforelse
                         </div>
@@ -104,7 +152,7 @@
             <div class="media-rightbar-inner">
                 <h3>OS Direction</h3>
                 <div class="rail-list">
-                    <div class="mini-note">This library is where campaign media, generated drafts, offer assets, and website visuals come together in one OS-native workspace.</div>
+                    <div class="mini-note">This library now mixes real Atlas outputs with OS-managed assets so founders can review generated images, campaign files, documents, and website visuals in one place.</div>
                 </div>
             </div>
         </aside>

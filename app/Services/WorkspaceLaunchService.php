@@ -8,6 +8,11 @@ class WorkspaceLaunchService
 {
     public function buildLaunchUrl(Founder $user, string $module): ?string
     {
+        return $this->buildLaunchUrlForTarget($user, $module, $this->targetFor($user, $module));
+    }
+
+    public function buildLaunchUrlForTarget(Founder $user, string $module, string $target): ?string
+    {
         $module = strtolower(trim($module));
         if (!in_array($module, ['lms', 'atlas', 'bazaar', 'servio'], true)) {
             return null;
@@ -23,7 +28,7 @@ class WorkspaceLaunchService
             'username' => (string) $user->username,
             'email' => (string) $user->email,
             'role' => (string) $user->role,
-            'target' => $this->targetFor($user, $module),
+            'target' => $target,
             'expires' => (string) (time() + 300),
         ];
 
