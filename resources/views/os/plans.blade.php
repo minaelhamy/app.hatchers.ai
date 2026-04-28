@@ -36,17 +36,17 @@
         .plans-wrap {
             position: relative;
             z-index: 1;
-            width: min(100%, 1040px);
+            width: min(100%, 980px);
             display: grid;
-            gap: 24px;
+            gap: 20px;
             justify-items: center;
             text-align: center;
         }
 
         .plans-mark {
-            width: 94px;
-            height: 94px;
-            border-radius: 28px;
+            width: 82px;
+            height: 82px;
+            border-radius: 24px;
             background: linear-gradient(145deg, #ec2d70, #f24c44);
             box-shadow:
                 0 22px 48px rgba(225, 29, 116, 0.2),
@@ -54,16 +54,16 @@
         }
 
         .plans-brand {
-            font-size: 2rem;
-            letter-spacing: 0.18em;
+            font-size: 1.55rem;
+            letter-spacing: 0.16em;
             text-transform: uppercase;
             color: rgba(131, 111, 100, 0.72);
         }
 
         .plans-card {
             width: 100%;
-            padding: 30px;
-            border-radius: 30px;
+            padding: 24px;
+            border-radius: 24px;
             border: 1px solid rgba(214, 201, 184, 0.84);
             background:
                 radial-gradient(circle at 78% 18%, rgba(234, 197, 201, 0.14), transparent 0 18%),
@@ -79,9 +79,9 @@
             display: inline-flex;
             align-items: center;
             gap: 8px;
-            margin-bottom: 12px;
-            font-size: 0.72rem;
-            letter-spacing: 0.16em;
+            margin-bottom: 10px;
+            font-size: 0.66rem;
+            letter-spacing: 0.14em;
             text-transform: uppercase;
             color: rgba(116, 97, 86, 0.72);
         }
@@ -97,17 +97,18 @@
         .plans-title {
             margin: 0 0 12px;
             font-family: "Inter Tight", "Inter", sans-serif;
-            font-size: clamp(2.4rem, 5vw, 4.1rem);
-            line-height: 0.96;
-            letter-spacing: -0.06em;
+            font-size: clamp(1.95rem, 4.2vw, 2.95rem);
+            line-height: 0.98;
+            letter-spacing: -0.05em;
             color: #171310;
         }
 
         .plans-copy {
             margin: 0;
             color: rgba(92, 76, 67, 0.84);
-            line-height: 1.6;
-            max-width: 760px;
+            line-height: 1.52;
+            font-size: 0.93rem;
+            max-width: 700px;
         }
 
         .plans-test-pill {
@@ -120,7 +121,7 @@
             border: 1px solid rgba(223, 210, 197, 0.92);
             background: rgba(255,255,255,0.74);
             color: rgba(90, 72, 62, 0.88);
-            font-size: 0.84rem;
+            font-size: 0.78rem;
             font-weight: 600;
         }
 
@@ -145,15 +146,15 @@
         .plans-grid {
             display: grid;
             grid-template-columns: repeat(3, minmax(0, 1fr));
-            gap: 18px;
-            margin-top: 24px;
+            gap: 16px;
+            margin-top: 20px;
         }
 
         .plan-card {
             display: grid;
-            gap: 16px;
-            padding: 22px;
-            border-radius: 24px;
+            gap: 14px;
+            padding: 18px;
+            border-radius: 20px;
             border: 1px solid rgba(223, 211, 198, 0.9);
             background: rgba(255, 252, 248, 0.72);
             box-shadow: inset 0 1px 0 rgba(255,255,255,0.82);
@@ -171,18 +172,18 @@
         .plan-pill {
             display: inline-flex;
             width: fit-content;
-            padding: 8px 12px;
+            padding: 7px 11px;
             border-radius: 999px;
             border: 1px solid rgba(221, 208, 194, 0.94);
             background: rgba(244, 238, 229, 0.9);
-            font-size: 0.82rem;
+            font-size: 0.76rem;
             color: rgba(98, 83, 73, 0.86);
         }
 
         .plan-card h2 {
             margin: 0;
             font-family: "Inter Tight", "Inter", sans-serif;
-            font-size: 1.55rem;
+            font-size: 1.32rem;
             line-height: 1.02;
             letter-spacing: -0.04em;
             color: #171310;
@@ -190,7 +191,7 @@
 
         .plan-price {
             font-family: "Inter Tight", "Inter", sans-serif;
-            font-size: 2.45rem;
+            font-size: 2rem;
             font-weight: 700;
             letter-spacing: -0.06em;
             color: #171310;
@@ -198,14 +199,15 @@
 
         .plan-price span {
             margin-left: 4px;
-            font-size: 0.98rem;
+            font-size: 0.9rem;
             font-weight: 500;
             color: rgba(103, 87, 77, 0.9);
         }
 
         .plan-description {
             color: rgba(92, 76, 67, 0.84);
-            line-height: 1.58;
+            line-height: 1.48;
+            font-size: 0.9rem;
         }
 
         .plan-features {
@@ -220,7 +222,8 @@
             position: relative;
             padding-left: 18px;
             color: rgba(85, 70, 61, 0.88);
-            line-height: 1.5;
+            line-height: 1.42;
+            font-size: 0.88rem;
         }
 
         .plan-features li::before {
@@ -239,10 +242,11 @@
             width: 100%;
             text-align: center;
             text-decoration: none;
-            padding: 14px 18px;
+            padding: 12px 16px;
             border-radius: 999px;
             background: linear-gradient(180deg, #181310, #2b221d);
             color: #fff;
+            font-size: 0.9rem;
             font-weight: 700;
             box-shadow: 0 14px 28px rgba(33, 25, 20, 0.15);
         }

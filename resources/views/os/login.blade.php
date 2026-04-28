@@ -36,17 +36,17 @@
         .entry-wrap {
             position: relative;
             z-index: 1;
-            width: min(100%, 520px);
+            width: min(100%, 460px);
             display: grid;
-            gap: 22px;
+            gap: 18px;
             justify-items: center;
             text-align: center;
         }
 
         .entry-mark {
-            width: 94px;
-            height: 94px;
-            border-radius: 28px;
+            width: 82px;
+            height: 82px;
+            border-radius: 24px;
             background: linear-gradient(145deg, #ec2d70, #f24c44);
             box-shadow:
                 0 22px 48px rgba(225, 29, 116, 0.2),
@@ -55,22 +55,22 @@
 
         .entry-brand {
             margin-top: -6px;
-            font-size: 2rem;
-            letter-spacing: 0.18em;
+            font-size: 1.55rem;
+            letter-spacing: 0.16em;
             text-transform: uppercase;
             color: rgba(131, 111, 100, 0.72);
         }
 
         .entry-copy {
             color: rgba(116, 96, 86, 0.82);
-            font-size: 1rem;
-            line-height: 1.55;
+            font-size: 0.92rem;
+            line-height: 1.5;
         }
 
         .entry-card {
             width: 100%;
-            padding: 28px;
-            border-radius: 28px;
+            padding: 24px;
+            border-radius: 24px;
             border: 1px solid rgba(214, 201, 184, 0.84);
             background:
                 radial-gradient(circle at 78% 18%, rgba(234, 197, 201, 0.14), transparent 0 18%),
@@ -86,9 +86,9 @@
             display: inline-flex;
             align-items: center;
             gap: 8px;
-            margin-bottom: 12px;
-            font-size: 0.72rem;
-            letter-spacing: 0.16em;
+            margin-bottom: 10px;
+            font-size: 0.66rem;
+            letter-spacing: 0.14em;
             text-transform: uppercase;
             color: rgba(116, 97, 86, 0.72);
         }
@@ -104,16 +104,17 @@
         .entry-title {
             margin: 0 0 10px;
             font-family: "Inter Tight", "Inter", sans-serif;
-            font-size: clamp(2.4rem, 5vw, 3.6rem);
-            line-height: 0.96;
-            letter-spacing: -0.06em;
+            font-size: clamp(1.85rem, 4vw, 2.5rem);
+            line-height: 0.98;
+            letter-spacing: -0.05em;
             color: #171310;
         }
 
         .entry-subcopy {
-            margin: 0 0 20px;
+            margin: 0 0 16px;
             color: rgba(92, 76, 67, 0.84);
-            line-height: 1.6;
+            line-height: 1.5;
+            font-size: 0.92rem;
         }
 
         .entry-alert {
@@ -127,20 +128,20 @@
 
         .entry-field-grid {
             display: grid;
-            gap: 14px;
+            gap: 12px;
         }
 
         .entry-field-label {
             display: block;
             margin-bottom: 7px;
-            font-size: 0.9rem;
+            font-size: 0.84rem;
             color: rgba(96, 81, 73, 0.86);
         }
 
         .entry-input {
             width: 100%;
-            padding: 14px 16px;
-            border-radius: 16px;
+            padding: 13px 15px;
+            border-radius: 14px;
             border: 1px solid rgba(220, 207, 191, 0.94);
             background: rgba(255, 255, 255, 0.9);
             box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78);
@@ -157,21 +158,22 @@
         .entry-submit {
             width: 100%;
             margin-top: 6px;
-            padding: 15px 18px;
+            padding: 13px 18px;
             border: 0;
             border-radius: 999px;
             background: linear-gradient(180deg, #181310, #2b221d);
             color: #fff;
             font: inherit;
+            font-size: 0.92rem;
             font-weight: 700;
             cursor: pointer;
             box-shadow: 0 14px 28px rgba(33, 25, 20, 0.15);
         }
 
         .entry-footnote {
-            margin-top: 18px;
+            margin-top: 16px;
             color: rgba(105, 89, 79, 0.78);
-            font-size: 0.96rem;
+            font-size: 0.88rem;
             text-align: center;
         }
 

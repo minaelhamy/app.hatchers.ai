@@ -294,8 +294,8 @@
             position: fixed;
             top: 106px;
             right: 48px;
-            width: 430px;
-            height: min(760px, calc(100vh - 170px));
+            width: 400px;
+            height: min(700px, calc(100vh - 180px));
             z-index: 44;
             display: grid;
             grid-template-rows: auto minmax(0, 1fr);
@@ -326,29 +326,30 @@
         }
 
         .assistant-window .os-app-window-title {
-            font-size: 0.88rem;
-            letter-spacing: 0.12em;
+            font-size: 0.82rem;
+            letter-spacing: 0.1em;
             text-transform: uppercase;
             color: rgba(103, 87, 76, 0.72);
         }
 
         .assistant-window-body {
             display: grid;
-            grid-template-rows: auto auto auto minmax(0, 1fr) auto;
-            gap: 12px;
-            padding: 14px;
+            grid-template-rows: auto auto minmax(0, 1fr) auto;
+            gap: 10px;
+            padding: 12px;
             min-height: 0;
             background:
                 radial-gradient(circle at 100% 0%, rgba(233, 191, 201, 0.12), transparent 0 26%),
                 linear-gradient(180deg, rgba(255, 252, 248, 0.98), rgba(250, 246, 240, 0.96));
+            overflow: hidden;
         }
 
         .assistant-toolbar,
         .assistant-plan,
         .assistant-prompts,
         .assistant-composer {
-            padding: 12px 14px;
-            border-radius: 22px;
+            padding: 10px 12px;
+            border-radius: 20px;
             border: 1px solid rgba(227, 216, 203, 0.95);
             background: rgba(255, 255, 255, 0.68);
             box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.84);
@@ -357,7 +358,7 @@
         .assistant-toolbar {
             display: grid;
             grid-template-columns: minmax(0, 1fr) auto auto;
-            gap: 8px;
+            gap: 6px;
             align-items: center;
         }
 
@@ -368,9 +369,9 @@
             background: rgba(255, 253, 249, 0.92);
             color: #241c18;
             border-radius: 999px;
-            padding: 9px 12px;
+            padding: 8px 12px;
             font: inherit;
-            font-size: 0.84rem;
+            font-size: 0.8rem;
         }
 
         .assistant-toolbar-button,
@@ -381,27 +382,27 @@
             background: rgba(255, 253, 249, 0.92);
             color: rgba(94, 77, 67, 0.92);
             border-radius: 999px;
-            padding: 8px 12px;
+            padding: 7px 11px;
             font: inherit;
-            font-size: 0.8rem;
+            font-size: 0.76rem;
             font-weight: 700;
             cursor: pointer;
         }
 
         .assistant-plan {
             display: grid;
-            gap: 8px;
+            gap: 6px;
         }
 
         .assistant-plan-title {
-            font-size: 0.72rem;
+            font-size: 0.68rem;
             letter-spacing: 0.14em;
             text-transform: uppercase;
             color: rgba(123, 107, 95, 0.72);
         }
 
         .assistant-plan-name {
-            font-size: 0.98rem;
+            font-size: 0.92rem;
             font-weight: 700;
             color: #2b231d;
         }
@@ -410,9 +411,10 @@
             margin: 0;
             padding-left: 18px;
             display: grid;
-            gap: 6px;
+            gap: 4px;
             color: rgba(77, 64, 56, 0.88);
-            line-height: 1.45;
+            line-height: 1.38;
+            font-size: 0.82rem;
         }
 
         .assistant-plan-actions {
@@ -430,11 +432,11 @@
             align-items: center;
             justify-content: space-between;
             gap: 10px;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
         }
 
         .assistant-prompts-title {
-            font-size: 0.72rem;
+            font-size: 0.68rem;
             letter-spacing: 0.14em;
             text-transform: uppercase;
             color: rgba(123, 107, 95, 0.72);
@@ -442,8 +444,8 @@
 
         .assistant-prompt-list {
             display: grid;
-            gap: 8px;
-            max-height: 168px;
+            gap: 6px;
+            max-height: 132px;
             overflow-y: auto;
             padding-right: 4px;
         }
@@ -453,9 +455,9 @@
             background: rgba(255, 253, 249, 0.9);
             color: #2a231e;
             border-radius: 999px;
-            padding: 9px 12px;
+            padding: 8px 11px;
             font: inherit;
-            font-size: 0.82rem;
+            font-size: 0.78rem;
             cursor: pointer;
             box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.74);
             transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
@@ -469,7 +471,7 @@
         .assistant-feed-shell {
             min-height: 0;
             display: grid;
-            border-radius: 24px;
+            border-radius: 22px;
             border: 1px solid rgba(227, 216, 203, 0.95);
             background: linear-gradient(180deg, rgba(255,255,255,0.86), rgba(255,252,248,0.92));
             box-shadow:
@@ -480,20 +482,20 @@
 
         .assistant-feed {
             display: grid;
-            gap: 12px;
+            gap: 10px;
             min-height: 0;
             overflow-y: auto;
-            padding: 14px 12px 12px;
+            padding: 12px 10px 10px;
             align-content: start;
             overscroll-behavior: contain;
         }
 
         .assistant-bubble {
             max-width: 90%;
-            border-radius: 24px;
-            padding: 14px 16px;
-            font-size: 0.94rem;
-            line-height: 1.58;
+            border-radius: 20px;
+            padding: 12px 14px;
+            font-size: 0.84rem;
+            line-height: 1.48;
             border: 1px solid rgba(223, 211, 198, 0.88);
             box-shadow:
                 0 10px 20px rgba(79, 60, 39, 0.04),
@@ -515,8 +517,8 @@
 
         .assistant-bubble-title {
             display: block;
-            margin-bottom: 6px;
-            font-size: 0.74rem;
+            margin-bottom: 5px;
+            font-size: 0.68rem;
             letter-spacing: 0.12em;
             text-transform: uppercase;
             color: rgba(123, 107, 95, 0.72);
@@ -528,7 +530,7 @@
 
         .assistant-bubble-content {
             display: grid;
-            gap: 10px;
+            gap: 8px;
         }
 
         .assistant-bubble-content > * {
@@ -537,7 +539,7 @@
 
         .assistant-bubble-content p {
             color: inherit;
-            line-height: 1.62;
+            line-height: 1.5;
         }
 
         .assistant-bubble-content strong {
@@ -549,11 +551,11 @@
             margin: 0;
             padding-left: 18px;
             display: grid;
-            gap: 7px;
+            gap: 5px;
         }
 
         .assistant-bubble-content li {
-            line-height: 1.55;
+            line-height: 1.45;
         }
 
         .assistant-bubble.atlas .assistant-bubble-content ul li::marker,
@@ -562,7 +564,7 @@
         }
 
         .assistant-section-title {
-            font-size: 0.76rem;
+            font-size: 0.7rem;
             letter-spacing: 0.12em;
             text-transform: uppercase;
             color: rgba(123, 107, 95, 0.72);
@@ -575,7 +577,7 @@
 
         .assistant-form {
             display: grid;
-            gap: 10px;
+            gap: 8px;
         }
 
         .assistant-composer {
@@ -585,16 +587,17 @@
 
         .assistant-textarea {
             width: 100%;
-            min-height: 84px;
-            max-height: 180px;
+            min-height: 72px;
+            max-height: 150px;
             resize: none;
-            border-radius: 22px;
+            border-radius: 18px;
             border: 1px solid rgba(220, 207, 191, 0.9);
             background: rgba(255, 255, 255, 0.88);
             color: #1b1714;
-            padding: 15px 16px;
+            padding: 13px 14px;
             font: inherit;
-            line-height: 1.5;
+            font-size: 0.84rem;
+            line-height: 1.45;
             box-shadow: inset 0 1px 0 rgba(255,255,255,0.76);
         }
 
@@ -610,7 +613,7 @@
         }
 
         .assistant-status {
-            font-size: 0.8rem;
+            font-size: 0.74rem;
             color: rgba(114, 96, 84, 0.72);
             line-height: 1.4;
         }
@@ -618,11 +621,12 @@
         .assistant-send {
             border: 0;
             border-radius: 999px;
-            padding: 12px 18px;
-            min-width: 110px;
+            padding: 11px 16px;
+            min-width: 92px;
             background: linear-gradient(180deg, #181310, #2b221d);
             color: #fff;
             font-weight: 700;
+            font-size: 0.8rem;
             cursor: pointer;
             box-shadow: 0 12px 28px rgba(35, 28, 23, 0.16);
         }
@@ -714,9 +718,9 @@
             .assistant-window {
                 position: static;
                 width: auto;
-                height: auto;
+                height: min(78vh, 680px);
                 margin-top: 22px;
-                min-height: auto;
+                min-height: 520px;
             }
 
             .assistant-window.is-maximized {
@@ -1386,9 +1390,9 @@
             <div class="os-app-window is-active">
                 <div class="os-app-window-bar" data-assistant-drag-handle>
                     <div class="os-app-window-dots">
-                        <button type="button" class="os-dot os-dot-close" data-assistant-close aria-label="Close Atlas"></button>
-                        <button type="button" class="os-dot os-dot-minimize" data-assistant-minimize aria-label="Minimize Atlas"></button>
-                        <button type="button" class="os-dot os-dot-expand" data-assistant-maximize aria-label="Maximize Atlas"></button>
+                        <button type="button" class="os-app-window-dot close" data-assistant-close aria-label="Close Atlas"></button>
+                        <button type="button" class="os-app-window-dot minimize" data-assistant-minimize aria-label="Minimize Atlas"></button>
+                        <button type="button" class="os-app-window-dot maximize" data-assistant-maximize aria-label="Maximize Atlas"></button>
                     </div>
                     <div class="os-app-window-title" data-assistant-thread-label>{{ $assistantSummary['label'] }}</div>
                     <div style="width: 58px;"></div>

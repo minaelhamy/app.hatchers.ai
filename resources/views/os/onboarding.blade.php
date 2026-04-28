@@ -36,9 +36,9 @@
         .signup-wrap {
             position: relative;
             z-index: 1;
-            width: min(100%, 980px);
+            width: min(100%, 920px);
             display: grid;
-            gap: 22px;
+            gap: 18px;
             justify-items: center;
             text-align: center;
             opacity: 1;
@@ -58,9 +58,9 @@
         }
 
         .signup-mark {
-            width: 94px;
-            height: 94px;
-            border-radius: 28px;
+            width: 82px;
+            height: 82px;
+            border-radius: 24px;
             background: linear-gradient(145deg, #ec2d70, #f24c44);
             box-shadow:
                 0 22px 48px rgba(225, 29, 116, 0.2),
@@ -69,22 +69,22 @@
 
         .signup-brand {
             margin-top: -6px;
-            font-size: 2rem;
-            letter-spacing: 0.18em;
+            font-size: 1.55rem;
+            letter-spacing: 0.16em;
             text-transform: uppercase;
             color: rgba(131, 111, 100, 0.72);
         }
 
         .signup-copy {
             color: rgba(116, 96, 86, 0.82);
-            font-size: 1rem;
-            line-height: 1.55;
+            font-size: 0.92rem;
+            line-height: 1.5;
         }
 
         .signup-card {
             width: 100%;
-            padding: 30px;
-            border-radius: 30px;
+            padding: 24px;
+            border-radius: 24px;
             border: 1px solid rgba(214, 201, 184, 0.84);
             background:
                 radial-gradient(circle at 78% 18%, rgba(234, 197, 201, 0.14), transparent 0 18%),
@@ -100,9 +100,9 @@
             display: inline-flex;
             align-items: center;
             gap: 8px;
-            margin-bottom: 12px;
-            font-size: 0.72rem;
-            letter-spacing: 0.16em;
+            margin-bottom: 10px;
+            font-size: 0.66rem;
+            letter-spacing: 0.14em;
             text-transform: uppercase;
             color: rgba(116, 97, 86, 0.72);
         }
@@ -117,23 +117,24 @@
 
         .signup-header {
             display: grid;
-            gap: 14px;
-            margin-bottom: 24px;
+            gap: 12px;
+            margin-bottom: 20px;
         }
 
         .signup-title {
             margin: 0;
             font-family: "Inter Tight", "Inter", sans-serif;
-            font-size: clamp(2.4rem, 5vw, 3.8rem);
-            line-height: 0.96;
-            letter-spacing: -0.06em;
+            font-size: clamp(1.95rem, 4vw, 2.8rem);
+            line-height: 0.98;
+            letter-spacing: -0.05em;
             color: #171310;
         }
 
         .signup-subcopy {
             margin: 0;
             color: rgba(92, 76, 67, 0.84);
-            line-height: 1.6;
+            line-height: 1.5;
+            font-size: 0.92rem;
             max-width: 720px;
         }
 
@@ -151,12 +152,12 @@
             align-items: center;
             gap: 8px;
             width: fit-content;
-            padding: 10px 14px;
+            padding: 9px 13px;
             border-radius: 999px;
             border: 1px solid rgba(223, 210, 197, 0.92);
             background: rgba(255,255,255,0.74);
             color: rgba(90, 72, 62, 0.88);
-            font-size: 0.84rem;
+            font-size: 0.78rem;
             font-weight: 600;
         }
 
@@ -174,8 +175,8 @@
             align-items: center;
             justify-content: space-between;
             gap: 16px;
-            padding: 16px 18px;
-            border-radius: 20px;
+            padding: 14px 16px;
+            border-radius: 18px;
             border: 1px solid rgba(223, 210, 197, 0.92);
             background: rgba(255,255,255,0.66);
             box-shadow: inset 0 1px 0 rgba(255,255,255,0.8);
@@ -194,7 +195,7 @@
 
         .signup-entry-banner span {
             color: rgba(96, 81, 73, 0.84);
-            font-size: 0.94rem;
+            font-size: 0.88rem;
         }
 
         .signup-alert {
@@ -211,7 +212,7 @@
 
         .signup-form-grid {
             display: grid;
-            gap: 16px;
+            gap: 14px;
         }
 
         .signup-grid-2,
@@ -231,7 +232,7 @@
         .signup-label {
             display: block;
             margin-bottom: 7px;
-            font-size: 0.9rem;
+            font-size: 0.84rem;
             color: rgba(96, 81, 73, 0.86);
         }
 
@@ -239,13 +240,14 @@
         .signup-select,
         .signup-textarea {
             width: 100%;
-            padding: 14px 16px;
-            border-radius: 16px;
+            padding: 13px 15px;
+            border-radius: 14px;
             border: 1px solid rgba(220, 207, 191, 0.94);
             background: rgba(255, 255, 255, 0.9);
             box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78);
             color: #191411;
             font: inherit;
+            font-size: 0.9rem;
         }
 
         .signup-textarea {
@@ -270,9 +272,10 @@
         .signup-secondary {
             text-decoration: none;
             border-radius: 999px;
-            padding: 14px 18px;
+            padding: 12px 16px;
             font-weight: 700;
             font: inherit;
+            font-size: 0.88rem;
         }
 
         .signup-submit {
@@ -292,7 +295,7 @@
         .signup-footnote {
             margin: 0;
             color: rgba(104, 88, 79, 0.78);
-            font-size: 0.92rem;
+            font-size: 0.84rem;
         }
 
         @media (max-width: 840px) {
