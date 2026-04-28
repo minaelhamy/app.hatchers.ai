@@ -2300,6 +2300,7 @@
                     route: node.dataset.launcherRoute || '/',
                     icon: node.dataset.launcherIcon || 'file',
                     className: node.dataset.launcherClass || '',
+                    external: node.dataset.launcherExternal === '1',
                 };
             });
 
@@ -2393,6 +2394,14 @@
                 } catch (error) {
                     return url.includes('?') ? `${url}&os_embed=1` : `${url}?os_embed=1`;
                 }
+            };
+
+            const frameSrcForApp = (app) => {
+                if (!app.external) {
+                    return withEmbedParam(app.route);
+                }
+
+                return app.route;
             };
 
             const renderDock = () => {
@@ -2507,7 +2516,7 @@
                         <div class="os-app-window-title">${app.label}</div>
                         <div class="os-app-window-actions"></div>
                     </div>
-                    <iframe class="os-app-window-frame" title="${app.label}" src="${withEmbedParam(app.route)}"></iframe>
+                    <iframe class="os-app-window-frame" title="${app.label}" src="${frameSrcForApp(app)}"></iframe>
                 `;
                 host.appendChild(win);
                 window.setTimeout(() => win.classList.remove('is-entering'), 280);

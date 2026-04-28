@@ -417,6 +417,7 @@
 @section('content')
     @php
         $workspace = $dashboard['workspace'] ?? [];
+        $launchCards = collect($launchCards ?? [])->keyBy(fn ($card) => strtolower((string) ($card['module'] ?? '')));
         $desktopOpen = request('open', '');
         $desktopNow = now()->timezone(config('app.timezone'));
         $desktopClock = $desktopNow->format('D, M j   g:i A');
@@ -425,11 +426,44 @@
         $supportsServices = in_array($businessModel, ['service', 'hybrid'], true);
         $desktopApps = [
             [
+                'key' => 'atlas-engine',
+                'label' => 'Atlas',
+                'route' => (string) ($launchCards->get('atlas')['url'] ?? route('founder.ai-tools')),
+                'class' => 'os-icon-ai',
+                'icon' => 'globe',
+                'external' => !empty($launchCards->get('atlas')['url']),
+            ],
+            [
+                'key' => 'lms-engine',
+                'label' => 'LMS',
+                'route' => (string) ($launchCards->get('lms')['url'] ?? route('founder.learning-plan')),
+                'class' => 'os-icon-learning',
+                'icon' => 'cap',
+                'external' => !empty($launchCards->get('lms')['url']),
+            ],
+            [
+                'key' => 'bazaar-engine',
+                'label' => 'Bazaar',
+                'route' => (string) ($launchCards->get('bazaar')['url'] ?? route('founder.commerce')),
+                'class' => 'os-icon-commerce',
+                'icon' => 'bag',
+                'external' => !empty($launchCards->get('bazaar')['url']),
+            ],
+            [
+                'key' => 'servio-engine',
+                'label' => 'Servio',
+                'route' => (string) ($launchCards->get('servio')['url'] ?? route('website')),
+                'class' => 'os-icon-website',
+                'icon' => 'window',
+                'external' => !empty($launchCards->get('servio')['url']),
+            ],
+            [
                 'key' => 'learning-plan',
                 'label' => 'Learning Hub',
                 'route' => route('founder.learning-plan'),
                 'class' => 'os-icon-learning',
                 'icon' => 'cap',
+                'external' => false,
             ],
             [
                 'key' => 'inbox',
@@ -437,6 +471,7 @@
                 'route' => route('founder.inbox'),
                 'class' => 'os-icon-inbox',
                 'icon' => 'tray',
+                'external' => false,
             ],
             [
                 'key' => 'settings',
@@ -444,6 +479,7 @@
                 'route' => route('founder.settings'),
                 'class' => 'os-icon-brand',
                 'icon' => 'spark',
+                'external' => false,
             ],
             [
                 'key' => 'ai-tools',
@@ -451,6 +487,7 @@
                 'route' => route('founder.ai-tools'),
                 'class' => 'os-icon-ai',
                 'icon' => 'globe',
+                'external' => false,
             ],
             [
                 'key' => 'activity',
@@ -458,6 +495,7 @@
                 'route' => route('founder.activity'),
                 'class' => 'os-icon-activity',
                 'icon' => 'pulse',
+                'external' => false,
             ],
             [
                 'key' => 'commerce',
@@ -465,6 +503,7 @@
                 'route' => route('founder.commerce'),
                 'class' => 'os-icon-commerce',
                 'icon' => 'bag',
+                'external' => false,
             ],
             [
                 'key' => 'media-library',
@@ -472,6 +511,7 @@
                 'route' => route('founder.media-library'),
                 'class' => 'os-icon-media',
                 'icon' => 'image',
+                'external' => false,
             ],
             [
                 'key' => 'website',
@@ -479,6 +519,7 @@
                 'route' => route('website'),
                 'class' => 'os-icon-website',
                 'icon' => 'window',
+                'external' => false,
             ],
             [
                 'key' => 'tasks',
@@ -486,6 +527,7 @@
                 'route' => route('founder.tasks'),
                 'class' => 'os-icon-tasks',
                 'icon' => 'checklist',
+                'external' => false,
             ],
             [
                 'key' => 'first-100',
@@ -493,6 +535,7 @@
                 'route' => route('founder.first-100'),
                 'class' => 'os-icon-growth',
                 'icon' => 'target',
+                'external' => false,
             ],
             [
                 'key' => 'marketing',
@@ -500,6 +543,7 @@
                 'route' => route('founder.marketing'),
                 'class' => 'os-icon-marketing',
                 'icon' => 'megaphone',
+                'external' => false,
             ],
             [
                 'key' => 'search',
@@ -507,6 +551,7 @@
                 'route' => route('founder.search'),
                 'class' => 'os-icon-search',
                 'icon' => 'search',
+                'external' => false,
             ],
             [
                 'key' => 'automations',
@@ -514,6 +559,7 @@
                 'route' => route('founder.automations'),
                 'class' => 'os-icon-automation',
                 'icon' => 'gear',
+                'external' => false,
             ],
             [
                 'key' => 'analytics',
@@ -521,6 +567,7 @@
                 'route' => route('founder.analytics'),
                 'class' => 'os-icon-analytics',
                 'icon' => 'chart',
+                'external' => false,
             ],
             [
                 'key' => 'wallet',
@@ -528,6 +575,7 @@
                 'route' => route('founder.commerce.wallet'),
                 'class' => 'os-icon-wallet',
                 'icon' => 'wallet',
+                'external' => false,
             ],
         ];
 
@@ -538,6 +586,7 @@
                 'route' => route('founder.commerce.orders'),
                 'class' => 'os-icon-orders',
                 'icon' => 'box',
+                'external' => false,
             ];
         }
 
@@ -548,6 +597,7 @@
                 'route' => route('founder.commerce.bookings'),
                 'class' => 'os-icon-bookings',
                 'icon' => 'calendar-check',
+                'external' => false,
             ];
         }
     @endphp
@@ -583,6 +633,7 @@
                         data-launcher-route="{{ $app['route'] }}"
                         data-launcher-class="{{ $app['class'] }}"
                         data-launcher-icon="{{ $app['icon'] }}"
+                        data-launcher-external="{{ !empty($app['external']) ? '1' : '0' }}"
                     >
                         <span class="os-desktop-icon-tile {{ $app['class'] }}">
                             @switch($app['icon'])
