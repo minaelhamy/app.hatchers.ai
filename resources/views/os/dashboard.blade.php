@@ -155,12 +155,61 @@
             color: rgba(118, 104, 93, 0.72);
         }
 
+        .os-desktop-bar-right {
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            justify-self: end;
+        }
+
         .os-desktop-time {
             font-size: 0.92rem;
             font-weight: 500;
             color: rgba(70, 57, 48, 0.8);
             white-space: nowrap;
             letter-spacing: -0.01em;
+        }
+
+        .os-desktop-logout-form {
+            margin: 0;
+        }
+
+        .os-desktop-logout {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            min-height: 38px;
+            padding: 0 14px;
+            border-radius: 999px;
+            border: 1px solid rgba(228, 216, 204, 0.95);
+            background: rgba(255, 251, 247, 0.62);
+            box-shadow:
+                inset 0 1px 0 rgba(255, 255, 255, 0.84),
+                0 8px 18px rgba(80, 58, 40, 0.06);
+            color: rgba(73, 58, 49, 0.86);
+            font: inherit;
+            font-size: 0.88rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+        }
+
+        .os-desktop-logout:hover {
+            transform: translateY(-1px);
+            background: rgba(255, 253, 250, 0.78);
+            box-shadow:
+                inset 0 1px 0 rgba(255, 255, 255, 0.9),
+                0 12px 22px rgba(80, 58, 40, 0.1);
+        }
+
+        .os-desktop-logout svg {
+            width: 16px;
+            height: 16px;
+            stroke: currentColor;
+            fill: none;
+            stroke-width: 1.8;
+            stroke-linecap: round;
+            stroke-linejoin: round;
         }
 
         .os-desktop-icons {
@@ -619,7 +668,21 @@
                         <span class="os-desktop-shortcut">⌘K</span>
                     </div>
                 </div>
-                <div class="os-desktop-time">{{ $desktopClock }}</div>
+                <div class="os-desktop-bar-right">
+                    <div class="os-desktop-time">{{ $desktopClock }}</div>
+                    <form class="os-desktop-logout-form" method="POST" action="/logout">
+                        @csrf
+                        <button class="os-desktop-logout" type="submit" aria-label="Log out">
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M10 17L15 12L10 7"></path>
+                                <path d="M15 12H4"></path>
+                                <path d="M20 20H12"></path>
+                                <path d="M20 4H12"></path>
+                            </svg>
+                            <span>Logout</span>
+                        </button>
+                    </form>
+                </div>
             </div>
 
             <div class="os-desktop-icons" data-os-launcher data-storage-key="hatchers-os-desktop-order-{{ $dashboard['founder']->id ?? 'guest' }}">
