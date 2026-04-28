@@ -129,9 +129,15 @@ class FounderModuleSyncService
 
             $data = json_decode((string) $response->getBody(), true);
             if ($response->getStatusCode() < 200 || $response->getStatusCode() >= 300 || !is_array($data) || empty($data['success'])) {
+                $body = trim((string) $response->getBody());
+                $normalizedBody = preg_replace('/\s+/', ' ', $body);
+                $bodySnippet = is_string($normalizedBody) ? mb_substr($normalizedBody, 0, 240) : '';
+
                 return [
                     'ok' => false,
-                    'error' => is_array($data) && !empty($data['error']) ? (string) $data['error'] : 'Unexpected response from ' . strtoupper($module) . '.',
+                    'error' => is_array($data) && !empty($data['error'])
+                        ? (string) $data['error']
+                        : 'Unexpected response from ' . strtoupper($module) . ($bodySnippet !== '' ? ': ' . $bodySnippet : '.'),
                 ];
             }
 
