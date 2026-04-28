@@ -135,6 +135,11 @@ class AtlasIntelligenceService
         $progress = (int) ($weeklyState?->weekly_progress_percent ?? 0);
         $revenue = (float) ($commercialSummary?->gross_revenue ?? 0);
         $currency = (string) ($commercialSummary?->currency ?? 'USD');
+        $mentorEntitled = (bool) (
+            (($founder->mentor_entitled_until && $founder->mentor_entitled_until->isFuture()) || $founder->mentor_entitled_until?->isToday()) ||
+            (($subscription?->plan_code ?? null) === 'hatchers-os-mentor') ||
+            str_contains(strtolower((string) ($subscription?->plan_name ?? '')), 'mentor')
+        );
 
         $payload = [
             'app' => 'os',
@@ -153,6 +158,12 @@ class AtlasIntelligenceService
                     'Prioritize sharper offers, better hooks, stronger urgency, risk reversal, lead capture, and persistent follow-up.',
                     'Bias toward the next revenue action, not generic motivation.',
                     'When the founder is stuck, turn the reply into the next three concrete actions inside Hatchers OS.',
+                ],
+                'mentor_subscription_behavior' => [
+                    'ai_mentor_entitled' => $mentorEntitled,
+                    'instruction' => $mentorEntitled
+                        ? 'This founder is entitled to the AI mentor experience. Act like the primary mentor inside Hatchers OS with proactive guidance, accountability, and clear next actions.'
+                        : 'Support this founder helpfully, but do not assume they are on the mentor-guided plan unless the context shows it.',
                 ],
                 'system_knowledge' => [
                     'You are expected to understand Hatchers OS, LMS, Atlas, Bazaar, and Servio as one connected founder system.',
