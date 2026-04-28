@@ -3593,7 +3593,17 @@ class OsShellController extends Controller
         /** @var \App\Models\Founder $user */
         $user = Auth::user();
 
-        $url = $workspaceLaunchService->buildLaunchUrl($user, $module);
+        $target = '';
+        if (request()->filled('target')) {
+            $requestedTarget = (string) request()->query('target', '');
+            $target = strtolower($module) === 'atlas'
+                ? $this->sanitizeAtlasWorkspaceTarget($requestedTarget)
+                : '';
+        }
+
+        $url = $target !== ''
+            ? $workspaceLaunchService->buildLaunchUrlForTarget($user, $module, $target)
+            : $workspaceLaunchService->buildLaunchUrl($user, $module);
         if ($url === null) {
             return redirect()->route('dashboard')->with('error', 'Hatchers OS could not prepare that workspace launch yet.');
         }
@@ -8309,6 +8319,7 @@ class OsShellController extends Controller
             '/ai-images/campaign',
             '/ai-images/campaign-detail',
             '/ai-images/grid',
+            '/ai-templates',
             '/all-images',
             '/all-documents',
             '/document',
