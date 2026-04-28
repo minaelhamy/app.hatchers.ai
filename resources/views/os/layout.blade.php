@@ -334,7 +334,7 @@
 
         .assistant-window-body {
             display: grid;
-            grid-template-rows: auto auto minmax(0, 1fr) auto;
+            grid-template-rows: auto minmax(0, 1fr) auto;
             gap: 10px;
             padding: 12px;
             min-height: 0;
@@ -345,8 +345,6 @@
         }
 
         .assistant-toolbar,
-        .assistant-plan,
-        .assistant-prompts,
         .assistant-composer {
             padding: 10px 12px;
             border-radius: 20px;
@@ -357,7 +355,7 @@
 
         .assistant-toolbar {
             display: grid;
-            grid-template-columns: minmax(0, 1fr) auto auto;
+            grid-template-columns: minmax(0, 1fr) auto;
             gap: 6px;
             align-items: center;
         }
@@ -375,8 +373,6 @@
         }
 
         .assistant-toolbar-button,
-        .assistant-plan-action,
-        .assistant-prompts-toggle,
         .assistant-chip {
             border: 1px solid rgba(220, 207, 191, 0.92);
             background: rgba(255, 253, 249, 0.92);
@@ -387,85 +383,6 @@
             font-size: 0.76rem;
             font-weight: 700;
             cursor: pointer;
-        }
-
-        .assistant-plan {
-            display: grid;
-            gap: 6px;
-        }
-
-        .assistant-plan-title {
-            font-size: 0.68rem;
-            letter-spacing: 0.14em;
-            text-transform: uppercase;
-            color: rgba(123, 107, 95, 0.72);
-        }
-
-        .assistant-plan-name {
-            font-size: 0.92rem;
-            font-weight: 700;
-            color: #2b231d;
-        }
-
-        .assistant-plan-list {
-            margin: 0;
-            padding-left: 18px;
-            display: grid;
-            gap: 4px;
-            color: rgba(77, 64, 56, 0.88);
-            line-height: 1.38;
-            font-size: 0.82rem;
-        }
-
-        .assistant-plan-actions {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
-
-        .assistant-prompts[hidden] {
-            display: none;
-        }
-
-        .assistant-prompts-head {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 10px;
-            margin-bottom: 6px;
-        }
-
-        .assistant-prompts-title {
-            font-size: 0.68rem;
-            letter-spacing: 0.14em;
-            text-transform: uppercase;
-            color: rgba(123, 107, 95, 0.72);
-        }
-
-        .assistant-prompt-list {
-            display: grid;
-            gap: 6px;
-            max-height: 132px;
-            overflow-y: auto;
-            padding-right: 4px;
-        }
-
-        .assistant-prompt {
-            border: 1px solid rgba(220, 207, 191, 0.9);
-            background: rgba(255, 253, 249, 0.9);
-            color: #2a231e;
-            border-radius: 999px;
-            padding: 8px 11px;
-            font: inherit;
-            font-size: 0.78rem;
-            cursor: pointer;
-            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.74);
-            transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
-        }
-
-        .assistant-prompt:hover {
-            transform: translateY(-1px);
-            background: rgba(255, 255, 255, 0.96);
         }
 
         .assistant-feed-shell {
@@ -677,19 +594,16 @@
             box-shadow: 0 12px 24px rgba(242, 65, 97, 0.34);
         }
 
-        .assistant-prompt-list::-webkit-scrollbar,
         .assistant-feed::-webkit-scrollbar {
             width: 8px;
         }
 
-        .assistant-prompt-list::-webkit-scrollbar-thumb,
         .assistant-feed::-webkit-scrollbar-thumb {
             background: rgba(199, 183, 167, 0.9);
             border-radius: 999px;
             border: 2px solid rgba(255, 250, 244, 0.9);
         }
 
-        .assistant-prompt-list::-webkit-scrollbar-track,
         .assistant-feed::-webkit-scrollbar-track {
             background: transparent;
         }
@@ -760,6 +674,33 @@
             min-width: 360px;
             min-height: 280px;
             transition: box-shadow 0.22s ease, transform 0.22s ease;
+        }
+
+        .os-app-window-resize-handle,
+        .assistant-resize-handle {
+            position: absolute;
+            right: 10px;
+            bottom: 10px;
+            width: 18px;
+            height: 18px;
+            border: 0;
+            padding: 0;
+            background: transparent;
+            cursor: nwse-resize;
+            z-index: 5;
+        }
+
+        .os-app-window-resize-handle::before,
+        .assistant-resize-handle::before {
+            content: "";
+            position: absolute;
+            right: 2px;
+            bottom: 2px;
+            width: 12px;
+            height: 12px;
+            border-right: 2px solid rgba(150, 132, 116, 0.55);
+            border-bottom: 2px solid rgba(150, 132, 116, 0.55);
+            border-bottom-right-radius: 4px;
         }
 
         .os-app-window.is-entering {
@@ -1275,7 +1216,6 @@
         $assistantSummary = [
             'thread_key' => '',
             'label' => 'New founder chat',
-            'pinned_plan' => [],
         ];
         $assistantThreads = [];
         if ($authUser?->role === 'admin') {
@@ -1306,7 +1246,6 @@
             $assistantSummary = [
                 'thread_key' => (string) ($assistantThread?->thread_key ?? ''),
                 'label' => (string) ($assistantThreadMeta['label'] ?? 'New founder chat'),
-                'pinned_plan' => is_array($assistantThreadMeta['pinned_plan'] ?? null) ? $assistantThreadMeta['pinned_plan'] : [],
             ];
             $assistantThreads = $authUser->conversationThreads()
                 ->where('thread_key', 'like', 'atlas-assistant%')
@@ -1336,13 +1275,7 @@
                 'bookings' => (int) ($commercialSummary?->booking_count ?? 0),
                 'revenue' => strtoupper((string) ($commercialSummary?->currency ?? 'USD')) . ' ' . number_format((float) ($commercialSummary?->gross_revenue ?? 0), 0),
             ];
-            $assistantPrompts = [
-                'What should I focus on today to move revenue fastest?',
-                'Review my offer and tell me what is weak.',
-                'What is blocking conversions right now in my OS?',
-                'Give me the next three actions using Sell Like Crazy thinking.',
-                'How do I get my first 3 paying customers this week?',
-            ];
+            $assistantPrompts = [];
         }
     @endphp
     <div class="shell">
@@ -1408,33 +1341,6 @@
                             @endforeach
                         </select>
                         <button class="assistant-toolbar-button" type="button" data-assistant-reset>New chat</button>
-                        <button class="assistant-toolbar-button" type="button" data-assistant-prompts-toggle>Starters</button>
-                    </div>
-
-                    <div class="assistant-plan" data-assistant-plan @if (empty($assistantSummary['pinned_plan']['steps'] ?? [])) hidden @endif>
-                        <div class="assistant-plan-title">Pinned plan</div>
-                        <div class="assistant-plan-name" data-assistant-plan-name>{{ (string) ($assistantSummary['pinned_plan']['title'] ?? "Today's plan") }}</div>
-                        <ol class="assistant-plan-list" data-assistant-plan-list>
-                            @foreach ((array) ($assistantSummary['pinned_plan']['steps'] ?? []) as $planStep)
-                                <li>{{ (string) $planStep }}</li>
-                            @endforeach
-                        </ol>
-                        <div class="assistant-plan-actions">
-                            <button class="assistant-plan-action" type="button" data-assistant-save-plan>Turn into tasks</button>
-                            <button class="assistant-plan-action" type="button" data-assistant-open-tasks>Open Tasks</button>
-                        </div>
-                    </div>
-
-                    <div class="assistant-prompts" data-assistant-prompts-block>
-                        <div class="assistant-prompts-head">
-                            <div class="assistant-prompts-title">Start quickly</div>
-                            <button class="assistant-prompts-toggle" type="button" data-assistant-prompts-toggle>Hide</button>
-                        </div>
-                        <div class="assistant-prompt-list">
-                            @foreach ($assistantPrompts as $prompt)
-                                <button class="assistant-prompt" type="button" data-assistant-prompt="{{ $prompt }}">{{ $prompt }}</button>
-                            @endforeach
-                        </div>
                     </div>
 
                     <div class="assistant-feed-shell">
@@ -1482,6 +1388,7 @@
                         </form>
                     </div>
                 </div>
+                <button class="assistant-resize-handle" type="button" aria-label="Resize Atlas"></button>
             </div>
         </section>
         <button class="assistant-launcher" type="button" data-assistant-launcher aria-label="Open Atlas">
@@ -1502,26 +1409,19 @@
             const resetButton = assistant.querySelector('[data-assistant-reset]');
             const threadLabel = assistant.querySelector('[data-assistant-thread-label]');
             const threadSelect = assistant.querySelector('[data-assistant-thread-select]');
-            const planPanel = assistant.querySelector('[data-assistant-plan]');
-            const planName = assistant.querySelector('[data-assistant-plan-name]');
-            const planList = assistant.querySelector('[data-assistant-plan-list]');
-            const savePlanButton = assistant.querySelector('[data-assistant-save-plan]');
-            const openTasksButton = assistant.querySelector('[data-assistant-open-tasks]');
-            const promptButtons = assistant.querySelectorAll('[data-assistant-prompt]');
-            const promptsToggle = assistant.querySelector('[data-assistant-prompts-toggle]');
-            const promptsBlock = assistant.querySelector('[data-assistant-prompts-block]');
             const existingActionButtons = assistant.querySelectorAll('[data-assistant-action]');
             const launcher = document.querySelector('[data-assistant-launcher]');
             const dragHandle = assistant.querySelector('[data-assistant-drag-handle]');
             const closeButton = assistant.querySelector('[data-assistant-close]');
             const minimizeButton = assistant.querySelector('[data-assistant-minimize]');
             const maximizeButton = assistant.querySelector('[data-assistant-maximize]');
+            const resizeHandle = assistant.querySelector('.assistant-resize-handle');
             const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
             const storageKey = 'hatchers-os-assistant-window';
             let currentThreadKey = @json($assistantSummary['thread_key'] ?? '');
-            let isPromptOpen = !feed || feed.querySelectorAll('.assistant-bubble').length <= 1;
             let isMaximized = false;
             let dragState = null;
+            let resizeState = null;
             let restoreRect = null;
 
             const readState = () => {
@@ -1554,25 +1454,6 @@
                     maximized: assistant.classList.contains('is-maximized'),
                 };
                 writeState(rect);
-            };
-
-            const applyPromptVisibility = () => {
-                if (!promptsBlock) return;
-                promptsBlock.hidden = !isPromptOpen;
-                if (promptsToggle) {
-                    promptsToggle.textContent = isPromptOpen ? 'Hide' : 'Starters';
-                }
-            };
-
-            const hasConversation = () => assistant.querySelectorAll('.assistant-bubble').length > 1;
-
-            const syncConversationMode = ({ forceOpenPrompts = false } = {}) => {
-                if (forceOpenPrompts) {
-                    isPromptOpen = true;
-                } else if (hasConversation()) {
-                    isPromptOpen = false;
-                }
-                applyPromptVisibility();
             };
 
             const showLauncher = (visible) => {
@@ -1669,54 +1550,6 @@
                 if (fallbackHref) {
                     window.location.href = fallbackHref;
                 }
-            };
-
-            const buildPinnedPlanFromText = (text, actions = []) => {
-                const steps = [];
-                const normalized = String(text || '').replace(/\r\n/g, '\n');
-
-                normalized.split('\n').forEach((line) => {
-                    const trimmed = line.trim();
-                    if (!trimmed) return;
-                    const match = trimmed.match(/^(?:\d+\.|[-*])\s+(.+)$/);
-                    if (match) {
-                        steps.push(match[1].trim());
-                    }
-                });
-
-                if (steps.length < 2 && Array.isArray(actions)) {
-                    actions.forEach((action) => {
-                        const label = String(action?.cta || action?.title || action?.label || '').trim();
-                        if (label) {
-                            steps.push(label);
-                        }
-                    });
-                }
-
-                return steps.slice(0, 3);
-            };
-
-            const setPinnedPlan = (steps, title = "Today's plan") => {
-                if (!planPanel || !planList || !planName) return;
-
-                const cleanSteps = (Array.isArray(steps) ? steps : [])
-                    .map((step) => String(step || '').trim())
-                    .filter(Boolean)
-                    .slice(0, 3);
-
-                if (!cleanSteps.length) {
-                    planPanel.hidden = true;
-                    return;
-                }
-
-                planPanel.hidden = false;
-                planName.textContent = title;
-                planList.innerHTML = cleanSteps.map((step) => `<li>${step}</li>`).join('');
-            };
-
-            const currentPinnedPlanSteps = () => {
-                if (!planList || !planPanel || planPanel.hidden) return [];
-                return Array.from(planList.querySelectorAll('li')).map((item) => item.textContent?.trim() || '').filter(Boolean);
             };
 
             const appendInlineFormattedText = (target, text) => {
@@ -1834,26 +1667,7 @@
                     const trimmed = String(text || '').trim();
                     setThreadLabel(trimmed.slice(0, 42) + (trimmed.length > 42 ? '…' : ''));
                 }
-                if (type === 'atlas') {
-                    const planSteps = buildPinnedPlanFromText(text, actions);
-                    setPinnedPlan(planSteps);
-                }
-                syncConversationMode();
             };
-
-            promptButtons.forEach((button) => {
-                button.addEventListener('click', () => {
-                    if (!textarea) return;
-                    textarea.value = button.dataset.assistantPrompt || '';
-                    autosizeTextarea();
-                    textarea.focus();
-                });
-            });
-
-            promptsToggle?.addEventListener('click', () => {
-                isPromptOpen = !isPromptOpen;
-                applyPromptVisibility();
-            });
 
             existingActionButtons.forEach((button) => {
                 button.addEventListener('click', () => {
@@ -1898,8 +1712,6 @@
 
                     setThreadLabel(data.label || 'Founder chat');
                     setThreadSelection(currentThreadKey);
-                    setPinnedPlan(data.pinned_plan?.steps || [], data.pinned_plan?.title || "Today's plan");
-                    syncConversationMode();
                     if (status) status.textContent = 'Chat loaded.';
                 } catch (error) {
                     if (status) status.textContent = 'Could not load that chat.';
@@ -1942,9 +1754,7 @@
                     setThreadLabel(data.label || 'New founder chat');
                     setThreadSelection(currentThreadKey);
                     prependThreadButton(currentThreadKey, data.label || 'New founder chat');
-                    setPinnedPlan([]);
                     addBubble('atlas', data.reply || 'New chat started. Ask Atlas anything.');
-                    syncConversationMode({ forceOpenPrompts: true });
                     if (status) status.textContent = 'Fresh chat ready.';
                 } catch (error) {
                     if (status) status.textContent = 'Could not reset chat right now.';
@@ -1952,50 +1762,6 @@
                     if (sendButton) sendButton.disabled = false;
                     resetButton.disabled = false;
                 }
-            });
-
-            savePlanButton?.addEventListener('click', async () => {
-                const steps = currentPinnedPlanSteps();
-                if (!steps.length) {
-                    if (status) status.textContent = 'There is no pinned plan to save yet.';
-                    return;
-                }
-
-                savePlanButton.disabled = true;
-                if (status) status.textContent = 'Saving this plan into your OS tasks...';
-
-                try {
-                    const response = await fetch('/assistant/chat/tasks', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRF-TOKEN': csrf,
-                            'Accept': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            thread_key: currentThreadKey,
-                            title: planName?.textContent || "Today's plan",
-                            steps,
-                        }),
-                    });
-
-                    const data = await response.json();
-                    if (!response.ok || !data.success) {
-                        if (status) status.textContent = data.error || 'Could not save tasks.';
-                        return;
-                    }
-
-                    addBubble('atlas', data.reply || 'Saved into your tasks.', data.actions || []);
-                    if (status) status.textContent = `Saved ${data.created_count || steps.length} tasks into Hatchers OS.`;
-                } catch (error) {
-                    if (status) status.textContent = 'Could not save tasks.';
-                } finally {
-                    savePlanButton.disabled = false;
-                }
-            });
-
-            openTasksButton?.addEventListener('click', () => {
-                desktopOpenApp('tasks', '/tasks');
             });
 
             assistant.querySelectorAll('[data-assistant-message-content]').forEach((node) => {
@@ -2071,6 +1837,10 @@
                 restoreWindow();
             });
 
+            window.addEventListener('hatchers:hide-assistant', () => {
+                setVisibleState('minimized');
+            });
+
             dragHandle?.addEventListener('pointerdown', (event) => {
                 if (event.target.closest('button')) return;
                 if (isMaximized) return;
@@ -2095,9 +1865,36 @@
                 assistant.style.right = 'auto';
             });
 
+            resizeHandle?.addEventListener('pointerdown', (event) => {
+                if (isMaximized) return;
+                const rect = assistant.getBoundingClientRect();
+                resizeState = {
+                    startX: event.clientX,
+                    startY: event.clientY,
+                    startWidth: rect.width,
+                    startHeight: rect.height,
+                };
+                resizeHandle.setPointerCapture?.(event.pointerId);
+                event.preventDefault();
+            });
+
+            window.addEventListener('pointermove', (event) => {
+                if (!resizeState) return;
+                const nextWidth = Math.max(360, resizeState.startWidth + (event.clientX - resizeState.startX));
+                const nextHeight = Math.max(360, resizeState.startHeight + (event.clientY - resizeState.startY));
+                assistant.style.width = `${Math.min(nextWidth, window.innerWidth - 40)}px`;
+                assistant.style.height = `${Math.min(nextHeight, window.innerHeight - 120)}px`;
+            });
+
             window.addEventListener('pointerup', () => {
                 if (!dragState) return;
                 dragState = null;
+                saveWindowState();
+            });
+
+            window.addEventListener('pointerup', () => {
+                if (!resizeState) return;
+                resizeState = null;
                 saveWindowState();
             });
 
@@ -2122,8 +1919,6 @@
                 }
             }
 
-            syncConversationMode();
-            applyPromptVisibility();
         })();
     </script>
     <script>
@@ -2521,6 +2316,7 @@
                         <div class="os-app-window-actions"></div>
                     </div>
                     <iframe class="os-app-window-frame" title="${app.label}" src="${frameSrcForApp(app)}"></iframe>
+                    <button class="os-app-window-resize-handle" type="button" aria-label="Resize ${app.label}"></button>
                 `;
                 host.appendChild(win);
                 window.setTimeout(() => win.classList.remove('is-entering'), 280);
@@ -2574,11 +2370,15 @@
                 win.addEventListener('mousedown', () => focusWindow(app.key));
 
                 const dragHandle = win.querySelector('[data-window-drag]');
+                const resizeHandle = win.querySelector('.os-app-window-resize-handle');
                 let dragging = false;
+                let resizing = false;
                 let originX = 0;
                 let originY = 0;
                 let baseX = 0;
                 let baseY = 0;
+                let baseWidth = 0;
+                let baseHeight = 0;
 
                 dragHandle?.addEventListener('mousedown', (event) => {
                     if (entry.maximized) return;
@@ -2600,11 +2400,35 @@
                     win.style.top = `${Math.max(16, nextY)}px`;
                 });
 
+                resizeHandle?.addEventListener('mousedown', (event) => {
+                    if (entry.maximized) return;
+                    resizing = true;
+                    focusWindow(app.key);
+                    originX = event.clientX;
+                    originY = event.clientY;
+                    baseWidth = parseFloat(win.style.width || '0');
+                    baseHeight = parseFloat(win.style.height || '0');
+                    document.body.style.userSelect = 'none';
+                    event.preventDefault();
+                });
+
+                window.addEventListener('mousemove', (event) => {
+                    if (!resizing) return;
+                    const nextWidth = baseWidth + (event.clientX - originX);
+                    const nextHeight = baseHeight + (event.clientY - originY);
+                    win.style.width = `${Math.min(host.clientWidth - 16, Math.max(360, nextWidth))}px`;
+                    win.style.height = `${Math.min(host.clientHeight - 16, Math.max(280, nextHeight))}px`;
+                });
+
                 window.addEventListener('mouseup', () => {
                     if (dragging) {
                         persistWindowGeometry(entry);
                     }
                     dragging = false;
+                    if (resizing) {
+                        persistWindowGeometry(entry);
+                    }
+                    resizing = false;
                     document.body.style.userSelect = '';
                 });
 
@@ -2619,6 +2443,10 @@
                 if (windows.has(key)) {
                     focusWindow(key);
                     return;
+                }
+
+                if (['bazaar-engine', 'servio-engine'].includes(key)) {
+                    window.dispatchEvent(new CustomEvent('hatchers:hide-assistant'));
                 }
 
                 const launch = getLaunchPosition(app, sourceNode);

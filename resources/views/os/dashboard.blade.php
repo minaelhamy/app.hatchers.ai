@@ -525,18 +525,18 @@
             [
                 'key' => 'settings',
                 'label' => 'Company Intelligence',
-                'route' => route('founder.settings'),
+                'route' => route('workspace.launch', ['module' => 'atlas', 'target' => '/company-intelligence']),
                 'class' => 'os-icon-automation',
                 'icon' => 'gear',
-                'external' => false,
+                'external' => true,
             ],
             [
                 'key' => 'atlas-brand-studio',
                 'label' => 'Brand Studio',
-                'route' => route('workspace.launch', ['module' => 'atlas', 'target' => '/company-intelligence']),
+                'route' => route('founder.settings'),
                 'class' => 'os-icon-brand',
                 'icon' => 'spark',
-                'external' => true,
+                'external' => false,
             ],
             [
                 'key' => 'atlas-campaign-studio',
@@ -563,14 +563,6 @@
                 'external' => false,
             ],
             [
-                'key' => 'commerce',
-                'label' => 'Commerce',
-                'route' => route('founder.commerce'),
-                'class' => 'os-icon-commerce',
-                'icon' => 'bag',
-                'external' => false,
-            ],
-            [
                 'key' => 'media-library',
                 'label' => 'Media Library',
                 'route' => route('founder.media-library'),
@@ -592,14 +584,6 @@
                 'route' => route('founder.first-100'),
                 'class' => 'os-icon-growth',
                 'icon' => 'target',
-                'external' => false,
-            ],
-            [
-                'key' => 'marketing',
-                'label' => 'Marketing',
-                'route' => route('founder.marketing'),
-                'class' => 'os-icon-marketing',
-                'icon' => 'megaphone',
                 'external' => false,
             ],
             [

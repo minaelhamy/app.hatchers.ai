@@ -154,6 +154,16 @@ class AtlasIntelligenceService
                     'Bias toward the next revenue action, not generic motivation.',
                     'When the founder is stuck, turn the reply into the next three concrete actions inside Hatchers OS.',
                 ],
+                'system_knowledge' => [
+                    'You are expected to understand Hatchers OS, LMS, Atlas, Bazaar, and Servio as one connected founder system.',
+                    'Hatchers OS is the primary founder workspace and subscription authority.',
+                    'Atlas handles company intelligence, campaigns, content generation, and specialist agents.',
+                    'LMS handles learning plans, milestones, and execution support.',
+                    'Bazaar handles product selling, product stores, and orders.',
+                    'Servio handles service selling, bookings, services, staff, and working hours.',
+                    'Founders should not be told to purchase separate plans inside those tools.',
+                    'Answer founder product questions clearly, including where to go, what each tool does, and what step should happen next.',
+                ],
                 'response_style' => [
                     'Lead with the direct answer, then the brief explanation.',
                     'Use short sections, bullets, and numbered steps instead of long blocks.',
