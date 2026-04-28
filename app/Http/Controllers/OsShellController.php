@@ -3910,7 +3910,7 @@ class OsShellController extends Controller
 
         $validated = $request->validate([
             'founder_id' => ['required', 'integer', 'exists:founders,id'],
-            'target' => ['required', Rule::in(['atlas', 'bazaar', 'servio', 'all'])],
+            'target' => ['required', Rule::in(['lms', 'atlas', 'bazaar', 'servio', 'all'])],
         ]);
 
         $founder = Founder::query()->with('company')->findOrFail((int) $validated['founder_id']);
@@ -3951,7 +3951,7 @@ class OsShellController extends Controller
         $this->ensureAdminPermission($user, 'module_monitoring');
 
         $validated = $request->validate([
-            'target' => ['required', Rule::in(['atlas', 'bazaar', 'servio', 'all'])],
+            'target' => ['required', Rule::in(['lms', 'atlas', 'bazaar', 'servio', 'all'])],
         ]);
 
         $result = $founderModuleSyncService->retryModuleAcrossFounders($validated['target']);
@@ -5752,7 +5752,11 @@ class OsShellController extends Controller
         );
     }
 
-    public function storeOnboarding(Request $request, AtlasIntelligenceService $atlas): RedirectResponse
+    public function storeOnboarding(
+        Request $request,
+        AtlasIntelligenceService $atlas,
+        FounderModuleSyncService $founderModuleSyncService
+    ): RedirectResponse
     {
         $validated = $request->validate([
             'plan_code' => ['required', Rule::in(array_keys($this->founderSignupPlans()))],
@@ -5969,7 +5973,19 @@ class OsShellController extends Controller
                 ->withErrors(['signup' => 'Hatchers AI could not complete signup right now. Please review the form and try again.']);
         }
 
-        $founder = Founder::query()->where('email', $validated['email'])->first();
+        $founder = Founder::query()->with('company')->where('email', $validated['email'])->first();
+        if ($founder instanceof Founder) {
+            $syncResult = $founderModuleSyncService->syncFounder($founder, 'all');
+            if (empty($syncResult['ok'])) {
+                Log::warning('Founder signup completed but module sync had issues.', [
+                    'founder_id' => $founder->id,
+                    'email' => $founder->email,
+                    'message' => $syncResult['message'] ?? 'Founder module sync failed.',
+                    'results' => $syncResult['results'] ?? [],
+                ]);
+            }
+        }
+
         if ($founder && $this->authVerificationDisabled()) {
             $founder->forceFill([
                 'email_verified_at' => $founder->email_verified_at ?: now(),

@@ -149,6 +149,7 @@ class FounderModuleSyncService
     private function syncEndpoint(string $module): ?string
     {
         return match ($module) {
+            'lms' => rtrim((string) config('modules.lms.base_url'), '/') . '/hatchers/founder-sync',
             'atlas' => rtrim((string) config('modules.atlas.base_url'), '/') . '/hatchers/founder-sync',
             'bazaar' => rtrim((string) config('modules.bazaar.base_url'), '/') . '/api/hatchers/founder-sync',
             'servio' => rtrim((string) config('modules.servio.base_url'), '/') . '/api/hatchers/founder-sync',
@@ -158,7 +159,7 @@ class FounderModuleSyncService
 
     private function syncTargets(string $target): array
     {
-        return $target === 'all' ? ['atlas', 'bazaar', 'servio'] : [$target];
+        return $target === 'all' ? ['lms', 'atlas', 'bazaar', 'servio'] : [$target];
     }
 
     private function persistWebsiteTargetFromSync(Founder $founder, string $module, array $data): void
