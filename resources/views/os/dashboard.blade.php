@@ -62,9 +62,9 @@
             z-index: 2;
             display: grid;
             grid-template-columns: 1fr auto;
-            gap: 18px;
+            gap: 16px;
             align-items: center;
-            padding: 14px 20px 10px;
+            padding: 12px 18px 9px;
         }
 
         .os-desktop-bar::after {
@@ -80,7 +80,7 @@
         .os-desktop-bar-left {
             display: flex;
             align-items: center;
-            gap: 14px;
+            gap: 12px;
             min-width: 0;
         }
 
@@ -106,7 +106,7 @@
         }
 
         .os-desktop-brand-name {
-            font-size: 0.98rem;
+            font-size: 0.9rem;
         }
 
         .os-desktop-search {
@@ -114,8 +114,8 @@
             align-items: center;
             gap: 10px;
             width: min(610px, 100%);
-            min-height: 42px;
-            padding: 7px 14px;
+            min-height: 38px;
+            padding: 6px 12px;
             border-radius: 999px;
             border: 1px solid rgba(246, 240, 234, 0.92);
             background: rgba(255, 248, 243, 0.74);
@@ -142,7 +142,7 @@
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            font-size: 0.95rem;
+            font-size: 0.84rem;
             letter-spacing: -0.01em;
         }
 
@@ -151,19 +151,19 @@
             border-radius: 8px;
             border: 1px solid rgba(219, 208, 198, 0.72);
             background: rgba(255, 255, 255, 0.34);
-            font-size: 0.76rem;
+            font-size: 0.7rem;
             color: rgba(118, 104, 93, 0.72);
         }
 
         .os-desktop-bar-right {
             display: inline-flex;
             align-items: center;
-            gap: 12px;
+            gap: 10px;
             justify-self: end;
         }
 
         .os-desktop-time {
-            font-size: 0.92rem;
+            font-size: 0.82rem;
             font-weight: 500;
             color: rgba(70, 57, 48, 0.8);
             white-space: nowrap;
@@ -178,8 +178,8 @@
             display: inline-flex;
             align-items: center;
             gap: 8px;
-            min-height: 38px;
-            padding: 0 14px;
+            min-height: 36px;
+            padding: 0 12px;
             border-radius: 999px;
             border: 1px solid rgba(228, 216, 204, 0.95);
             background: rgba(255, 251, 247, 0.62);
@@ -188,10 +188,65 @@
                 0 8px 18px rgba(80, 58, 40, 0.06);
             color: rgba(73, 58, 49, 0.86);
             font: inherit;
-            font-size: 0.88rem;
+            font-size: 0.78rem;
             font-weight: 600;
             cursor: pointer;
             transition: transform 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+        }
+
+        .os-desktop-notifications {
+            position: relative;
+            width: 38px;
+            height: 38px;
+            border-radius: 999px;
+            border: 1px solid rgba(228, 216, 204, 0.95);
+            background: rgba(255, 251, 247, 0.62);
+            box-shadow:
+                inset 0 1px 0 rgba(255, 255, 255, 0.84),
+                0 8px 18px rgba(80, 58, 40, 0.06);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: rgba(73, 58, 49, 0.86);
+            text-decoration: none;
+            transition: transform 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+        }
+
+        .os-desktop-notifications:hover {
+            transform: translateY(-1px);
+            background: rgba(255, 253, 250, 0.78);
+            box-shadow:
+                inset 0 1px 0 rgba(255, 255, 255, 0.9),
+                0 12px 22px rgba(80, 58, 40, 0.1);
+        }
+
+        .os-desktop-notifications svg {
+            width: 15px;
+            height: 15px;
+            stroke: currentColor;
+            fill: none;
+            stroke-width: 1.8;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        .os-desktop-notifications-badge {
+            position: absolute;
+            top: -3px;
+            right: -2px;
+            min-width: 16px;
+            height: 16px;
+            padding: 0 4px;
+            border-radius: 999px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #ef4444, #f97316);
+            color: #fff;
+            font-size: 0.62rem;
+            font-weight: 800;
+            line-height: 1;
+            box-shadow: 0 8px 14px rgba(214, 69, 38, 0.24);
         }
 
         .os-desktop-logout:hover {
@@ -217,8 +272,8 @@
             z-index: 2;
             display: grid;
             grid-template-columns: repeat(4, 116px);
-            gap: 28px 34px;
-            padding: 72px 0 96px 62px;
+            gap: 24px 28px;
+            padding: 56px 0 92px 52px;
             align-content: start;
         }
 
@@ -246,9 +301,9 @@
         }
 
         .os-desktop-icon-tile {
-            width: 86px;
-            height: 86px;
-            border-radius: 22px;
+            width: 82px;
+            height: 82px;
+            border-radius: 20px;
             display: grid;
             place-items: center;
             position: relative;
@@ -293,12 +348,12 @@
         }
 
         .os-desktop-icon-label {
-            font-size: 0.9rem;
+            font-size: 0.8rem;
             font-weight: 500;
             letter-spacing: -0.01em;
             text-align: center;
             line-height: 1.16;
-            max-width: 108px;
+            max-width: 96px;
             color: rgba(60, 47, 39, 0.88);
         }
 
@@ -338,9 +393,44 @@
             bottom: 28px;
             z-index: 2;
             color: rgba(106, 90, 82, 0.5);
-            font-size: 0.82rem;
+            font-size: 0.72rem;
             letter-spacing: 0.05em;
             text-transform: lowercase;
+        }
+
+        .os-desktop-icon.is-heartbeating .os-desktop-icon-tile {
+            animation: os-heartbeat-tile 1.7s ease-in-out infinite;
+        }
+
+        .os-desktop-icon.is-heartbeating .os-desktop-icon-label {
+            animation: os-heartbeat-label 1.7s ease-in-out infinite;
+        }
+
+        @keyframes os-heartbeat-tile {
+            0%, 100% {
+                transform: scale(1);
+                box-shadow:
+                    0 14px 28px rgba(61, 46, 28, 0.12),
+                    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+            }
+            28% {
+                transform: scale(1.035);
+                box-shadow:
+                    0 20px 36px rgba(61, 46, 28, 0.18),
+                    0 0 0 8px rgba(255, 255, 255, 0.12),
+                    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+            }
+            46% {
+                transform: scale(0.995);
+            }
+            62% {
+                transform: scale(1.02);
+            }
+        }
+
+        @keyframes os-heartbeat-label {
+            0%, 100% { color: rgba(60, 47, 39, 0.88); }
+            28% { color: rgba(31, 23, 18, 0.98); }
         }
 
         .os-desktop-dock {
@@ -463,6 +553,71 @@
     </style>
 @endsection
 
+@section('scripts')
+    <script>
+        (() => {
+            const desktop = document.querySelector('[data-os-desktop-home]');
+            if (!desktop) return;
+
+            const founderId = @json((string) ($dashboard['founder']->id ?? 'guest'));
+            const todayKey = @json($desktopDateKey);
+            const openedStorageKey = `hatchers-os-opened-icons-${founderId}`;
+            const tasksBeatKey = `hatchers-os-tasks-heartbeat-${founderId}`;
+
+            const readJson = (key) => {
+                try {
+                    return JSON.parse(window.localStorage.getItem(key) || '{}');
+                } catch (error) {
+                    return {};
+                }
+            };
+
+            const writeJson = (key, value) => {
+                try {
+                    window.localStorage.setItem(key, JSON.stringify(value));
+                } catch (error) {
+                    // Ignore storage failures.
+                }
+            };
+
+            const markOpened = (iconKey) => {
+                if (!iconKey) return;
+                const openedState = readJson(openedStorageKey);
+                openedState[iconKey] = todayKey;
+                writeJson(openedStorageKey, openedState);
+            };
+
+            const openedState = readJson(openedStorageKey);
+            const tasksState = readJson(tasksBeatKey);
+
+            desktop.querySelectorAll('.os-desktop-icon[data-launcher-key]').forEach((icon) => {
+                const iconKey = icon.dataset.launcherKey || '';
+                const needsHeartbeat = icon.dataset.launcherHeartbeat === '1';
+                const needsDailyHeartbeat = icon.dataset.launcherDailyHeartbeat === '1';
+
+                if (needsHeartbeat && openedState[iconKey] !== todayKey) {
+                    icon.classList.add('is-heartbeating');
+                }
+
+                if (needsDailyHeartbeat && tasksState[todayKey] !== true) {
+                    icon.classList.add('is-heartbeating');
+                }
+
+                icon.addEventListener('click', () => {
+                    markOpened(iconKey);
+                    icon.classList.remove('is-heartbeating');
+
+                    if (needsDailyHeartbeat) {
+                        const nextTasksState = readJson(tasksBeatKey);
+                        nextTasksState[todayKey] = true;
+                        writeJson(tasksBeatKey, nextTasksState);
+                    }
+                });
+            });
+        })();
+    </script>
+@endsection
+
 @section('content')
     @php
         $workspace = $dashboard['workspace'] ?? [];
@@ -470,9 +625,13 @@
         $desktopOpen = request('open', '');
         $desktopNow = now()->timezone(config('app.timezone'));
         $desktopClock = $desktopNow->format('D, M j   g:i A');
+        $desktopDateKey = $desktopNow->format('Y-m-d');
         $businessModel = strtolower((string) ($dashboard['company']->business_model ?? 'hybrid'));
         $supportsProducts = in_array($businessModel, ['product', 'hybrid'], true);
         $supportsServices = in_array($businessModel, ['service', 'hybrid'], true);
+        $companyIntelligenceWizard = $companyIntelligenceWizard ?? ['is_complete' => true];
+        $companyIntelligenceComplete = (bool) ($companyIntelligenceWizard['is_complete'] ?? true);
+        $unreadNotificationCount = (int) ($workspace['unread_notification_count'] ?? 0);
         $desktopApps = [
             [
                 'key' => 'atlas-engine',
@@ -529,6 +688,7 @@
                 'class' => 'os-icon-automation',
                 'icon' => 'gear',
                 'external' => false,
+                'heartbeat' => !$companyIntelligenceComplete,
             ],
             [
                 'key' => 'atlas-brand-studio',
@@ -569,6 +729,7 @@
                 'class' => 'os-icon-tasks',
                 'icon' => 'checklist',
                 'external' => false,
+                'daily_heartbeat' => true,
             ],
             [
                 'key' => 'first-100',
@@ -653,6 +814,15 @@
                     </div>
                 </div>
                 <div class="os-desktop-bar-right">
+                    <a class="os-desktop-notifications" href="{{ route('founder.notifications') }}" aria-label="Notifications">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M12 4C9.8 4 8 5.8 8 8V10.1C8 11 7.7 11.8 7.1 12.5L5.8 14C5.2 14.6 5.6 15.5 6.4 15.5H17.6C18.4 15.5 18.8 14.6 18.2 14L16.9 12.5C16.3 11.8 16 11 16 10.1V8C16 5.8 14.2 4 12 4Z"></path>
+                            <path d="M10 18C10.4 19.1 11.1 19.6 12 19.6C12.9 19.6 13.6 19.1 14 18"></path>
+                        </svg>
+                        @if ($unreadNotificationCount > 0)
+                            <span class="os-desktop-notifications-badge">{{ $unreadNotificationCount > 9 ? '9+' : $unreadNotificationCount }}</span>
+                        @endif
+                    </a>
                     <div class="os-desktop-time">{{ $desktopClock }}</div>
                     <form class="os-desktop-logout-form" method="POST" action="/logout">
                         @csrf
@@ -681,6 +851,8 @@
                         data-launcher-class="{{ $app['class'] }}"
                         data-launcher-icon="{{ $app['icon'] }}"
                         data-launcher-external="{{ !empty($app['external']) ? '1' : '0' }}"
+                        data-launcher-heartbeat="{{ !empty($app['heartbeat']) ? '1' : '0' }}"
+                        data-launcher-daily-heartbeat="{{ !empty($app['daily_heartbeat']) ? '1' : '0' }}"
                     >
                         <span class="os-desktop-icon-tile {{ $app['class'] }}">
                             @switch($app['icon'])

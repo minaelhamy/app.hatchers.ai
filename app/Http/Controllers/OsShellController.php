@@ -294,6 +294,7 @@ class OsShellController extends Controller
             'pageTitle' => 'Founder Dashboard',
             'dashboard' => $founderDashboardService->build($user),
             'launchCards' => $workspaceLaunchService->launchCards($user),
+            'companyIntelligenceWizard' => $this->companyIntelligenceWizardState($user),
         ]);
     }
 

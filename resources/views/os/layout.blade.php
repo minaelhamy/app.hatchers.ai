@@ -294,7 +294,7 @@
             position: fixed;
             top: 106px;
             right: 48px;
-            width: 400px;
+            width: 388px;
             height: min(700px, calc(100vh - 180px));
             z-index: 44;
             display: grid;
@@ -326,7 +326,7 @@
         }
 
         .assistant-window .os-app-window-title {
-            font-size: 0.82rem;
+            font-size: 0.76rem;
             letter-spacing: 0.1em;
             text-transform: uppercase;
             color: rgba(103, 87, 76, 0.72);
@@ -346,7 +346,7 @@
 
         .assistant-toolbar,
         .assistant-composer {
-            padding: 10px 12px;
+            padding: 9px 11px;
             border-radius: 20px;
             border: 1px solid rgba(227, 216, 203, 0.95);
             background: rgba(255, 255, 255, 0.68);
@@ -367,9 +367,9 @@
             background: rgba(255, 253, 249, 0.92);
             color: #241c18;
             border-radius: 999px;
-            padding: 8px 12px;
+            padding: 7px 11px;
             font: inherit;
-            font-size: 0.8rem;
+            font-size: 0.76rem;
         }
 
         .assistant-toolbar-button,
@@ -378,9 +378,9 @@
             background: rgba(255, 253, 249, 0.92);
             color: rgba(94, 77, 67, 0.92);
             border-radius: 999px;
-            padding: 7px 11px;
+            padding: 6px 10px;
             font: inherit;
-            font-size: 0.76rem;
+            font-size: 0.72rem;
             font-weight: 700;
             cursor: pointer;
         }
@@ -399,10 +399,10 @@
 
         .assistant-feed {
             display: grid;
-            gap: 10px;
+            gap: 9px;
             min-height: 0;
             overflow-y: auto;
-            padding: 12px 10px 10px;
+            padding: 11px 9px 9px;
             align-content: start;
             overscroll-behavior: contain;
         }
@@ -410,9 +410,9 @@
         .assistant-bubble {
             max-width: 90%;
             border-radius: 20px;
-            padding: 12px 14px;
-            font-size: 0.84rem;
-            line-height: 1.48;
+            padding: 11px 13px;
+            font-size: 0.78rem;
+            line-height: 1.42;
             border: 1px solid rgba(223, 211, 198, 0.88);
             box-shadow:
                 0 10px 20px rgba(79, 60, 39, 0.04),
@@ -435,7 +435,7 @@
         .assistant-bubble-title {
             display: block;
             margin-bottom: 5px;
-            font-size: 0.68rem;
+            font-size: 0.63rem;
             letter-spacing: 0.12em;
             text-transform: uppercase;
             color: rgba(123, 107, 95, 0.72);
@@ -481,7 +481,7 @@
         }
 
         .assistant-section-title {
-            font-size: 0.7rem;
+            font-size: 0.64rem;
             letter-spacing: 0.12em;
             text-transform: uppercase;
             color: rgba(123, 107, 95, 0.72);
@@ -504,17 +504,17 @@
 
         .assistant-textarea {
             width: 100%;
-            min-height: 72px;
+            min-height: 64px;
             max-height: 150px;
             resize: none;
             border-radius: 18px;
             border: 1px solid rgba(220, 207, 191, 0.9);
             background: rgba(255, 255, 255, 0.88);
             color: #1b1714;
-            padding: 13px 14px;
+            padding: 11px 13px;
             font: inherit;
-            font-size: 0.84rem;
-            line-height: 1.45;
+            font-size: 0.78rem;
+            line-height: 1.38;
             box-shadow: inset 0 1px 0 rgba(255,255,255,0.76);
         }
 
@@ -671,8 +671,6 @@
                 inset 0 1px 0 rgba(255, 255, 255, 0.9);
             backdrop-filter: blur(16px);
             pointer-events: auto;
-            min-width: 360px;
-            min-height: 280px;
             transition: box-shadow 0.22s ease, transform 0.22s ease;
         }
 
@@ -731,7 +729,7 @@
             align-items: center;
             justify-content: space-between;
             gap: 16px;
-            padding: 14px 18px;
+            padding: 12px 16px;
             background: rgba(255, 250, 245, 0.9);
             border-bottom: 1px solid rgba(214, 201, 184, 0.68);
             cursor: grab;
@@ -780,7 +778,7 @@
             min-width: 0;
             text-align: center;
             font-family: "Inter Tight", "Inter", "Avenir Next", sans-serif;
-            font-size: 0.9rem;
+            font-size: 0.8rem;
             font-weight: 700;
             letter-spacing: 0;
             white-space: nowrap;
@@ -806,10 +804,14 @@
 
         .os-app-window-frame {
             width: 100%;
-            height: calc(100% - 61px);
+            height: calc(100% - 53px);
             border: 0;
             background: #fffdf8;
             display: block;
+        }
+
+        body.os-embed-mode {
+            font-size: 14px;
         }
 
         .os-app-window.is-minimized {
@@ -1880,10 +1882,10 @@
 
             window.addEventListener('pointermove', (event) => {
                 if (!resizeState) return;
-                const nextWidth = Math.max(360, resizeState.startWidth + (event.clientX - resizeState.startX));
-                const nextHeight = Math.max(360, resizeState.startHeight + (event.clientY - resizeState.startY));
-                assistant.style.width = `${Math.min(nextWidth, window.innerWidth - 40)}px`;
-                assistant.style.height = `${Math.min(nextHeight, window.innerHeight - 120)}px`;
+                const nextWidth = resizeState.startWidth + (event.clientX - resizeState.startX);
+                const nextHeight = resizeState.startHeight + (event.clientY - resizeState.startY);
+                assistant.style.width = `${nextWidth}px`;
+                assistant.style.height = `${nextHeight}px`;
             });
 
             window.addEventListener('pointerup', () => {
@@ -2416,8 +2418,8 @@
                     if (!resizing) return;
                     const nextWidth = baseWidth + (event.clientX - originX);
                     const nextHeight = baseHeight + (event.clientY - originY);
-                    win.style.width = `${Math.min(host.clientWidth - 16, Math.max(360, nextWidth))}px`;
-                    win.style.height = `${Math.min(host.clientHeight - 16, Math.max(280, nextHeight))}px`;
+                    win.style.width = `${nextWidth}px`;
+                    win.style.height = `${nextHeight}px`;
                 });
 
                 window.addEventListener('mouseup', () => {
