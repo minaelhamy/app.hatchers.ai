@@ -438,7 +438,7 @@ class WebsiteAutopilotService
             ->exists();
 
         if ($existing) {
-            return ['ok' => true, 'message' => 'Starter offer already exists in founder workflow.'];
+            return ['ok' => true, 'message' => 'Starter offer already exists.'];
         }
 
         $result = $this->websiteProvisioningService->createStarterRecord($founder, [

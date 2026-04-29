@@ -189,7 +189,7 @@ class WebsiteWorkspaceService
         if ($businessModel === 'hybrid') {
             $steps[] = [
                 'title' => 'Support both business motions',
-                'description' => 'Hybrid founders can publish a commerce storefront and a services site, while still managing both from one founder workspace.',
+                'description' => 'Hybrid businesses can publish both a storefront and a services site from one place.',
             ];
         }
 

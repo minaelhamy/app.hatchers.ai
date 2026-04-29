@@ -332,7 +332,7 @@
 
                     <h1 class="signup-title">Tell Hatchers how your business works.</h1>
                     <p class="signup-subcopy">
-                        Finish this setup once so the OS can personalize your website, commerce, learning, and founder workflow around your business.
+                        Finish this setup once so we can tailor your website, learning, and workspace to your business.
                     </p>
 
                     <div class="signup-entry-banner" data-signup-entry-banner>
@@ -605,7 +605,7 @@
             if (banner && bannerTitle && bannerCopy && bannerBadge) {
                 banner.classList.add('is-visible');
                 bannerTitle.textContent = `${transitionState.planName} selected`;
-                bannerCopy.textContent = `Now shaping your onboarding around ${String(transitionState.planBestFor || 'your founder workflow').toLowerCase()}.`;
+                bannerCopy.textContent = `Now shaping your onboarding around ${String(transitionState.planBestFor || 'your business').toLowerCase()}.`;
                 if (transitionState.planLabel) {
                     bannerBadge.textContent = transitionState.planLabel;
                 }

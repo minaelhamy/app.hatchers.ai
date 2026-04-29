@@ -112,9 +112,9 @@
 
             <section class="hero">
                 <div class="eyebrow">Website Launch</div>
-                <h1>Hatchers builds the first website for {{ $companyName }}, then guides the founder through launch.</h1>
+                <h1>Build the first website for {{ $companyName }}.</h1>
                 <p class="muted">
-                    Stay in one founder workflow: review the draft, finish the setup, and publish the site at your Hatchers OS website path.
+                    Review the draft, finish the setup, and publish when you're ready.
                 </p>
                 <div class="cta-row">
                     <span class="pill">Business model: {{ ucfirst($businessModel) }}</span>
@@ -134,7 +134,7 @@
             <section class="grid-2" style="margin-top: 22px;">
                 <div class="card">
                     <h2>Company Intelligence Brief</h2>
-                    <p class="muted" style="margin-bottom: 14px;">This is the founder context Hatchers will use as the core for the website. Anything missing below can still be filled later, but the stronger this brief is, the better the first website build will be.</p>
+                    <p class="muted" style="margin-bottom: 14px;">This information will shape the first website draft. You can still refine it later.</p>
                     <div class="stack">
                         @foreach ($buildSummary as $row)
                             @if (!empty($row['value']))
@@ -157,7 +157,7 @@
 
                 <div class="card">
                     <h2>Build My Website</h2>
-                    <p class="muted" style="margin-bottom: 14px;">Hatchers will choose the right engine, pick a template, write the copy, prepare the services or products, plan the images, and build the first website draft for you. Leave any field blank if you do not know it yet.</p>
+                    <p class="muted" style="margin-bottom: 14px;">We'll prepare the first website draft for you using the details below. Leave anything blank if you do not know it yet.</p>
                     <form method="POST" action="{{ route('website.build.store') }}" class="stack">
                         @csrf
                         <div class="stack-item">
@@ -564,19 +564,19 @@
                 </div>
 
                 <div class="card">
-                    <h2>How Domain Setup Works</h2>
+                    <h2>Domain Setup</h2>
                     <div class="stack" style="margin-top: 14px;">
                         <div class="stack-item">
-                            <strong>Keep the founder workflow here</strong><br>
-                            Founders should not have to think in terms of separate platform brands to launch a branded website.
+                            <strong>Start here</strong><br>
+                            Add the domain you want to use for your website.
                         </div>
                         <div class="stack-item">
                             <strong>Point the domain once</strong><br>
-                            Hatchers stores the desired domain here, then routes the storefront behind the scenes.
+                            We'll connect it to your website behind the scenes.
                         </div>
                         <div class="stack-item">
-                            <strong>Promote the branded link later</strong><br>
-                            If you need to move fast, publish first on the OS path and connect the branded domain after.
+                            <strong>Publish first if needed</strong><br>
+                            You can publish now and connect the branded domain afterward.
                         </div>
                     </div>
                 </div>
@@ -618,19 +618,19 @@
                 </div>
 
                 <div class="card">
-                    <h2>OS Website Principles</h2>
+                    <h2>Website Setup Notes</h2>
                     <div class="stack" style="margin-top: 14px;">
                         <div class="stack-item">
-                            <strong>One founder workspace</strong><br>
-                            Founders should build and manage from Hatchers OS without having to learn separate tool names.
+                            <strong>Keep it simple</strong><br>
+                            Focus on the website, offer, and contact details first.
                         </div>
                         <div class="stack-item">
-                            <strong>One publishing language</strong><br>
-                            The founder should choose a public website path and launch flow, not separate platform brands.
+                            <strong>Choose one public link</strong><br>
+                            Pick the website link you want people to visit.
                         </div>
                         <div class="stack-item">
-                            <strong>Engine routing behind the scenes</strong><br>
-                            Hatchers chooses the right commerce and service routing behind the scenes while the founder stays in one workflow.
+                            <strong>We'll handle the setup</strong><br>
+                            The right website engine will be used automatically in the background.
                         </div>
                     </div>
                 </div>
@@ -687,23 +687,23 @@
 
             <section class="grid-2" style="margin-top: 22px;">
                 <div class="card">
-                    <h2>What Hatchers Already Prepared</h2>
+                    <h2>What's Ready So Far</h2>
                     <div class="stack" style="margin-top: 14px;">
                         <div class="stack-item">
-                            <strong>Shared intelligence</strong><br>
-                            Hatchers already brings together website readiness, revenue, offers, orders, bookings, and campaign context in one founder workspace.
+                            <strong>Business details</strong><br>
+                            Your business information is already available to help shape the website draft.
                         </div>
                         <div class="stack-item">
-                            <strong>OS-native website control</strong><br>
-                            Founders can now manage website title, website path, and publish flow from the same website workspace.
+                            <strong>Website settings</strong><br>
+                            You can manage the website title, link, and publish flow from here.
                         </div>
                         <div class="stack-item">
-                            <strong>Direct founder actions</strong><br>
-                            The OS can already create and update the real records the public website depends on after explicit confirmation.
+                            <strong>Draft updates</strong><br>
+                            Changes you confirm here can be applied directly to the live website setup.
                         </div>
                         <div class="stack-item">
-                            <strong>Unified founder logic</strong><br>
-                            The OS already knows the founder, company, subscription, weekly state, and website engine context.
+                            <strong>Current setup</strong><br>
+                            Your current business model and website type are already taken into account.
                         </div>
                     </div>
                 </div>

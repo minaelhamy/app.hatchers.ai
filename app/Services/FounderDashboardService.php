@@ -172,7 +172,7 @@ class FounderDashboardService
                 'mentor_name' => $mentorLinked ? $mentorName : '',
                 'mentor_context' => $mentorLinked
                     ? 'Previously completed during mentor-guided execution.'
-                    : 'Previously completed in your weekly founder workflow.',
+                    : 'Previously completed this week.',
                 'status_label' => '',
                 'detail_type' => 'task',
                 'detail_heading' => 'List your first 10 potential customers',

@@ -301,7 +301,7 @@
                             <div class="commerce-card">
                                 <div class="commerce-card-meta">Product Manager</div>
                                 <div class="commerce-card-title">Add a product from the OS</div>
-                                <div class="commerce-card-copy">Create the product here and keep the founder workflow inside Hatchers OS.</div>
+                                <div class="commerce-card-copy">Create the first product here.</div>
                                 <form method="POST" action="/website/starter" class="commerce-field">
                                     @csrf
                                     <input type="hidden" name="website_engine" value="bazaar">
@@ -321,7 +321,7 @@
                             <div class="commerce-card">
                                 <div class="commerce-card-meta">Services Manager</div>
                                 <div class="commerce-card-title">Add a service from the OS</div>
-                                <div class="commerce-card-copy">Create the service here and keep the founder workflow inside Hatchers OS.</div>
+                                <div class="commerce-card-copy">Create the first service here.</div>
                                 <form method="POST" action="/website/starter" class="commerce-field">
                                     @csrf
                                     <input type="hidden" name="website_engine" value="servio">
@@ -610,7 +610,7 @@
                             <div class="commerce-card">
                                 <div class="commerce-card-meta">Service Operations</div>
                                 <div class="commerce-card-title">Configure booking rules from the OS</div>
-                                <div class="commerce-card-copy">Availability, session length, buffer time, and cancellation policy should all be managed from Hatchers OS for a service business.</div>
+                                <div class="commerce-card-copy">Set availability, session length, buffer time, and cancellation policy here.</div>
                                 <form method="POST" action="{{ route('founder.commerce.settings.store') }}" class="commerce-field">
                                     @csrf
                                     <input type="hidden" name="setting_type" value="booking_policy">
@@ -634,7 +634,7 @@
                             <div class="commerce-card">
                                 <div class="commerce-card-meta">Bookings</div>
                                 <div class="commerce-card-title">{{ $growth['booking_count'] }} bookings tracked</div>
-                                <div class="commerce-card-copy">The OS keeps booking and service delivery signals visible in one founder-facing workspace.</div>
+                                <div class="commerce-card-copy">See bookings and service activity in one place.</div>
                                 <div class="commerce-actions"><a class="commerce-cta" href="{{ route('founder.commerce.bookings') }}">Open bookings view</a></div>
                             </div>
                         </div>
@@ -648,13 +648,13 @@
                             <div class="commerce-card">
                                 <div class="commerce-card-meta">Orders</div>
                                 <div class="commerce-card-title">{{ $growth['order_count'] }} orders tracked</div>
-                                <div class="commerce-card-copy">The OS keeps store health, order volume, and storefront readiness visible in one place.</div>
+                                <div class="commerce-card-copy">See orders, sales activity, and storefront status in one place.</div>
                                 <div class="commerce-actions"><a class="commerce-cta" href="{{ route('founder.commerce.orders') }}">Open orders view</a></div>
                             </div>
                             <div class="commerce-card">
                                 <div class="commerce-card-meta">Website</div>
                                 <div class="commerce-card-title">Public storefront and checkout</div>
-                                <div class="commerce-card-copy">The live public experience stays on your Hatchers OS website path.</div>
+                                <div class="commerce-card-copy">Open the public storefront and checkout flow.</div>
                                 <div class="commerce-actions"><a class="commerce-cta" href="{{ route('website') }}">Open website workspace</a></div>
                             </div>
                         </div>
@@ -668,13 +668,13 @@
                             <div class="commerce-card">
                                 <div class="commerce-card-meta">Bookings</div>
                                 <div class="commerce-card-title">{{ $growth['booking_count'] }} bookings tracked</div>
-                                <div class="commerce-card-copy">The OS keeps booking and service delivery signals visible in one founder-facing workspace.</div>
+                                <div class="commerce-card-copy">See bookings and service activity in one place.</div>
                                 <div class="commerce-actions"><a class="commerce-cta" href="{{ route('founder.commerce.bookings') }}">Open bookings view</a></div>
                             </div>
                             <div class="commerce-card">
                                 <div class="commerce-card-meta">Website</div>
                                 <div class="commerce-card-title">Public service site and booking flow</div>
-                                <div class="commerce-card-copy">The live public experience stays on your Hatchers OS website path.</div>
+                                <div class="commerce-card-copy">Open the public service website and booking flow.</div>
                                 <div class="commerce-actions"><a class="commerce-cta" href="{{ route('website') }}">Open website workspace</a></div>
                             </div>
                         </div>
