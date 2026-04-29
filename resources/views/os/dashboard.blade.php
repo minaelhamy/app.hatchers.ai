@@ -249,6 +249,132 @@
             box-shadow: 0 8px 14px rgba(214, 69, 38, 0.24);
         }
 
+        .os-notification-dropdown {
+            position: absolute;
+            top: calc(100% + 12px);
+            right: 52px;
+            width: min(360px, calc(100vw - 40px));
+            border-radius: 22px;
+            border: 1px solid rgba(226, 214, 201, 0.96);
+            background: rgba(255, 252, 248, 0.95);
+            box-shadow:
+                0 28px 60px rgba(55, 41, 24, 0.16),
+                inset 0 1px 0 rgba(255, 255, 255, 0.92);
+            backdrop-filter: blur(18px);
+            padding: 12px;
+            display: none;
+            z-index: 15;
+        }
+
+        .os-notification-dropdown.is-open {
+            display: grid;
+            gap: 10px;
+        }
+
+        .os-notification-dropdown-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 4px 4px 2px;
+        }
+
+        .os-notification-dropdown-title {
+            font-size: 0.74rem;
+            text-transform: uppercase;
+            letter-spacing: 0.14em;
+            color: rgba(113, 95, 81, 0.7);
+        }
+
+        .os-notification-dropdown-count {
+            font-size: 0.72rem;
+            color: rgba(113, 95, 81, 0.75);
+        }
+
+        .os-notification-dropdown-list {
+            display: grid;
+            gap: 8px;
+            max-height: min(420px, calc(100vh - 220px));
+            overflow-y: auto;
+            padding-right: 2px;
+        }
+
+        .os-notification-item {
+            width: 100%;
+            border: 1px solid rgba(226, 214, 201, 0.94);
+            background: rgba(255, 255, 255, 0.86);
+            border-radius: 18px;
+            padding: 11px 12px;
+            display: grid;
+            grid-template-columns: 36px minmax(0, 1fr);
+            gap: 10px;
+            align-items: start;
+            text-align: left;
+            cursor: pointer;
+            transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+        }
+
+        .os-notification-item:hover {
+            transform: translateY(-1px);
+            border-color: rgba(204, 188, 171, 0.98);
+            box-shadow: 0 12px 24px rgba(66, 51, 39, 0.08);
+        }
+
+        .os-notification-item-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 999px;
+            display: grid;
+            place-items: center;
+            color: #fff;
+            font-size: 0.72rem;
+            font-weight: 800;
+            letter-spacing: 0.04em;
+            background: linear-gradient(135deg, #8e1c74, #ff2c35);
+        }
+
+        .os-notification-item-icon.task {
+            background: linear-gradient(135deg, #7f6f9e, #6d618d);
+        }
+
+        .os-notification-item-icon.mentor,
+        .os-notification-item-icon.lms {
+            background: linear-gradient(135deg, #7391c9, #5e7ab2);
+        }
+
+        .os-notification-item-icon.servio {
+            background: linear-gradient(135deg, #7ea19a, #668a83);
+        }
+
+        .os-notification-item-icon.bazaar {
+            background: linear-gradient(135deg, #b69c78, #a18b69);
+        }
+
+        .os-notification-item-title {
+            font-size: 0.8rem;
+            line-height: 1.4;
+            font-weight: 700;
+            color: rgba(42, 33, 27, 0.92);
+        }
+
+        .os-notification-item-meta {
+            display: block;
+            margin-top: 4px;
+            font-size: 0.72rem;
+            color: rgba(111, 94, 80, 0.76);
+            line-height: 1.45;
+        }
+
+        .os-notification-empty {
+            border: 1px solid rgba(226, 214, 201, 0.94);
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 18px;
+            padding: 16px;
+            font-size: 0.78rem;
+            color: rgba(111, 94, 80, 0.78);
+            line-height: 1.5;
+        }
+
         .os-desktop-logout:hover {
             transform: translateY(-1px);
             background: rgba(255, 253, 250, 0.78);
@@ -614,6 +740,32 @@
                     }
                 });
             });
+
+            const notificationToggle = desktop.querySelector('[data-notification-toggle]');
+            const notificationDropdown = desktop.querySelector('[data-notification-dropdown]');
+
+            notificationToggle?.addEventListener('click', (event) => {
+                event.stopPropagation();
+                notificationDropdown?.classList.toggle('is-open');
+            });
+
+            notificationDropdown?.addEventListener('click', (event) => {
+                const button = event.target.closest('[data-notification-open]');
+                if (!button) return;
+                const key = button.getAttribute('data-notification-open') || '';
+                notificationDropdown.classList.remove('is-open');
+                if (key) {
+                    window.dispatchEvent(new CustomEvent('hatchers:open-app', {
+                        detail: { key },
+                    }));
+                }
+            });
+
+            window.addEventListener('click', (event) => {
+                if (!notificationDropdown?.classList.contains('is-open')) return;
+                if (notificationDropdown.contains(event.target) || notificationToggle?.contains(event.target)) return;
+                notificationDropdown.classList.remove('is-open');
+            });
         })();
     </script>
 @endsection
@@ -632,6 +784,31 @@
         $companyIntelligenceWizard = $companyIntelligenceWizard ?? ['is_complete' => true];
         $companyIntelligenceComplete = (bool) ($companyIntelligenceWizard['is_complete'] ?? true);
         $unreadNotificationCount = (int) ($workspace['unread_notification_count'] ?? 0);
+        $notificationItems = collect(array_merge(
+            $workspace['notification_groups']['new'] ?? [],
+            $workspace['notification_groups']['earlier'] ?? []
+        ))->take(6)->map(function (array $item): array {
+            $kind = strtolower((string) ($item['kind'] ?? 'default'));
+            $appKey = match ($kind) {
+                'mentor', 'lms' => 'learning-plan',
+                'task' => 'tasks',
+                'atlas' => 'atlas-engine',
+                'bazaar' => 'bazaar-engine',
+                'servio' => 'servio-engine',
+                default => 'inbox',
+            };
+
+            return [
+                'title' => (string) ($item['title'] ?? 'Update'),
+                'meta' => trim(implode(' · ', array_filter([
+                    (string) ($item['meta'] ?? ''),
+                    (string) ($item['age_label'] ?? ''),
+                ]))),
+                'kind' => $kind,
+                'app_key' => $appKey,
+                'badge' => strtoupper(substr($kind !== '' ? $kind : 'i', 0, 1)),
+            ];
+        })->values()->all();
         $desktopApps = [
             [
                 'key' => 'atlas-engine',
@@ -814,7 +991,7 @@
                     </div>
                 </div>
                 <div class="os-desktop-bar-right">
-                    <a class="os-desktop-notifications" href="{{ route('founder.notifications') }}" aria-label="Notifications">
+                    <button class="os-desktop-notifications" type="button" aria-label="Notifications" data-notification-toggle>
                         <svg viewBox="0 0 24 24" aria-hidden="true">
                             <path d="M12 4C9.8 4 8 5.8 8 8V10.1C8 11 7.7 11.8 7.1 12.5L5.8 14C5.2 14.6 5.6 15.5 6.4 15.5H17.6C18.4 15.5 18.8 14.6 18.2 14L16.9 12.5C16.3 11.8 16 11 16 10.1V8C16 5.8 14.2 4 12 4Z"></path>
                             <path d="M10 18C10.4 19.1 11.1 19.6 12 19.6C12.9 19.6 13.6 19.1 14 18"></path>
@@ -822,7 +999,30 @@
                         @if ($unreadNotificationCount > 0)
                             <span class="os-desktop-notifications-badge">{{ $unreadNotificationCount > 9 ? '9+' : $unreadNotificationCount }}</span>
                         @endif
-                    </a>
+                    </button>
+                    <div class="os-notification-dropdown" data-notification-dropdown>
+                        <div class="os-notification-dropdown-header">
+                            <div class="os-notification-dropdown-title">Notifications</div>
+                            <div class="os-notification-dropdown-count">{{ $unreadNotificationCount }} active</div>
+                        </div>
+                        <div class="os-notification-dropdown-list">
+                            @forelse ($notificationItems as $notification)
+                                <button
+                                    type="button"
+                                    class="os-notification-item"
+                                    data-notification-open="{{ $notification['app_key'] }}"
+                                >
+                                    <span class="os-notification-item-icon {{ $notification['kind'] }}">{{ $notification['badge'] }}</span>
+                                    <span>
+                                        <span class="os-notification-item-title">{{ $notification['title'] }}</span>
+                                        <span class="os-notification-item-meta">{{ $notification['meta'] !== '' ? $notification['meta'] : 'Open in workspace' }}</span>
+                                    </span>
+                                </button>
+                            @empty
+                                <div class="os-notification-empty">No new notifications right now. When something needs attention, it will appear here.</div>
+                            @endforelse
+                        </div>
+                    </div>
                     <div class="os-desktop-time">{{ $desktopClock }}</div>
                     <form class="os-desktop-logout-form" method="POST" action="/logout">
                         @csrf

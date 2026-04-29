@@ -331,10 +331,6 @@
                 <h1 class="plans-title">Choose your mode.</h1>
                 <p class="plans-copy">Pick the plan that fits how you want to build, then continue into your workspace setup.</p>
 
-                @if (config('app.disable_auth_verification'))
-                    <div class="plans-test-pill">Test mode active · signup and login verification are disabled</div>
-                @endif
-
                 @if (session('error'))
                     <div class="plans-notice" style="margin-top: 16px;">{{ session('error') }}</div>
                 @endif
