@@ -210,7 +210,7 @@ class WebsiteAutopilotService
                 $output['funnel_blocks']['faq'] = collect($objections !== [] ? $objections : ['Why choose us?', 'How fast can we start?', 'What makes this offer worth it?'])
                     ->map(fn (string $objection): array => [
                         'question' => $objection,
-                        'answer' => 'Hatchers shaped this answer around ' . ($problemSolved !== '' ? $problemSolved : 'your founder brief') . ' so the founder can remove hesitation and move the buyer to the next step.',
+                        'answer' => $this->faqAnswer($objection, $companyName, $starterTitle, $problemSolved, $icpName, $city),
                     ])->values()->all();
                 break;
             default:
@@ -310,7 +310,7 @@ class WebsiteAutopilotService
                 [
                     'title' => 'Why people say yes',
                     'body' => 'This site follows a Sell Like Crazy structure: clear problem, clear promise, clear offer, and a single action path.',
-                    'bullets' => $proofPoints !== [] ? $proofPoints : ($objections !== [] ? $objections : ['Transparent pricing', 'Local trust', 'Simple first step']),
+                    'bullets' => $proofPoints !== [] ? $proofPoints : $this->defaultProofBullets($companyName, $starterTitle, $outcomes, $city),
                 ],
                 [
                     'title' => 'About ' . $companyName,
@@ -366,7 +366,7 @@ class WebsiteAutopilotService
                 'faq' => collect($faqPoints !== [] ? $faqPoints : ($objections !== [] ? $objections : ['How does it work?', 'Is pricing clear?', 'What happens next?']))
                     ->map(fn (string $objection): array => [
                         'question' => $objection,
-                        'answer' => 'Answer this objection using the founder brief, ICP, and the simplest possible next step.',
+                        'answer' => $this->faqAnswer($objection, $companyName, $starterTitle, $problemSolved, $icpName, $city),
                     ])->values()->all(),
             ],
             'atlas_handoff' => [
@@ -430,6 +430,9 @@ class WebsiteAutopilotService
             'story_subtitle' => $this->storySubtitle($draft),
             'story_description' => $this->storyDescription($draft),
             'media_assets' => $mediaAssets,
+            'hero_headline' => (string) ($draft['hero']['headline'] ?? ''),
+            'hero_subhead' => (string) ($draft['hero']['subhead'] ?? ''),
+            'hero_brief' => (string) ($draft['hero']['brief'] ?? ''),
         ]);
 
         return [
@@ -463,6 +466,7 @@ class WebsiteAutopilotService
             'starter_title' => $title,
             'starter_description' => $starterOffer['description'] ?? '',
             'starter_price' => $starterOffer['price'] ?? '0',
+            'media_assets' => $this->starterRecordMedia($draft, 0),
         ]);
 
         if (!($result['ok'] ?? false)) {
@@ -486,7 +490,7 @@ class WebsiteAutopilotService
             'cta_url' => route('founder.commerce'),
         ]);
 
-        foreach (array_slice((array) ($draft['catalog_items'] ?? []), 1, 3) as $item) {
+        foreach (array_slice((array) ($draft['catalog_items'] ?? []), 1, 3) as $index => $item) {
             if (!is_array($item) || trim((string) ($item['title'] ?? '')) === '') {
                 continue;
             }
@@ -497,6 +501,7 @@ class WebsiteAutopilotService
                 'starter_title' => (string) $item['title'],
                 'starter_description' => (string) ($item['description'] ?? ''),
                 'starter_price' => (string) ($item['price'] ?? '0'),
+                'media_assets' => $this->starterRecordMedia($draft, $index + 1),
             ]);
         }
 
@@ -621,6 +626,15 @@ class WebsiteAutopilotService
             $this->slotMedia('section_one', 'section one banner', $features),
             $this->slotMedia('section_two', 'section two banner', $proof),
             $this->slotMedia('section_three', 'section three banner', $action),
+            $this->slotMedia('category', 'category image', $features ?? $hero),
+            $this->slotMedia('service_primary', 'service primary image', $hero ?? $features),
+            $this->slotMedia('service_detail', 'service detail image', $features ?? $proof ?? $hero),
+            $this->slotMedia('service_support', 'service support image', $action ?? $story ?? $hero),
+            $this->slotMedia('testimonial_primary', 'testimonial image', $proof ?? $story ?? $hero),
+            $this->slotMedia('gallery_primary', 'gallery image one', $story ?? $hero),
+            $this->slotMedia('gallery_secondary', 'gallery image two', $features ?? $hero),
+            $this->slotMedia('gallery_tertiary', 'gallery image three', $action ?? $proof ?? $hero),
+            $this->slotMedia('why_choose_item', 'why choose us image', $story ?? $features ?? $hero),
         ]));
     }
 
@@ -1125,11 +1139,27 @@ class WebsiteAutopilotService
 
         foreach (array_slice($proof, 0, 3) as $index => $bullet) {
             $items[] = [
-                'name' => 'Happy Client ' . ($index + 1),
-                'position' => 'Verified customer outcome',
-                'description' => $bullet,
+                'name' => $this->testimonialName($index),
+                'position' => 'Verified customer',
+                'description' => $this->normalizeTestimonialLine((string) $bullet, $draft),
                 'star' => 5,
             ];
+        }
+
+        if ($items === []) {
+            foreach ($this->defaultProofBullets(
+                (string) ($draft['website_title'] ?? 'This business'),
+                (string) ($draft['starter_offer']['title'] ?? 'the main offer'),
+                [],
+                ''
+            ) as $index => $bullet) {
+                $items[] = [
+                    'name' => $this->testimonialName($index),
+                    'position' => 'Verified customer',
+                    'description' => $bullet,
+                    'star' => 5,
+                ];
+            }
         }
 
         return $items;
@@ -1180,6 +1210,108 @@ class WebsiteAutopilotService
         $sections = array_values(array_filter((array) ($draft['sections'] ?? []), fn ($item) => is_array($item)));
 
         return trim((string) (($sections[0]['body'] ?? '') ?: ($sections[1]['body'] ?? '')));
+    }
+
+    private function starterRecordMedia(array $draft, int $offset): array
+    {
+        $media = array_values(array_filter((array) ($draft['media_assets'] ?? []), fn ($item) => is_array($item)));
+        if ($media === []) {
+            $resolved = $this->normalizeResolvedAssets((array) ($draft['atlas_handoff']['asset_slots'] ?? []));
+            $byKey = collect($resolved)->keyBy(fn (array $asset): string => trim((string) ($asset['slot_key'] ?? '')));
+            $hero = $byKey->get('hero') ?? ($resolved[0] ?? null);
+            $features = $byKey->get('features') ?? ($resolved[1] ?? $hero);
+            $proof = $byKey->get('proof') ?? ($resolved[2] ?? $features ?? $hero);
+            $story = $byKey->get('story') ?? ($resolved[3] ?? $features ?? $hero);
+            $action = $byKey->get('action') ?? ($resolved[5] ?? $proof ?? $hero);
+
+            $media = array_values(array_filter([
+                $this->slotMedia('category', 'category image', $features ?? $hero),
+                $this->slotMedia('service_primary', 'service primary image', $hero ?? $features),
+                $this->slotMedia('service_detail', 'service detail image', $features ?? $proof ?? $hero),
+                $this->slotMedia('service_support', 'service support image', $action ?? $story ?? $hero),
+            ]));
+        }
+
+        $byTarget = collect($media)->keyBy(fn (array $item): string => trim((string) ($item['target'] ?? '')));
+        $serviceTargets = ['service_primary', 'service_detail', 'service_support', 'hero', 'section_one', 'section_two', 'section_three'];
+
+        $serviceImages = collect($serviceTargets)
+            ->map(fn (string $target) => $byTarget->get($target))
+            ->filter(fn ($item) => is_array($item) && trim((string) ($item['source_url'] ?? '')) !== '')
+            ->values();
+
+        $slice = $serviceImages->slice($offset, 3)->values();
+        if ($slice->isEmpty()) {
+            $slice = $serviceImages->take(3)->values();
+        }
+
+        $categoryAsset = $byTarget->get('category') ?? $byTarget->get('section_one') ?? $byTarget->get('hero');
+
+        return array_values(array_filter([
+            is_array($categoryAsset) && trim((string) ($categoryAsset['source_url'] ?? '')) !== '' ? [
+                'target' => 'category',
+                'source_url' => trim((string) ($categoryAsset['source_url'] ?? '')),
+            ] : null,
+            ...$slice->map(fn (array $asset): array => [
+                'target' => 'service',
+                'source_url' => trim((string) ($asset['source_url'] ?? '')),
+            ])->all(),
+        ]));
+    }
+
+    private function defaultProofBullets(string $companyName, string $starterTitle, array $outcomes, string $city): array
+    {
+        $cityPrefix = trim($city) !== '' ? trim($city) . ' ' : '';
+
+        return array_slice(array_values(array_filter(array_merge(
+            $outcomes,
+            [
+                'A clear ' . strtolower($starterTitle) . ' with no confusing next step.',
+                'Fast replies and a simple booking path from the first visit.',
+                $cityPrefix . 'local trust with an offer that feels straightforward and reliable.',
+            ]
+        ))), 0, 3);
+    }
+
+    private function faqAnswer(string $question, string $companyName, string $starterTitle, string $problemSolved, string $icpName, string $city): string
+    {
+        $question = Str::lower(trim($question));
+        $offer = trim($starterTitle) !== '' ? $starterTitle : 'the first offer';
+        $problemLine = trim($problemSolved) !== '' ? trim($problemSolved) : 'make the next step simple and clear';
+        $cityClause = trim($city) !== '' ? ' in ' . trim($city) : '';
+
+        return match (true) {
+            str_contains($question, 'price'), str_contains($question, 'cost'), str_contains($question, 'high') =>
+                $companyName . ' keeps the pricing around ' . strtolower($offer) . ' simple and visible, so buyers can decide without guesswork. The offer is meant to feel clear for ' . $icpName . ', not confusing or pressured.',
+            str_contains($question, 'how'), str_contains($question, 'work'), str_contains($question, 'what happens next') =>
+                'The process is designed to feel straightforward' . $cityClause . ': review the offer, choose the next step, and get a clear follow-up from ' . $companyName . '. Everything is built around helping customers ' . $problemLine . '.',
+            str_contains($question, 'trust'), str_contains($question, 'safe'), str_contains($question, 'sure') =>
+                $companyName . ' is positioned to feel trustworthy from the first visit. The site explains the offer clearly, shows proof, and makes the next step obvious before asking for a commitment.',
+            default =>
+                $companyName . ' uses a direct-response structure so visitors understand what ' . strtolower($offer) . ' is, who it is for, and the easiest next step. That removes hesitation and helps the right customer act with confidence.',
+        };
+    }
+
+    private function testimonialName(int $index): string
+    {
+        return ['Local Client', 'Repeat Client', 'Busy Customer'][$index] ?? ('Client ' . ($index + 1));
+    }
+
+    private function normalizeTestimonialLine(string $line, array $draft): string
+    {
+        $line = trim($line);
+        if ($line === '') {
+            return 'The experience felt simple, clear, and easy to trust from the first step.';
+        }
+
+        foreach (['not sure', 'too expensive', 'high', 'think about it', 'hesitation', 'confusing'] as $signal) {
+            if (str_contains(Str::lower($line), $signal)) {
+                $offer = (string) ($draft['starter_offer']['title'] ?? 'the offer');
+                return 'I understood exactly what ' . strtolower($offer) . ' included, and it felt easy to decide and move forward.';
+            }
+        }
+
+        return $line;
     }
 
     private function fallbackBlueprint(Company $company): ?VerticalBlueprint

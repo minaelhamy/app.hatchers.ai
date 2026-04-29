@@ -105,6 +105,9 @@ class WebsiteProvisioningService
             'story_title' => trim((string) ($input['story_title'] ?? '')),
             'story_subtitle' => trim((string) ($input['story_subtitle'] ?? '')),
             'story_description' => trim((string) ($input['story_description'] ?? '')),
+            'hero_headline' => trim((string) ($input['hero_headline'] ?? '')),
+            'hero_subhead' => trim((string) ($input['hero_subhead'] ?? '')),
+            'hero_brief' => trim((string) ($input['hero_brief'] ?? '')),
             'media_assets' => array_values(array_filter((array) ($input['media_assets'] ?? []), fn ($item) => is_array($item))),
         ];
 
@@ -187,6 +190,7 @@ class WebsiteProvisioningService
             'title' => $title,
             'description' => $description,
             'price' => $price,
+            'media_assets' => array_values(array_filter((array) ($input['media_assets'] ?? []), fn ($item) => is_array($item))),
         ]);
     }
 
