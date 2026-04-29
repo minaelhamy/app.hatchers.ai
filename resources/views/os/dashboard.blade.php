@@ -555,14 +555,6 @@
                 'external' => true,
             ],
             [
-                'key' => 'activity',
-                'label' => 'Activity',
-                'route' => route('founder.activity'),
-                'class' => 'os-icon-activity',
-                'icon' => 'pulse',
-                'external' => false,
-            ],
-            [
                 'key' => 'media-library',
                 'label' => 'Media Library',
                 'route' => route('founder.media-library'),
@@ -580,7 +572,7 @@
             ],
             [
                 'key' => 'first-100',
-                'label' => 'First 100',
+                'label' => 'Lead Tracker',
                 'route' => route('founder.first-100'),
                 'class' => 'os-icon-growth',
                 'icon' => 'target',

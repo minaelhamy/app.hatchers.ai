@@ -84,7 +84,7 @@
         <main class="tasks-main">
             <div class="tasks-main-inner">
                 <h1>Tasks</h1>
-                <p>Your weekly execution queue with AI-assisted action built into Hatchers Ai OS.</p>
+                <p>Your single daily execution center. If you want to know what to do next, start here.</p>
                 @if (session('success'))
                     <div class="task-banner success">{{ session('success') }}</div>
                 @endif

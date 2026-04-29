@@ -75,8 +75,8 @@
 
         <main class="activity-main">
             <div class="activity-main-inner">
-                <h1>Activity</h1>
-                <p>Your cross-tool founder activity center inside Hatchers Ai Business OS.</p>
+                <h1>System Activity</h1>
+                <p>This is a system timeline and sync view. It helps you check tool updates, not decide your next action.</p>
 
                 <section class="activity-stats">
                     <div class="activity-stat">
@@ -94,21 +94,6 @@
                 </section>
 
                 <div class="activity-grid" style="margin-top:18px;">
-                    <section class="activity-card">
-                        <h2 class="activity-section-title">Next Best Actions</h2>
-                        <div class="activity-actions">
-                            @foreach ($workspace['next_best_actions'] as $action)
-                                <div class="activity-action">
-                                    <div>
-                                        <strong>{{ $action['title'] }}</strong>
-                                        <div class="muted" style="margin-top:4px;">{{ $action['description'] }}</div>
-                                    </div>
-                                    <a class="activity-pill" href="{{ $action['href'] }}">{{ $action['label'] }}</a>
-                                </div>
-                            @endforeach
-                        </div>
-                    </section>
-
                     <section class="activity-card" id="sync-issues">
                         <h2 class="activity-section-title">Sync Trust</h2>
                         @forelse ($syncStatus['modules'] as $status)

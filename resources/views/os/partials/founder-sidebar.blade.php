@@ -20,7 +20,7 @@
     $sidebarItems = [
         ['key' => 'home', 'label' => 'Home', 'icon' => 'HM', 'accent' => 'amber', 'href' => '/dashboard/founder'],
         ['key' => 'tasks', 'label' => 'Tasks', 'icon' => 'TK', 'accent' => 'sky', 'href' => route('founder.tasks')],
-        ['key' => 'first-100', 'label' => 'First 100', 'icon' => '100', 'accent' => 'rose', 'href' => route('founder.first-100')],
+        ['key' => 'first-100', 'label' => 'Lead Tracker', 'icon' => '100', 'accent' => 'rose', 'href' => route('founder.first-100')],
         ['key' => 'marketing', 'label' => 'Marketing', 'icon' => 'MK', 'accent' => 'plum', 'href' => route('founder.marketing')],
         ['key' => 'website', 'label' => 'Website', 'icon' => 'WEB', 'accent' => 'mint', 'href' => route('website')],
         ['key' => 'commerce', 'label' => 'Commerce', 'icon' => 'COM', 'accent' => 'slate', 'href' => route('founder.commerce')],
@@ -36,7 +36,6 @@
     }
 
     $sidebarItems = array_merge($sidebarItems, [
-        ['key' => 'activity', 'label' => 'Activity', 'icon' => 'ACT', 'accent' => 'slate', 'href' => route('founder.activity')],
         ['key' => 'inbox', 'label' => 'Inbox', 'icon' => 'IN', 'accent' => 'sky', 'href' => route('founder.inbox')],
         ['key' => 'search', 'label' => 'Search', 'icon' => 'Q', 'accent' => 'amber', 'href' => route('founder.search')],
         ['key' => 'ai-tools', 'label' => 'AI Studio', 'icon' => 'AI', 'accent' => 'rose', 'href' => route('founder.ai-tools')],

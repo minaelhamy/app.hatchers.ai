@@ -334,7 +334,7 @@ class OsShellController extends Controller
         }
 
         return view('os.activity', [
-            'pageTitle' => 'Activity',
+            'pageTitle' => 'System Activity',
             'dashboard' => $founderDashboardService->build($user),
         ]);
     }
@@ -357,7 +357,7 @@ class OsShellController extends Controller
         ]);
 
         return view('os.first-100', [
-            'pageTitle' => 'First 100 Customers',
+            'pageTitle' => 'Lead Tracker',
             'dashboard' => $founderDashboardService->build($user),
             'tracker' => $revenueOsService->workspace($user, $filters),
         ]);
@@ -511,7 +511,7 @@ class OsShellController extends Controller
             'lost_at' => $stage === 'lost' ? now() : null,
         ]);
 
-        return redirect()->route('founder.first-100')->with('success', 'Lead added to your First 100 tracker.');
+        return redirect()->route('founder.first-100')->with('success', 'Lead added to your Lead Tracker.');
     }
 
     public function founderUpdateLead(Request $request, FounderLead $lead, FounderRevenueOsService $revenueOsService): RedirectResponse
@@ -560,7 +560,7 @@ class OsShellController extends Controller
 
         $lead->save();
 
-        return redirect()->route('founder.first-100')->with('success', 'Lead updated in your First 100 tracker.');
+        return redirect()->route('founder.first-100')->with('success', 'Lead updated in your Lead Tracker.');
     }
 
     public function founderLogLeadTouch(Request $request, FounderLead $lead): RedirectResponse
@@ -626,7 +626,7 @@ class OsShellController extends Controller
 
         $lead->save();
 
-        return redirect()->route('founder.first-100')->with('success', 'Conversation touch logged in your First 100 tracker.');
+        return redirect()->route('founder.first-100')->with('success', 'Conversation touch logged in your Lead Tracker.');
     }
 
     public function founderStorePromoLink(Request $request, FounderRevenueOsService $revenueOsService): RedirectResponse

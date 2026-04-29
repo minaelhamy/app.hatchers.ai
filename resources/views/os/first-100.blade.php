@@ -75,13 +75,12 @@
         $offlineBridge = $tracker['offline_bridge'];
         $filters = $tracker['filters'];
         $leads = $tracker['leads'];
-        $trackerMode = request()->query('mode', 'today');
-        if (!in_array($trackerMode, ['today', 'pipeline', 'scripts', 'offline'], true)) {
-            $trackerMode = 'today';
+        $trackerMode = request()->query('mode', 'pipeline');
+        if (!in_array($trackerMode, ['pipeline', 'scripts', 'offline'], true)) {
+            $trackerMode = 'pipeline';
         }
         $trackerModeHelp = [
-            'today' => 'Use this mode when you want the OS to tell you who to contact and what to do right now.',
-            'pipeline' => 'Use this mode when you need to add leads, filter the pipeline, and manage records in detail.',
+            'pipeline' => 'Use this mode to track leads, update stages, and manage follow-up records clearly.',
             'scripts' => 'Use this mode when you are actively messaging leads and need scripts, objections, and follow-up rules.',
             'offline' => 'Use this mode when you are running flyer, QR, referral, or in-person campaigns and want source attribution.',
         ];
@@ -106,11 +105,10 @@
 
         <main class="tracker-main">
             <div class="tracker-main-inner">
-                <h1>First 100 Customers</h1>
-                <p>Turn your website, offers, and local outreach into a real customer pipeline. This is the founder workspace for named leads, follow-up, and first-customer momentum.</p>
+                <h1>Lead Tracker</h1>
+                <p>Track named leads, follow-up, stages, and outreach history here. Use Tasks to decide what to do next.</p>
                 <div class="tracker-mode-nav">
-                    <a class="tracker-mode-tab {{ $trackerMode === 'today' ? 'active' : '' }}" href="{{ route('founder.first-100', array_filter(['mode' => 'today'])) }}">Today</a>
-                    <a class="tracker-mode-tab {{ $trackerMode === 'pipeline' ? 'active' : '' }}" href="{{ route('founder.first-100', array_filter(['mode' => 'pipeline'])) }}">Pipeline</a>
+                    <a class="tracker-mode-tab {{ $trackerMode === 'pipeline' ? 'active' : '' }}" href="{{ route('founder.first-100', array_filter(['mode' => 'pipeline'])) }}">Leads</a>
                     <a class="tracker-mode-tab {{ $trackerMode === 'scripts' ? 'active' : '' }}" href="{{ route('founder.first-100', array_filter(['mode' => 'scripts'])) }}">Scripts</a>
                     <a class="tracker-mode-tab {{ $trackerMode === 'offline' ? 'active' : '' }}" href="{{ route('founder.first-100', array_filter(['mode' => 'offline'])) }}">Offline</a>
                 </div>
@@ -133,60 +131,6 @@
                     <div class="tracker-metric"><div class="tracker-muted">Follow-up due</div><strong>{{ $metrics['follow_up_due'] }}</strong></div>
                     <div class="tracker-metric"><div class="tracker-muted">Pipeline value</div><strong>USD {{ number_format((float) $metrics['estimated_pipeline_value'], 2) }}</strong></div>
                 </section>
-
-                @if ($trackerMode === 'today')
-                <section class="tracker-card" style="margin-bottom:12px;">
-                    <h2 class="tracker-section-title">{{ $dailyPlan['headline'] }}</h2>
-                    <div class="tracker-muted">{{ $dailyPlan['focus'] }}</div>
-                    <div class="tracker-muted" style="margin-top:8px;"><strong>Lead angle:</strong> {{ $dailyPlan['hook'] }}</div>
-                    <div class="tracker-grid" style="margin-top:14px;">
-                        @foreach ($dailyPlan['tasks'] as $task)
-                            <div class="tracker-lead-card">
-                                <strong>{{ $task['title'] }}</strong>
-                                <div class="tracker-muted" style="margin-top:6px;">{{ $task['description'] }}</div>
-                                <div class="tracker-actions" style="margin-top:10px;">
-                                    <a class="tracker-pill" href="{{ $task['href'] }}">{{ $task['label'] }}</a>
-                                </div>
-                            </div>
-                        @endforeach
-                    </div>
-                </section>
-
-                <section class="tracker-card" style="margin-bottom:12px;">
-                    <h2 class="tracker-section-title">Local Acquisition Engine</h2>
-                    <div class="tracker-muted">Priority channel: {{ $acquisitionEngine['priority_channel'] }}. Use these playbooks to turn your vertical, city, and ICP into real conversations.</div>
-                    <div class="tracker-muted" style="margin-top:8px;"><strong>Sell Like Crazy angle:</strong> {{ $acquisitionEngine['lead_angle'] }}</div>
-                    <div class="tracker-grid" style="margin-top:14px;">
-                        @foreach ($acquisitionEngine['playbooks'] as $playbook)
-                            <div class="tracker-lead-card">
-                                <div class="tracker-row-header">
-                                    <div>
-                                        <strong>{{ $playbook['channel_label'] }}</strong><br>
-                                        <span class="tracker-muted">{{ $playbook['why_now'] }}</span>
-                                    </div>
-                                    <div class="tracker-badge {{ $playbook['priority'] ? 'success' : '' }}">{{ $playbook['priority'] ? 'Priority' : $playbook['today_target'] . ' today' }}</div>
-                                </div>
-                                <div class="tracker-muted" style="margin-top:10px;"><strong>Today:</strong> {{ $playbook['today_action'] }}</div>
-                                <div class="tracker-muted" style="margin-top:8px;"><strong>Offer angle:</strong> {{ $playbook['offer_angle'] }}</div>
-                                <div class="tracker-muted" style="margin-top:8px;"><strong>Launch status:</strong> {{ ucfirst(str_replace('_', ' ', $playbook['status'] ?? 'recommended')) }}</div>
-                                <div class="tracker-lead-card" style="margin-top:12px; background:#fff;">
-                                    <strong>{{ $playbook['script_title'] }}</strong>
-                                    <div class="tracker-muted" style="margin-top:6px; white-space:pre-line;">{{ $playbook['script_body'] }}</div>
-                                </div>
-                                <div class="tracker-actions" style="margin-top:10px;">
-                                    @if (!($playbook['adopted'] ?? false) && !empty($playbook['lead_channel_id']))
-                                        <form method="POST" action="{{ route('founder.first-100.acquisition.apply', $playbook['lead_channel_id']) }}" style="margin:0;">
-                                            @csrf
-                                            <button class="tracker-btn" type="submit">Add To Launch System</button>
-                                        </form>
-                                    @endif
-                                    <a class="tracker-pill" href="{{ $playbook['href'] }}">Work this channel</a>
-                                </div>
-                            </div>
-                        @endforeach
-                    </div>
-                </section>
-                @endif
 
                 @if ($trackerMode === 'scripts')
                 <section class="tracker-card" style="margin-bottom:12px;">
