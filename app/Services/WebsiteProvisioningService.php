@@ -223,7 +223,7 @@ class WebsiteProvisioningService
 
     private function postToEngine(string $engine, array $payload): array
     {
-        $sharedSecret = trim((string) env('WEBSITE_PLATFORM_SHARED_SECRET', ''));
+        $sharedSecret = $this->sharedSecret();
         $baseUrl = rtrim((string) config('modules.' . $engine . '.base_url'), '/');
         if ($sharedSecret === '' || $baseUrl === '') {
             return [
@@ -295,10 +295,15 @@ class WebsiteProvisioningService
 
     private function bridgeConfigured(string $engine): bool
     {
-        $sharedSecret = trim((string) env('WEBSITE_PLATFORM_SHARED_SECRET', ''));
+        $sharedSecret = $this->sharedSecret();
         $baseUrl = rtrim((string) config('modules.' . $engine . '.base_url'), '/');
 
         return $sharedSecret !== '' && $baseUrl !== '';
+    }
+
+    private function sharedSecret(): string
+    {
+        return trim((string) config('services.os.shared_secret', ''));
     }
 
     private function fallbackPublicUrl(Founder $founder, string $path = ''): string
