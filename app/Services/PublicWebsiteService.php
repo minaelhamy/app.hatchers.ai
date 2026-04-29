@@ -84,12 +84,12 @@ class PublicWebsiteService
                 ->values()
                 ->all(),
             'asset_slots' => collect((array) ($draftOutput['atlas_handoff']['asset_slots'] ?? []))
-                ->filter('is_array')
+                ->filter(fn ($asset): bool => is_array($asset))
                 ->values()
                 ->all(),
             'checkout_context' => [
                 'shipping_zones' => collect((array) ($payload['shipping_zones'] ?? []))
-                    ->filter('is_array')
+                    ->filter(fn ($zone): bool => is_array($zone))
                     ->map(fn (array $zone): array => [
                         'area_name' => (string) ($zone['area_name'] ?? ''),
                         'delivery_charge' => (float) ($zone['delivery_charge'] ?? 0),
@@ -107,7 +107,7 @@ class PublicWebsiteService
     private function generatedSections(array $draftOutput): array
     {
         return collect((array) ($draftOutput['sections'] ?? []))
-            ->filter('is_array')
+            ->filter(fn ($section): bool => is_array($section))
             ->values()
             ->map(function (array $section): array {
                 $asset = is_array($section['asset'] ?? null) ? $section['asset'] : [];
@@ -245,7 +245,7 @@ class PublicWebsiteService
                         'payment_collection' => $paymentCollection,
                         'accepted_payment_methods' => $this->acceptedPaymentMethods($paymentCollection),
                         'variants' => collect((array) ($product['variants'] ?? []))
-                            ->filter('is_array')
+                            ->filter(fn ($variant): bool => is_array($variant))
                             ->map(fn (array $variant): array => [
                                 'name' => (string) ($variant['name'] ?? ''),
                                 'price' => (float) ($variant['price'] ?? 0),
@@ -254,7 +254,7 @@ class PublicWebsiteService
                             ->values()
                             ->all(),
                         'extras' => collect((array) ($product['extras'] ?? []))
-                            ->filter('is_array')
+                            ->filter(fn ($extra): bool => is_array($extra))
                             ->map(fn (array $extra): array => [
                                 'name' => (string) ($extra['name'] ?? ''),
                                 'price' => (float) ($extra['price'] ?? 0),
@@ -295,7 +295,7 @@ class PublicWebsiteService
                         'payment_collection' => $paymentCollection,
                         'accepted_payment_methods' => $this->acceptedPaymentMethods($paymentCollection),
                         'additional_services' => collect((array) ($service['additional_services'] ?? []))
-                            ->filter('is_array')
+                            ->filter(fn ($extra): bool => is_array($extra))
                             ->map(fn (array $extra): array => [
                                 'name' => (string) ($extra['name'] ?? ''),
                                 'price' => (float) ($extra['price'] ?? 0),
@@ -424,7 +424,7 @@ class PublicWebsiteService
 
         if ($businessModel !== 'service') {
             $shipping = collect((array) ($payload['shipping_zones'] ?? []))
-                ->filter('is_array')
+                ->filter(fn ($zone): bool => is_array($zone))
                 ->map(function (array $zone) use ($currency): array {
                     return [
                         'title' => (string) ($zone['area_name'] ?? 'Delivery zone'),
@@ -446,7 +446,7 @@ class PublicWebsiteService
 
         if ($businessModel !== 'product') {
             $availability = collect((array) ($payload['recent_services'] ?? []))
-                ->filter('is_array')
+                ->filter(fn ($service): bool => is_array($service))
                 ->map(function (array $service): array {
                     $days = collect((array) ($service['availability_days'] ?? []))
                         ->filter(fn ($day): bool => trim((string) $day) !== '')
