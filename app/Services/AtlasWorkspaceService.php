@@ -74,4 +74,63 @@ class AtlasWorkspaceService
             'documents' => is_array($data['documents'] ?? null) ? $data['documents'] : [],
         ];
     }
+
+    public function websiteAssets(Founder $founder): array
+    {
+        $baseline = [
+            'ok' => false,
+            'asset_slots' => [],
+        ];
+
+        $secret = trim((string) config('services.atlas.shared_secret'));
+        $endpoint = rtrim((string) config('services.atlas.base_url'), '/') . '/hatchers/website/assets';
+
+        if ($secret === '' || $endpoint === '/hatchers/website/assets') {
+            return $baseline;
+        }
+
+        $payload = [
+            'app' => 'os',
+            'role' => $founder->role ?: 'founder',
+            'current_page' => 'website_autopilot',
+            'name' => $founder->full_name,
+            'username' => $founder->username,
+            'email' => $founder->email,
+        ];
+
+        $json = json_encode($payload);
+        if ($json === false) {
+            return $baseline;
+        }
+
+        try {
+            $response = Http::timeout(25)
+                ->withHeaders([
+                    'X-Hatchers-Signature' => hash_hmac('sha256', $json, $secret),
+                    'Content-Type' => 'application/json',
+                ])
+                ->post($endpoint, $payload);
+        } catch (\Throwable $exception) {
+            Log::warning('Atlas website assets failed', [
+                'founder_id' => $founder->id,
+                'message' => $exception->getMessage(),
+            ]);
+
+            return $baseline;
+        }
+
+        if (!$response->successful()) {
+            return $baseline;
+        }
+
+        $data = $response->json();
+        if (!is_array($data)) {
+            return $baseline;
+        }
+
+        return [
+            'ok' => true,
+            'asset_slots' => is_array($data['asset_slots'] ?? null) ? $data['asset_slots'] : [],
+        ];
+    }
 }

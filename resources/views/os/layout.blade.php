@@ -2128,6 +2128,7 @@
             const appPresets = {
                 'ai-tools': { width: 980, height: 680 },
                 'website': { width: 1040, height: 700 },
+                'build-website': { width: 1040, height: 700 },
                 'commerce': { width: 940, height: 660 },
                 'marketing': { width: 900, height: 640 },
                 'media-library': { width: 920, height: 660 },

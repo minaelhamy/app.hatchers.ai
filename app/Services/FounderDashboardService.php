@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Founder;
 use App\Models\FounderActionPlan;
+use App\Models\FounderNotification;
 use App\Models\ModuleSnapshot;
 use Illuminate\Support\Carbon;
 
@@ -361,6 +362,25 @@ class FounderDashboardService
     private function buildNotifications(Founder $founder, array $activityFeed, array $execution): array
     {
         $notifications = [];
+        $company = $founder->company;
+
+        $savedNotifications = FounderNotification::query()
+            ->where('founder_id', $founder->id)
+            ->latest('id')
+            ->limit(6)
+            ->get();
+
+        foreach ($savedNotifications as $notification) {
+            $notifications[] = [
+                'title' => (string) $notification->title,
+                'meta' => (string) ($notification->meta ?? ''),
+                'kind' => strtolower((string) $notification->kind),
+                'age_label' => $this->notificationAgeLabel($notification->created_at),
+                'is_new' => !$notification->is_read,
+                'app_key' => (string) ($notification->app_key ?? ''),
+                'href' => (string) ($notification->link_url ?? ''),
+            ];
+        }
 
         if ($execution['next_meeting_at']) {
             $notifications[] = [
@@ -382,6 +402,19 @@ class FounderDashboardService
             ];
         }
 
+        if ($this->companyIntelligenceLooksComplete($founder)
+            && in_array(strtolower((string) ($company?->website_generation_status ?? 'not_started')), ['not_started', 'queued'], true)
+            && strtolower((string) ($company?->website_status ?? 'not_started')) !== 'live') {
+            $notifications[] = [
+                'title' => 'We can build your website now.',
+                'meta' => 'Open Build My Website and Hatchers will prepare the first full draft for you.',
+                'kind' => 'website',
+                'age_label' => 'Now',
+                'is_new' => true,
+                'app_key' => 'build-website',
+            ];
+        }
+
         foreach (array_slice($activityFeed, 0, 4) as $index => $item) {
             $notifications[] = [
                 'title' => $item['message'],
@@ -392,7 +425,16 @@ class FounderDashboardService
             ];
         }
 
-        return array_slice($notifications, 0, 4);
+        $notifications = collect($notifications)
+            ->unique(fn (array $item) => implode('|', [
+                strtolower((string) ($item['kind'] ?? '')),
+                strtolower((string) ($item['title'] ?? '')),
+                strtolower((string) ($item['meta'] ?? '')),
+            ]))
+            ->values()
+            ->all();
+
+        return array_slice($notifications, 0, 6);
     }
 
     private function groupNotifications(array $notifications): array
@@ -444,6 +486,52 @@ class FounderDashboardService
             'author' => $founder->full_name,
             'message' => $message,
         ], $messages);
+    }
+
+    private function companyIntelligenceLooksComplete(Founder $founder): bool
+    {
+        $company = $founder->company;
+        $intelligence = $company?->intelligence;
+
+        if (!$company || !$intelligence) {
+            return false;
+        }
+
+        $required = [
+            trim((string) $founder->full_name),
+            trim((string) ($company->company_name ?? '')),
+            trim((string) ($company->company_brief ?? '')),
+            trim((string) ($company->business_model ?? '')),
+            trim((string) ($intelligence->target_audience ?? '')),
+            trim((string) ($intelligence->primary_icp_name ?? '')),
+            trim((string) ($intelligence->ideal_customer_profile ?? '')),
+            trim((string) ($intelligence->problem_solved ?? '')),
+            trim((string) ($intelligence->core_offer ?? '')),
+            trim((string) ($intelligence->differentiators ?? '')),
+            trim((string) ($intelligence->objections ?? '')),
+            trim((string) ($intelligence->buying_triggers ?? '')),
+            trim((string) ($intelligence->brand_voice ?? '')),
+            trim((string) ($intelligence->visual_style ?? '')),
+            trim((string) ($intelligence->primary_growth_goal ?? '')),
+            trim((string) ($intelligence->known_blockers ?? '')),
+        ];
+
+        foreach ($required as $value) {
+            if ($value === '') {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function notificationAgeLabel($createdAt): string
+    {
+        if (!$createdAt instanceof Carbon) {
+            return 'Recently';
+        }
+
+        return $createdAt->diffForHumans(null, true) . ' ago';
     }
 
     private function actionSummary(FounderActionPlan $actionPlan): string

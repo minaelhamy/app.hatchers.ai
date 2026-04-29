@@ -789,14 +789,18 @@
             $workspace['notification_groups']['earlier'] ?? []
         ))->take(6)->map(function (array $item): array {
             $kind = strtolower((string) ($item['kind'] ?? 'default'));
-            $appKey = match ($kind) {
-                'mentor', 'lms' => 'learning-plan',
-                'task' => 'tasks',
-                'atlas' => 'atlas-engine',
-                'bazaar' => 'bazaar-engine',
-                'servio' => 'servio-engine',
-                default => 'inbox',
-            };
+            $appKey = trim((string) ($item['app_key'] ?? ''));
+            if ($appKey === '') {
+                $appKey = match ($kind) {
+                    'mentor', 'lms' => 'learning-plan',
+                    'task' => 'tasks',
+                    'atlas' => 'atlas-engine',
+                    'bazaar' => 'bazaar-engine',
+                    'servio' => 'servio-engine',
+                    'website', 'website_building', 'website_ready' => 'build-website',
+                    default => 'inbox',
+                };
+            }
 
             return [
                 'title' => (string) ($item['title'] ?? 'Update'),
@@ -866,6 +870,14 @@
                 'icon' => 'gear',
                 'external' => false,
                 'heartbeat' => !$companyIntelligenceComplete,
+            ],
+            [
+                'key' => 'build-website',
+                'label' => 'Build My Website',
+                'route' => route('website', ['stage' => 'build']),
+                'class' => 'os-icon-website',
+                'icon' => 'window',
+                'external' => false,
             ],
             [
                 'key' => 'atlas-brand-studio',

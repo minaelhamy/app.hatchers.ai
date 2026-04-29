@@ -51,6 +51,10 @@
         $domainModel = $website['domain_model'];
         $nextSteps = $website['next_steps'];
         $generationStatus = $website['website_generation_status'];
+        $buildBrief = $website['build_brief'] ?? [];
+        $buildSummary = $buildBrief['company_intelligence_summary'] ?? [];
+        $buildIntake = $buildBrief['intake'] ?? [];
+        $buildMissingItems = $buildBrief['missing_items'] ?? [];
         $autopilot = $website['autopilot'] ?? [];
         $autopilotDraft = $autopilot['draft'] ?? null;
         $launchSystem = $autopilot['launch_system'] ?? null;
@@ -61,11 +65,12 @@
         $supportsServices = in_array($businessModel, ['service', 'hybrid'], true);
         $defaultWebsiteTitle = old('website_title', $autopilotDraft['title'] ?? $recommendedCard['website_title']);
         $defaultThemeTemplate = old('theme_template', $autopilotDraft['theme_template'] ?? $recommendedCard['theme']);
-        $websiteStage = request()->query('stage', 'overview');
-        if (!in_array($websiteStage, ['overview', 'setup', 'publish'], true)) {
-            $websiteStage = 'overview';
+        $websiteStage = request()->query('stage', 'build');
+        if (!in_array($websiteStage, ['build', 'overview', 'setup', 'publish'], true)) {
+            $websiteStage = 'build';
         }
         $stageHelp = [
+            'build' => 'Start here after Company Intelligence. Hatchers will show the company brief, collect any missing website details, and build the first site for you.',
             'overview' => 'Start here if you are launching for the first time. Review the draft, make sure the message feels right, then move to setup.',
             'setup' => 'Set the public name, page path, theme, and first offer. This is the main build step before launch.',
             'publish' => 'Use this step when the draft and setup are ready and you want the public OS site to go live.',
@@ -117,12 +122,100 @@
                     <span class="pill">Launch draft: {{ ucfirst(str_replace('_', ' ', $generationStatus)) }}</span>
                 </div>
                 <div class="workspace-stage-nav">
-                    <a class="workspace-stage-tab {{ $websiteStage === 'overview' ? 'active' : '' }}" href="{{ route('website', ['stage' => 'overview']) }}">1. Review Draft</a>
-                    <a class="workspace-stage-tab {{ $websiteStage === 'setup' ? 'active' : '' }}" href="{{ route('website', ['stage' => 'setup']) }}">2. Finish Setup</a>
-                    <a class="workspace-stage-tab {{ $websiteStage === 'publish' ? 'active' : '' }}" href="{{ route('website', ['stage' => 'publish']) }}">3. Publish</a>
+                    <a class="workspace-stage-tab {{ $websiteStage === 'build' ? 'active' : '' }}" href="{{ route('website', ['stage' => 'build']) }}">1. Build My Website</a>
+                    <a class="workspace-stage-tab {{ $websiteStage === 'overview' ? 'active' : '' }}" href="{{ route('website', ['stage' => 'overview']) }}">2. Review Draft</a>
+                    <a class="workspace-stage-tab {{ $websiteStage === 'setup' ? 'active' : '' }}" href="{{ route('website', ['stage' => 'setup']) }}">3. Finish Setup</a>
+                    <a class="workspace-stage-tab {{ $websiteStage === 'publish' ? 'active' : '' }}" href="{{ route('website', ['stage' => 'publish']) }}">4. Publish</a>
                 </div>
                 <div class="workspace-stage-helper">{{ $stageHelp[$websiteStage] }}</div>
             </section>
+
+            @if ($websiteStage === 'build')
+            <section class="grid-2" style="margin-top: 22px;">
+                <div class="card">
+                    <h2>Company Intelligence Brief</h2>
+                    <p class="muted" style="margin-bottom: 14px;">This is the founder context Hatchers will use as the core for the website. Anything missing below can still be filled later, but the stronger this brief is, the better the first website build will be.</p>
+                    <div class="stack">
+                        @foreach ($buildSummary as $row)
+                            @if (!empty($row['value']))
+                                <div class="stack-item">
+                                    <strong>{{ $row['label'] }}</strong><br>
+                                    <span class="muted">{{ $row['value'] }}</span>
+                                </div>
+                            @endif
+                        @endforeach
+                        @if (!empty($buildMissingItems))
+                            <div class="stack-item">
+                                <strong>Helpful details still missing</strong><br>
+                                @foreach ($buildMissingItems as $missing)
+                                    <div class="muted">• {{ $missing }}</div>
+                                @endforeach
+                            </div>
+                        @endif
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>Build My Website</h2>
+                    <p class="muted" style="margin-bottom: 14px;">Hatchers will choose the right engine, pick a template, write the copy, prepare the services or products, plan the images, and build the first website draft for you. Leave any field blank if you do not know it yet.</p>
+                    <form method="POST" action="{{ route('website.build.store') }}" class="stack">
+                        @csrf
+                        <div class="stack-item">
+                            <strong>What should this website do first?</strong><br>
+                            <textarea name="website_goal" rows="3" style="margin-top:10px;width:100%;padding:12px;border-radius:14px;border:1px solid var(--line);background:#fff;">{{ old('website_goal', $buildIntake['website_goal'] ?? '') }}</textarea>
+                        </div>
+                        @if ($businessModel === 'hybrid')
+                            <div class="stack-item">
+                                <strong>Primary website focus</strong><br>
+                                <select name="primary_website_focus" style="margin-top:10px;width:100%;padding:12px;border-radius:14px;border:1px solid var(--line);background:#fff;">
+                                    <option value="auto" @selected(old('primary_website_focus', $buildIntake['primary_website_focus'] ?? 'auto') === 'auto')>Let Hatchers decide</option>
+                                    <option value="service" @selected(old('primary_website_focus', $buildIntake['primary_website_focus'] ?? '') === 'service')>Lead with services</option>
+                                    <option value="product" @selected(old('primary_website_focus', $buildIntake['primary_website_focus'] ?? '') === 'product')>Lead with products</option>
+                                </select>
+                            </div>
+                        @endif
+                        <div class="stack-item">
+                            <strong>Primary call to action</strong><br>
+                            <input type="text" name="primary_cta" value="{{ old('primary_cta', $buildIntake['primary_cta'] ?? '') }}" placeholder="Book now, shop now, get a quote, talk to us..." style="margin-top:10px;width:100%;padding:12px;border-radius:14px;border:1px solid var(--line);background:#fff;">
+                        </div>
+                        <div class="stack-item">
+                            <strong>{{ $supportsProducts && !$supportsServices ? 'Products to feature first' : 'Services or products to feature first' }}</strong><br>
+                            <span class="muted">One item per line using: Name | Price | Short description</span>
+                            <textarea name="offer_items" rows="6" style="margin-top:10px;width:100%;padding:12px;border-radius:14px;border:1px solid var(--line);background:#fff;">{{ old('offer_items', $buildIntake['offer_items'] ?? '') }}</textarea>
+                        </div>
+                        <div class="stack-item">
+                            <strong>Trust points to show</strong><br>
+                            <span class="muted">Reviews, years of experience, guarantees, certifications, before/after results, local reputation.</span>
+                            <textarea name="proof_points" rows="3" style="margin-top:10px;width:100%;padding:12px;border-radius:14px;border:1px solid var(--line);background:#fff;">{{ old('proof_points', $buildIntake['proof_points'] ?? '') }}</textarea>
+                        </div>
+                        <div class="stack-item">
+                            <strong>FAQ questions to answer</strong><br>
+                            <textarea name="faq_points" rows="4" style="margin-top:10px;width:100%;padding:12px;border-radius:14px;border:1px solid var(--line);background:#fff;">{{ old('faq_points', $buildIntake['faq_points'] ?? '') }}</textarea>
+                        </div>
+                        <div class="stack-item">
+                            <strong>Contact details and logistics</strong><br>
+                            <div class="grid-2" style="margin-top:10px;">
+                                <input type="email" name="contact_email" value="{{ old('contact_email', $buildIntake['contact_email'] ?? '') }}" placeholder="Contact email" style="width:100%;padding:12px;border-radius:14px;border:1px solid var(--line);background:#fff;">
+                                <input type="text" name="contact_phone" value="{{ old('contact_phone', $buildIntake['contact_phone'] ?? '') }}" placeholder="Contact phone" style="width:100%;padding:12px;border-radius:14px;border:1px solid var(--line);background:#fff;">
+                            </div>
+                            <div class="grid-2" style="margin-top:10px;">
+                                <input type="text" name="whatsapp_number" value="{{ old('whatsapp_number', $buildIntake['whatsapp_number'] ?? '') }}" placeholder="WhatsApp number" style="width:100%;padding:12px;border-radius:14px;border:1px solid var(--line);background:#fff;">
+                                <input type="text" name="business_hours" value="{{ old('business_hours', $buildIntake['business_hours'] ?? '') }}" placeholder="Business hours" style="width:100%;padding:12px;border-radius:14px;border:1px solid var(--line);background:#fff;">
+                            </div>
+                            <input type="text" name="business_address" value="{{ old('business_address', $buildIntake['business_address'] ?? '') }}" placeholder="Business address" style="margin-top:10px;width:100%;padding:12px;border-radius:14px;border:1px solid var(--line);background:#fff;">
+                            <textarea name="social_links" rows="2" placeholder="Instagram, Facebook, TikTok, LinkedIn, etc." style="margin-top:10px;width:100%;padding:12px;border-radius:14px;border:1px solid var(--line);background:#fff;">{{ old('social_links', $buildIntake['social_links'] ?? '') }}</textarea>
+                        </div>
+                        <div class="stack-item">
+                            <strong>Pages and image direction</strong><br>
+                            <textarea name="must_include_pages" rows="2" placeholder="Any must-have pages or sections..." style="margin-top:10px;width:100%;padding:12px;border-radius:14px;border:1px solid var(--line);background:#fff;">{{ old('must_include_pages', $buildIntake['must_include_pages'] ?? '') }}</textarea>
+                            <textarea name="image_preferences" rows="2" placeholder="Image style, mood, color tone, local scenes, team photos, product photography..." style="margin-top:10px;width:100%;padding:12px;border-radius:14px;border:1px solid var(--line);background:#fff;">{{ old('image_preferences', $buildIntake['image_preferences'] ?? '') }}</textarea>
+                            <textarea name="special_requests" rows="2" placeholder="Anything special we should include or avoid?" style="margin-top:10px;width:100%;padding:12px;border-radius:14px;border:1px solid var(--line);background:#fff;">{{ old('special_requests', $buildIntake['special_requests'] ?? '') }}</textarea>
+                        </div>
+                        <button class="btn primary" type="submit">Build My Website</button>
+                    </form>
+                </div>
+            </section>
+            @endif
 
             @if ($websiteStage === 'overview')
             <section class="grid-2" style="margin-top: 22px;">

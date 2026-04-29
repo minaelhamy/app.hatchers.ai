@@ -142,6 +142,11 @@ class Founder extends Authenticatable
         return $this->hasMany(FounderConversationThread::class);
     }
 
+    public function notifications(): HasMany
+    {
+        return $this->hasMany(FounderNotification::class);
+    }
+
     public function pricingRecommendations(): HasMany
     {
         return $this->hasMany(FounderPricingRecommendation::class);

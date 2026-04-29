@@ -20,6 +20,9 @@ class WebsiteWorkspaceService
         $autopilotDraft = $this->websiteAutopilotService->latestDraft($company);
         $latestLaunchSystem = $company?->launchSystems()->latest('id')->first();
         $latestIcp = $company ? $company->icpProfiles()->latest()->first() : null;
+        $intelligence = $company?->intelligence;
+        $businessBrief = $founder->businessBrief;
+        $websiteBuild = $this->websiteBuildPayload($businessBrief?->constraints_json ?? []);
         $businessModel = $this->normalizeBusinessModel((string) ($company?->business_model ?? 'hybrid'));
         $companyName = (string) ($company?->company_name ?? $founder->full_name);
         $slug = $this->slugify($companyName);
@@ -85,6 +88,22 @@ class WebsiteWorkspaceService
                     'selected_engine' => (string) ($latestLaunchSystem->selected_engine ?? ''),
                     'applied_at' => optional($latestLaunchSystem->applied_at)->toDateTimeString(),
                 ] : null,
+            ],
+            'build_brief' => [
+                'selected_engine' => $recommendedEngine,
+                'selected_engine_label' => strtoupper($recommendedEngine),
+                'company_intelligence_summary' => array_values(array_filter([
+                    ['label' => 'Business', 'value' => (string) ($company?->company_name ?? $founder->full_name)],
+                    ['label' => 'Business model', 'value' => ucfirst($businessModel)],
+                    ['label' => 'Audience', 'value' => (string) ($intelligence?->target_audience ?? '')],
+                    ['label' => 'Ideal customer', 'value' => (string) ($intelligence?->primary_icp_name ?? '')],
+                    ['label' => 'Problem solved', 'value' => (string) ($intelligence?->problem_solved ?? '')],
+                    ['label' => 'Core offer', 'value' => (string) ($intelligence?->core_offer ?? '')],
+                    ['label' => 'Brand voice', 'value' => (string) ($intelligence?->brand_voice ?? '')],
+                    ['label' => 'Visual style', 'value' => (string) ($intelligence?->visual_style ?? '')],
+                ])),
+                'intake' => $websiteBuild,
+                'missing_items' => $this->buildMissingWebsiteInputs($businessModel, $websiteBuild),
             ],
             'domain_model' => [
                 [
@@ -275,5 +294,51 @@ class WebsiteWorkspaceService
         $domain = preg_replace('#^https?://#', '', $domain) ?? '';
 
         return trim($domain, '/');
+    }
+
+    private function websiteBuildPayload(array $constraints): array
+    {
+        $payload = is_array($constraints['website_build'] ?? null) ? $constraints['website_build'] : [];
+
+        return [
+            'website_goal' => trim((string) ($payload['website_goal'] ?? '')),
+            'primary_website_focus' => trim((string) ($payload['primary_website_focus'] ?? 'auto')),
+            'primary_cta' => trim((string) ($payload['primary_cta'] ?? '')),
+            'contact_email' => trim((string) ($payload['contact_email'] ?? '')),
+            'contact_phone' => trim((string) ($payload['contact_phone'] ?? '')),
+            'whatsapp_number' => trim((string) ($payload['whatsapp_number'] ?? '')),
+            'business_address' => trim((string) ($payload['business_address'] ?? '')),
+            'business_hours' => trim((string) ($payload['business_hours'] ?? '')),
+            'social_links' => trim((string) ($payload['social_links'] ?? '')),
+            'must_include_pages' => trim((string) ($payload['must_include_pages'] ?? '')),
+            'offer_items' => trim((string) ($payload['offer_items'] ?? '')),
+            'faq_points' => trim((string) ($payload['faq_points'] ?? '')),
+            'proof_points' => trim((string) ($payload['proof_points'] ?? '')),
+            'image_preferences' => trim((string) ($payload['image_preferences'] ?? '')),
+            'special_requests' => trim((string) ($payload['special_requests'] ?? '')),
+        ];
+    }
+
+    private function buildMissingWebsiteInputs(string $businessModel, array $websiteBuild): array
+    {
+        $required = [
+            'website_goal' => 'What should the website do first: drive bookings, product orders, leads, or consultations?',
+            'offer_items' => $businessModel === 'product'
+                ? 'Which products should we feature first, and what prices should we show?'
+                : 'Which services should we feature first, and what prices should we show?',
+            'primary_cta' => 'What primary action should the visitor take first?',
+            'proof_points' => 'What trust signals, credentials, results, or guarantees should appear on the site?',
+            'faq_points' => 'What common questions should we answer in the FAQ?',
+            'image_preferences' => 'What should the photography style feel like?',
+        ];
+
+        $missing = [];
+        foreach ($required as $field => $prompt) {
+            if (trim((string) ($websiteBuild[$field] ?? '')) === '') {
+                $missing[] = $prompt;
+            }
+        }
+
+        return $missing;
     }
 }

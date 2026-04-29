@@ -88,6 +88,23 @@ class WebsiteProvisioningService
             'theme_template' => trim((string) ($input['theme_template'] ?? '')),
             'website_mode' => trim((string) ($input['website_mode'] ?? '')),
             'website_path' => trim((string) ($input['website_path'] ?? '')),
+            'description' => trim((string) ($input['description'] ?? '')),
+            'meta_title' => trim((string) ($input['meta_title'] ?? '')),
+            'meta_description' => trim((string) ($input['meta_description'] ?? '')),
+            'contact_email' => trim((string) ($input['contact_email'] ?? '')),
+            'contact_phone' => trim((string) ($input['contact_phone'] ?? '')),
+            'business_address' => trim((string) ($input['business_address'] ?? '')),
+            'whatsapp_number' => trim((string) ($input['whatsapp_number'] ?? '')),
+            'about_content' => trim((string) ($input['about_content'] ?? '')),
+            'faq_items' => array_values(array_filter((array) ($input['faq_items'] ?? []), fn ($item) => is_array($item))),
+            'social_links' => array_values(array_filter((array) ($input['social_links'] ?? []), fn ($item) => is_array($item))),
+            'feature_items' => array_values(array_filter((array) ($input['feature_items'] ?? []), fn ($item) => is_array($item))),
+            'testimonials' => array_values(array_filter((array) ($input['testimonials'] ?? []), fn ($item) => is_array($item))),
+            'story_items' => array_values(array_filter((array) ($input['story_items'] ?? []), fn ($item) => is_array($item))),
+            'story_title' => trim((string) ($input['story_title'] ?? '')),
+            'story_subtitle' => trim((string) ($input['story_subtitle'] ?? '')),
+            'story_description' => trim((string) ($input['story_description'] ?? '')),
+            'media_assets' => array_values(array_filter((array) ($input['media_assets'] ?? []), fn ($item) => is_array($item))),
         ];
 
         $response = $this->postToEngine($engine, $payload);

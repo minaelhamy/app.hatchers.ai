@@ -35,6 +35,7 @@ use App\Services\AtlasWorkspaceService;
 use App\Services\FounderModuleSyncService;
 use App\Services\FounderAiMentorProgramService;
 use App\Services\FounderDashboardService;
+use App\Services\FounderNotificationService;
 use App\Services\FounderRevenueOsService;
 use App\Services\IdentitySyncService;
 use App\Services\LmsIdentityBridgeService;
@@ -3880,6 +3881,127 @@ class OsShellController extends Controller
         }
 
         return redirect()->route('website')->with('success', 'Your first website draft is ready. Hatchers OS prefilled the site setup and built the first offer path for review.');
+    }
+
+    public function storeWebsiteBuildRequest(
+        Request $request,
+        WebsiteAutopilotService $websiteAutopilotService,
+        FounderNotificationService $founderNotificationService
+    ): RedirectResponse {
+        /** @var \App\Models\Founder $founder */
+        $founder = Auth::user();
+        if (!$founder->isFounder()) {
+            return redirect()->route('dashboard');
+        }
+
+        if ($redirect = $this->ensureCompanyIntelligenceComplete($founder)) {
+            return $redirect;
+        }
+
+        $validated = $request->validate([
+            'website_goal' => ['required', 'string', 'max:500'],
+            'primary_website_focus' => ['nullable', Rule::in(['auto', 'product', 'service'])],
+            'primary_cta' => ['nullable', 'string', 'max:255'],
+            'contact_email' => ['nullable', 'email', 'max:255'],
+            'contact_phone' => ['nullable', 'string', 'max:120'],
+            'whatsapp_number' => ['nullable', 'string', 'max:120'],
+            'business_address' => ['nullable', 'string', 'max:500'],
+            'business_hours' => ['nullable', 'string', 'max:500'],
+            'social_links' => ['nullable', 'string', 'max:1200'],
+            'must_include_pages' => ['nullable', 'string', 'max:1200'],
+            'offer_items' => ['nullable', 'string', 'max:4000'],
+            'faq_points' => ['nullable', 'string', 'max:2500'],
+            'proof_points' => ['nullable', 'string', 'max:2500'],
+            'image_preferences' => ['nullable', 'string', 'max:1500'],
+            'special_requests' => ['nullable', 'string', 'max:1500'],
+        ]);
+
+        $founder->loadMissing('company.intelligence', 'businessBrief', 'icpProfiles', 'actionPlans');
+        $company = $founder->company;
+        if (!$company) {
+            return redirect()->route('founder.settings', ['step' => 'basics'])->with('error', 'Complete the company basics before building the website.');
+        }
+
+        $brief = FounderBusinessBrief::updateOrCreate(
+            ['founder_id' => $founder->id, 'company_id' => $company->id],
+            [
+                'vertical_blueprint_id' => $company->vertical_blueprint_id,
+                'business_name' => (string) ($company->company_name ?? $founder->full_name),
+                'business_summary' => (string) ($company->company_brief ?? ''),
+                'problem_solved' => (string) ($company->intelligence?->problem_solved ?? ''),
+                'core_offer' => (string) ($company->intelligence?->core_offer ?? ''),
+                'business_type_detail' => (string) ($company->verticalBlueprint?->name ?? ''),
+                'location_city' => (string) ($company->primary_city ?? ''),
+                'location_country' => (string) ($brief->location_country ?? ''),
+                'service_radius' => (string) ($company->service_radius ?? ''),
+                'delivery_scope' => (string) ($brief->delivery_scope ?? $company->service_radius ?? ''),
+                'proof_points' => (string) ($brief->proof_points ?? ''),
+                'founder_story' => (string) ($brief->founder_story ?? $company->company_brief ?? ''),
+                'status' => 'captured',
+            ]
+        );
+
+        $constraints = is_array($brief->constraints_json) ? $brief->constraints_json : [];
+        $constraints['website_build'] = [
+            'website_goal' => trim((string) ($validated['website_goal'] ?? '')),
+            'primary_website_focus' => trim((string) ($validated['primary_website_focus'] ?? 'auto')),
+            'primary_cta' => trim((string) ($validated['primary_cta'] ?? '')),
+            'contact_email' => trim((string) ($validated['contact_email'] ?? '')),
+            'contact_phone' => trim((string) ($validated['contact_phone'] ?? '')),
+            'whatsapp_number' => trim((string) ($validated['whatsapp_number'] ?? '')),
+            'business_address' => trim((string) ($validated['business_address'] ?? '')),
+            'business_hours' => trim((string) ($validated['business_hours'] ?? '')),
+            'social_links' => trim((string) ($validated['social_links'] ?? '')),
+            'must_include_pages' => trim((string) ($validated['must_include_pages'] ?? '')),
+            'offer_items' => trim((string) ($validated['offer_items'] ?? '')),
+            'faq_points' => trim((string) ($validated['faq_points'] ?? '')),
+            'proof_points' => trim((string) ($validated['proof_points'] ?? '')),
+            'image_preferences' => trim((string) ($validated['image_preferences'] ?? '')),
+            'special_requests' => trim((string) ($validated['special_requests'] ?? '')),
+            'updated_at' => now()->toDateTimeString(),
+        ];
+
+        $brief->forceFill([
+            'constraints_json' => $constraints,
+            'proof_points' => trim((string) ($validated['proof_points'] ?? $brief->proof_points ?? '')),
+        ])->save();
+
+        $engineLabel = $this->websiteBuildEngineLabel($company, (string) ($validated['primary_website_focus'] ?? 'auto'));
+        $company->forceFill([
+            'website_generation_status' => 'in_progress',
+            'website_status' => 'in_progress',
+        ])->save();
+
+        $founderNotificationService->websiteBuildStarted($founder, $engineLabel);
+
+        $result = $websiteAutopilotService->generate($founder->fresh([
+            'company.verticalBlueprint',
+            'company.intelligence',
+            'company.websiteGenerationRuns',
+            'businessBrief',
+            'icpProfiles',
+            'actionPlans',
+        ]));
+
+        if (!($result['ok'] ?? false)) {
+            $company->forceFill([
+                'website_generation_status' => 'queued',
+                'website_status' => 'not_started',
+            ])->save();
+
+            return redirect()
+                ->route('website', ['stage' => 'build'])
+                ->with('error', (string) ($result['error'] ?? 'Hatchers OS could not build the website yet.'));
+        }
+
+        $freshCompany = $founder->fresh()->company;
+        $websiteUrl = (string) ($freshCompany?->website_url ?: ('https://app.hatchers.ai/' . ltrim((string) ($freshCompany?->website_path ?? ''), '/')));
+        $engineAppKey = strtolower((string) ($freshCompany?->website_engine ?? 'servio')) === 'bazaar' ? 'bazaar-engine' : 'servio-engine';
+        $founderNotificationService->websiteReady($founder, $engineAppKey, $websiteUrl);
+
+        return redirect()
+            ->route('website', ['stage' => 'overview'])
+            ->with('success', 'Your website draft is ready. Hatchers selected the template, filled the core site sections, and prepared the first storefront for review.');
     }
 
     public function founderApplyLaunchSystem(WebsiteAutopilotService $websiteAutopilotService): RedirectResponse
@@ -8697,6 +8819,22 @@ class OsShellController extends Controller
         }
 
         return in_array($engine, ['bazaar', 'servio'], true) ? $engine : 'bazaar';
+    }
+
+    private function websiteBuildEngineLabel(Company $company, string $focus): string
+    {
+        $focus = strtolower(trim($focus));
+        $businessModel = strtolower(trim((string) ($company->business_model ?? 'hybrid')));
+
+        if ($focus === 'product') {
+            return 'bazaar';
+        }
+
+        if ($focus === 'service') {
+            return 'servio';
+        }
+
+        return $businessModel === 'product' ? 'bazaar' : 'servio';
     }
 
     private function buildFounderSearchResults(Founder $founder, array $dashboard, string $query): array

@@ -16,7 +16,8 @@ class WebsiteAutopilotService
 {
     public function __construct(
         private WebsiteProvisioningService $websiteProvisioningService,
-        private AtlasIntelligenceService $atlasIntelligenceService
+        private AtlasIntelligenceService $atlasIntelligenceService,
+        private AtlasWorkspaceService $atlasWorkspaceService
     )
     {
     }
@@ -114,6 +115,7 @@ class WebsiteAutopilotService
                 'generated_at' => now(),
             ]);
 
+            $this->syncDraftToAtlas($founder, $draft);
             $engineSync = $this->syncDraftToWebsiteEngine($founder, $draft);
             $starterSync = $this->syncStarterOffer($founder, $draft);
 
@@ -138,7 +140,6 @@ class WebsiteAutopilotService
 
             $this->updateCompanyIntelligence($company, $draft);
             $this->upsertReviewTasks($founder, $draft);
-            $this->syncDraftToAtlas($founder, $draft);
 
             return $run;
         });
@@ -221,9 +222,12 @@ class WebsiteAutopilotService
         $brief,
         ?FounderIcpProfile $icp
     ): array {
-        $engine = strtolower(trim((string) ($blueprint->engine ?? $company->website_engine ?? 'servio')));
-        $websiteMode = strtolower(trim((string) ($blueprint->business_model ?? $company->business_model ?? 'service')));
-        $theme = $this->pickTheme($engine);
+        $websiteBuild = $this->websiteBuildConfig($brief);
+        $websiteMode = $this->resolveWebsiteMode(
+            strtolower(trim((string) ($company->business_model ?? $blueprint->business_model ?? 'service'))),
+            (string) ($websiteBuild['primary_website_focus'] ?? 'auto')
+        );
+        $engine = $websiteMode === 'product' ? 'bazaar' : 'servio';
         $companyName = trim((string) ($brief->business_name ?: $company->company_name ?: $founder->full_name));
         $city = trim((string) ($company->primary_city ?: $brief->location_city));
         $problemSolved = trim((string) ($brief->problem_solved ?: $company->company_brief));
@@ -233,13 +237,18 @@ class WebsiteAutopilotService
         $outcomes = $this->stringList($icp?->desired_outcomes_json ?? []);
         $objections = $this->stringList($icp?->objections_json ?? []);
         $channels = $this->stringList($blueprint->default_channels_json ?? []);
-        $pages = $this->stringList($blueprint->default_pages_json ?? []);
+        $catalogItems = $this->catalogItemsFromWebsiteBuild((string) ($websiteBuild['offer_items'] ?? ''), $websiteMode);
+        $pages = $this->pagePlan($blueprint, (string) ($websiteBuild['must_include_pages'] ?? ''));
         $tasks = $this->stringList($blueprint->default_tasks_json ?? []);
-        $imageQueries = $this->imageQueries($blueprint, $company, $icpName);
-        $pricing = $this->draftPricing($blueprint, $websiteMode, $companyName);
-        $primaryCta = trim((string) ($blueprint->default_cta_json['primary'] ?? ($websiteMode === 'service' ? 'Book now' : 'Shop now')));
+        $imageQueries = $this->imageQueries($blueprint, $company, $icpName, (string) ($websiteBuild['image_preferences'] ?? ''));
+        $pricing = $this->draftPricing($blueprint, $websiteMode, $companyName, $catalogItems);
+        $primaryCta = trim((string) (($websiteBuild['primary_cta'] ?? '') !== '' ? $websiteBuild['primary_cta'] : ($blueprint->default_cta_json['primary'] ?? ($websiteMode === 'service' ? 'Book now' : 'Shop now'))));
         $secondaryCta = trim((string) ($blueprint->default_cta_json['secondary'] ?? 'See how it works'));
         $websitePath = trim((string) ($company->website_path ?: Str::slug($companyName)));
+        $theme = $this->pickTheme($engine, (string) ($websiteBuild['image_preferences'] ?? ''), (string) ($company->intelligence?->visual_style ?? ''));
+        $websiteGoal = trim((string) ($websiteBuild['website_goal'] ?? ''));
+        $faqPoints = $this->textareaList((string) ($websiteBuild['faq_points'] ?? ''));
+        $proofPoints = $this->textareaList((string) ($websiteBuild['proof_points'] ?? ''));
 
         $headline = $this->heroHeadline($blueprint, $companyName, $problemSolved, $city);
         $subhead = $this->heroSubhead($companyName, $coreOffer, $icpName, $city);
@@ -248,8 +257,11 @@ class WebsiteAutopilotService
             : 'We help ' . $icpName . ' get a clearer, faster path to the right result.';
 
         $starterMode = $websiteMode === 'product' ? 'product' : 'service';
-        $starterTitle = trim((string) ($pricing['anchor_offer'] ?? ($coreOffer !== '' ? $coreOffer : ($starterMode === 'service' ? 'Signature service' : 'Signature product'))));
-        $starterDescription = $this->starterDescription($companyName, $starterTitle, $icpName, $city, $painPoints, $outcomes);
+        $starterSeed = $catalogItems[0] ?? null;
+        $starterTitle = trim((string) ($starterSeed['title'] ?? $pricing['anchor_offer'] ?? ($coreOffer !== '' ? $coreOffer : ($starterMode === 'service' ? 'Signature service' : 'Signature product'))));
+        $starterDescription = trim((string) ($starterSeed['description'] ?? $this->starterDescription($companyName, $starterTitle, $icpName, $city, $painPoints, $outcomes)));
+        $starterPrice = (string) ($starterSeed['price'] ?? ($pricing['starting_price'] ?? '49'));
+        $contactBlock = $this->contactBlock($websiteBuild, $city, (string) $brief->delivery_scope);
 
         return [
             'website_engine' => $engine,
@@ -275,20 +287,33 @@ class WebsiteAutopilotService
                 [
                     'title' => 'What you get',
                     'body' => $companyName . ' leads with ' . ($coreOffer !== '' ? $coreOffer : $starterTitle) . ' and a direct response path shaped around quick conversion.',
-                    'bullets' => $outcomes !== [] ? $outcomes : ['Fast booking or checkout', 'Clear pricing', 'Easy follow-up'],
+                    'bullets' => $catalogItems !== []
+                        ? array_map(fn (array $item): string => $item['title'] . ' · ' . $item['price'], array_slice($catalogItems, 0, 4))
+                        : ($outcomes !== [] ? $outcomes : ['Fast booking or checkout', 'Clear pricing', 'Easy follow-up']),
                 ],
                 [
                     'title' => 'Why people say yes',
                     'body' => 'This site follows a Sell Like Crazy structure: clear problem, clear promise, clear offer, and a single action path.',
-                    'bullets' => $objections !== [] ? $objections : ['Transparent pricing', 'Local trust', 'Simple first step'],
+                    'bullets' => $proofPoints !== [] ? $proofPoints : ($objections !== [] ? $objections : ['Transparent pricing', 'Local trust', 'Simple first step']),
+                ],
+                [
+                    'title' => 'About ' . $companyName,
+                    'body' => trim((string) ($brief->founder_story ?: $brief->business_summary ?: $company->company_brief)),
+                    'bullets' => $websiteGoal !== '' ? [$websiteGoal] : ['We can refine this story later as your business grows.'],
+                ],
+                [
+                    'title' => 'Contact and next step',
+                    'body' => 'The website should make the next action obvious and easy to complete.',
+                    'bullets' => $contactBlock,
                 ],
             ],
             'starter_offer' => [
                 'mode' => $starterMode,
                 'title' => $starterTitle,
                 'description' => $starterDescription,
-                'price' => (string) ($pricing['starting_price'] ?? '49'),
+                'price' => $starterPrice,
             ],
+            'catalog_items' => $catalogItems,
             'pricing' => $pricing,
             'sell_like_crazy' => [
                 'core_promise' => $headline,
@@ -306,11 +331,13 @@ class WebsiteAutopilotService
                 ],
                 'proof' => [
                     'title' => 'Why this works',
-                    'bullets' => $outcomes !== [] ? $outcomes : ['Clear process', 'Faster next step', 'Local trust'],
+                    'bullets' => $proofPoints !== [] ? $proofPoints : ($outcomes !== [] ? $outcomes : ['Clear process', 'Faster next step', 'Local trust']),
                 ],
                 'offer_stack' => [
                     'title' => 'What they get',
-                    'bullets' => array_values(array_filter([$starterTitle, $primaryCta, $secondaryCta])),
+                    'bullets' => $catalogItems !== []
+                        ? array_map(fn (array $item): string => $item['title'] . ' · ' . $item['price'], array_slice($catalogItems, 0, 4))
+                        : array_values(array_filter([$starterTitle, $primaryCta, $secondaryCta])),
                 ],
                 'guarantee' => [
                     'title' => 'Risk reversal',
@@ -320,7 +347,7 @@ class WebsiteAutopilotService
                     'title' => 'Why now',
                     'body' => 'Give the buyer a reason to act this week, not someday.',
                 ],
-                'faq' => collect($objections !== [] ? $objections : ['How does it work?', 'Is pricing clear?', 'What happens next?'])
+                'faq' => collect($faqPoints !== [] ? $faqPoints : ($objections !== [] ? $objections : ['How does it work?', 'Is pricing clear?', 'What happens next?']))
                     ->map(fn (string $objection): array => [
                         'question' => $objection,
                         'answer' => 'Answer this objection using the founder brief, ICP, and the simplest possible next step.',
@@ -342,11 +369,13 @@ class WebsiteAutopilotService
                     'hero_subhead' => $subhead,
                     'primary_cta' => $primaryCta,
                     'secondary_cta' => $secondaryCta,
+                    'catalog_items' => $catalogItems,
                 ],
             ],
             'launch_checklist' => array_values(array_filter([
                 'Review the hero promise and CTA before publishing.',
                 'Confirm the first offer pricing and add-ons.',
+                $websiteGoal !== '' ? 'Website goal: ' . $websiteGoal . '.' : null,
                 $channels !== [] ? 'Start with these channels: ' . implode(', ', array_slice($channels, 0, 3)) . '.' : null,
                 $tasks !== [] ? 'First execution sprint: ' . implode(' | ', array_slice($tasks, 0, 3)) . '.' : null,
             ])),
@@ -357,18 +386,41 @@ class WebsiteAutopilotService
 
     private function syncDraftToWebsiteEngine(Founder $founder, array $draft): array
     {
+        $founder->loadMissing('businessBrief', 'company');
+        $brief = $founder->businessBrief;
+        $websiteBuild = $brief ? $this->websiteBuildConfig($brief) : [];
+        $mediaAssets = $this->websiteMediaAssets($founder, $draft);
+
         $result = $this->websiteProvisioningService->applyWebsiteSetup($founder, [
             'website_engine' => $draft['website_engine'],
             'website_mode' => $draft['website_mode'],
             'website_title' => $draft['website_title'],
             'website_path' => $draft['website_path'],
             'theme_template' => $draft['theme_template'],
+            'description' => $this->websiteDescription($draft),
+            'meta_title' => $this->websiteMetaTitle($draft),
+            'meta_description' => $this->websiteMetaDescription($draft),
+            'contact_email' => (string) ($websiteBuild['contact_email'] ?? $founder->email ?? ''),
+            'contact_phone' => (string) ($websiteBuild['contact_phone'] ?? $websiteBuild['contact_phone_number'] ?? $websiteBuild['contact_mobile'] ?? $founder->phone ?? ''),
+            'business_address' => (string) ($websiteBuild['business_address'] ?? ''),
+            'whatsapp_number' => (string) ($websiteBuild['whatsapp_number'] ?? ''),
+            'about_content' => $this->aboutContent($draft),
+            'faq_items' => $this->faqItems($draft),
+            'social_links' => $this->socialLinks((string) ($websiteBuild['social_links'] ?? '')),
+            'feature_items' => $this->featureItems($draft),
+            'testimonials' => $this->testimonials($draft),
+            'story_items' => $this->storyItems($draft),
+            'story_title' => $this->storyTitle($draft),
+            'story_subtitle' => $this->storySubtitle($draft),
+            'story_description' => $this->storyDescription($draft),
+            'media_assets' => $mediaAssets,
         ]);
 
         return [
             'ok' => (bool) ($result['ok'] ?? false),
             'message' => (string) ($result['error'] ?? ''),
             'public_url' => (string) ($result['public_url'] ?? ''),
+            'media_assets_count' => count($mediaAssets),
         ];
     }
 
@@ -418,6 +470,20 @@ class WebsiteAutopilotService
             'cta_url' => route('founder.commerce'),
         ]);
 
+        foreach (array_slice((array) ($draft['catalog_items'] ?? []), 1, 3) as $item) {
+            if (!is_array($item) || trim((string) ($item['title'] ?? '')) === '') {
+                continue;
+            }
+
+            $this->websiteProvisioningService->createStarterRecord($founder, [
+                'website_engine' => $draft['website_engine'],
+                'starter_mode' => $starterOffer['mode'] ?? 'service',
+                'starter_title' => (string) $item['title'],
+                'starter_description' => (string) ($item['description'] ?? ''),
+                'starter_price' => (string) ($item['price'] ?? '0'),
+            ]);
+        }
+
         return ['ok' => true, 'message' => 'Starter offer created from the website autopilot draft.'];
     }
 
@@ -458,6 +524,7 @@ class WebsiteAutopilotService
                     'sell_like_crazy' => (array) ($draft['sell_like_crazy'] ?? []),
                     'sections' => (array) ($draft['sections'] ?? []),
                     'starter_offer' => (array) ($draft['starter_offer'] ?? []),
+                    'catalog_items' => (array) ($draft['catalog_items'] ?? []),
                 ],
             ],
             'sync_summary' => 'Hatchers OS generated a website autopilot draft and requested Atlas image/content handoff for the first site.',
@@ -509,9 +576,94 @@ class WebsiteAutopilotService
         ])));
     }
 
-    private function pickTheme(string $engine): array
+    private function websiteMediaAssets(Founder $founder, array $draft): array
     {
-        $theme = $this->websiteProvisioningService->availableThemes($engine)[0] ?? null;
+        $atlasAssets = $this->atlasWorkspaceService->websiteAssets($founder);
+        $resolved = $this->normalizeResolvedAssets((array) ($atlasAssets['asset_slots'] ?? []));
+
+        if ($resolved === []) {
+            $resolved = $this->normalizeResolvedAssets((array) ($draft['atlas_handoff']['asset_slots'] ?? []));
+        }
+
+        if ($resolved === []) {
+            return [];
+        }
+
+        $byKey = collect($resolved)->keyBy(fn (array $asset): string => trim((string) ($asset['slot_key'] ?? '')));
+        $hero = $byKey->get('hero') ?? ($resolved[0] ?? null);
+        $features = $byKey->get('features') ?? ($resolved[1] ?? $hero);
+        $proof = $byKey->get('proof') ?? ($resolved[2] ?? $features ?? $hero);
+        $story = $byKey->get('story') ?? ($resolved[3] ?? $features ?? $hero);
+        $faq = $byKey->get('faq') ?? ($resolved[4] ?? $proof ?? $hero);
+        $action = $byKey->get('action') ?? ($resolved[5] ?? $proof ?? $hero);
+
+        return array_values(array_filter([
+            $this->slotMedia('hero', 'hero banner', $hero),
+            $this->slotMedia('landing', 'landing banner', $hero),
+            $this->slotMedia('faq', 'faq image', $faq),
+            $this->slotMedia('story', 'story image', $story),
+            $this->slotMedia('section_one', 'section one banner', $features),
+            $this->slotMedia('section_two', 'section two banner', $proof),
+            $this->slotMedia('section_three', 'section three banner', $action),
+        ]));
+    }
+
+    private function normalizeResolvedAssets(array $assets): array
+    {
+        return collect($assets)
+            ->filter('is_array')
+            ->map(function (array $asset): ?array {
+                $sourceUrl = trim((string) ($asset['asset_url'] ?? $asset['preview_url'] ?? ''));
+                if ($sourceUrl === '') {
+                    return null;
+                }
+
+                return [
+                    'source_url' => $sourceUrl,
+                    'preview_url' => trim((string) ($asset['preview_url'] ?? $sourceUrl)),
+                    'alt_text' => trim((string) ($asset['alt_text'] ?? $asset['slot_label'] ?? 'Website image')),
+                    'credit_name' => trim((string) ($asset['credit_name'] ?? '')),
+                    'credit_url' => trim((string) ($asset['credit_url'] ?? '')),
+                    'slot_key' => trim((string) ($asset['slot_key'] ?? '')),
+                    'slot_label' => trim((string) ($asset['slot_label'] ?? '')),
+                    'provider' => trim((string) ($asset['provider'] ?? 'pexels')),
+                ];
+            })
+            ->filter()
+            ->values()
+            ->all();
+    }
+
+    private function slotMedia(string $target, string $label, ?array $asset): ?array
+    {
+        if (!is_array($asset) || trim((string) ($asset['source_url'] ?? '')) === '') {
+            return null;
+        }
+
+        return [
+            'target' => $target,
+            'label' => $label,
+            'source_url' => trim((string) ($asset['source_url'] ?? '')),
+            'preview_url' => trim((string) ($asset['preview_url'] ?? '')),
+            'alt_text' => trim((string) ($asset['alt_text'] ?? $label)),
+            'credit_name' => trim((string) ($asset['credit_name'] ?? '')),
+            'credit_url' => trim((string) ($asset['credit_url'] ?? '')),
+            'provider' => trim((string) ($asset['provider'] ?? 'pexels')),
+        ];
+    }
+
+    private function pickTheme(string $engine, string $imagePreferences = '', string $visualStyle = ''): array
+    {
+        $themes = $this->websiteProvisioningService->availableThemes($engine);
+        if ($themes === []) {
+            return ['id' => '1', 'label' => 'Theme 1'];
+        }
+
+        $styleSignal = strtolower(trim($imagePreferences . ' ' . $visualStyle));
+        $preferredIndex = str_contains($styleSignal, 'luxury') || str_contains($styleSignal, 'premium')
+            ? 2
+            : (str_contains($styleSignal, 'friendly') || str_contains($styleSignal, 'playful') || str_contains($styleSignal, 'warm') ? 1 : 0);
+        $theme = $themes[$preferredIndex] ?? $themes[0] ?? null;
 
         if (is_array($theme) && !empty($theme['id'])) {
             return $theme;
@@ -520,7 +672,7 @@ class WebsiteAutopilotService
         return ['id' => '1', 'label' => 'Theme 1'];
     }
 
-    private function imageQueries(VerticalBlueprint $blueprint, Company $company, string $icpName): array
+    private function imageQueries(VerticalBlueprint $blueprint, Company $company, string $icpName, string $imagePreferences = ''): array
     {
         $queries = collect((array) ($blueprint->default_image_queries_json ?? []))
             ->map(fn ($item) => trim((string) $item))
@@ -532,6 +684,10 @@ class WebsiteAutopilotService
 
         if ($icpName !== '') {
             $queries->push($icpName . ' lifestyle');
+        }
+
+        foreach ($this->textareaList($imagePreferences) as $preference) {
+            $queries->push($preference);
         }
 
         return $queries->unique()->take(5)->values()->all();
@@ -546,29 +702,68 @@ class WebsiteAutopilotService
         string $icpName
     ): array {
         $baseQuery = $imageQueries[0] ?? ($companyName . ' local business');
-        $cityTail = $city !== '' ? ' in ' . $city : '';
-        $pageKeys = array_slice($pages, 0, 4);
-        if ($pageKeys === []) {
-            $pageKeys = ['hero', 'offer', 'trust', 'cta'];
-        }
+        $cityHint = $city !== '' ? $city . ' ' : '';
+        $secondQuery = $imageQueries[1] ?? ($baseQuery . ' customer');
+        $thirdQuery = $imageQueries[2] ?? ($baseQuery . ' team');
+        $fourthQuery = $imageQueries[3] ?? ($baseQuery . ' consultation');
+        $fifthQuery = $imageQueries[4] ?? ($baseQuery . ' detail');
 
-        $slots = [];
-        foreach ($pageKeys as $index => $pageKey) {
-            $query = $imageQueries[$index] ?? $baseQuery;
-            $slotLabel = str_replace('_', ' ', (string) $pageKey);
-
-            $slots[] = [
-                'slot_key' => (string) $pageKey,
-                'slot_label' => Str::title($slotLabel),
+        return [
+            [
+                'slot_key' => 'hero',
+                'slot_label' => 'Hero Banner',
                 'provider' => 'pexels',
-                'query' => $query,
-                'alt_text' => $companyName . ' ' . strtolower($slotLabel) . $cityTail,
-                'visual_brief' => trim('Use a local, trust-building image for the ' . $slotLabel . ' section. Show ' . $icpName . ' moving toward the promised outcome. Problem focus: ' . $problemSolved . '.'),
+                'query' => trim($cityHint . $baseQuery . ' storefront lifestyle'),
+                'alt_text' => $companyName . ' hero image',
+                'visual_brief' => trim('Use a strong hero image that instantly shows the business context, local trust, and the main outcome for ' . $icpName . '. Problem focus: ' . $problemSolved . '.'),
                 'status' => 'requested',
-            ];
-        }
-
-        return $slots;
+            ],
+            [
+                'slot_key' => 'features',
+                'slot_label' => 'Features Section',
+                'provider' => 'pexels',
+                'query' => trim($fifthQuery . ' professional detail'),
+                'alt_text' => $companyName . ' features section image',
+                'visual_brief' => 'Use a detailed image that supports the offer, process, or quality of the work.',
+                'status' => 'requested',
+            ],
+            [
+                'slot_key' => 'proof',
+                'slot_label' => 'Social Proof',
+                'provider' => 'pexels',
+                'query' => trim($secondQuery . ' happy customer'),
+                'alt_text' => $companyName . ' proof section image',
+                'visual_brief' => 'Use a people-first image that feels like trust, satisfaction, or a real customer result.',
+                'status' => 'requested',
+            ],
+            [
+                'slot_key' => 'story',
+                'slot_label' => 'Founder Story',
+                'provider' => 'pexels',
+                'query' => trim($thirdQuery . ' small business owner'),
+                'alt_text' => $companyName . ' story section image',
+                'visual_brief' => 'Use a warm, human image that supports the About, founder, or story section.',
+                'status' => 'requested',
+            ],
+            [
+                'slot_key' => 'faq',
+                'slot_label' => 'FAQ Section',
+                'provider' => 'pexels',
+                'query' => trim($fourthQuery . ' helpful support'),
+                'alt_text' => $companyName . ' FAQ image',
+                'visual_brief' => 'Use a calm, supportive image that fits questions, guidance, or easy next steps.',
+                'status' => 'requested',
+            ],
+            [
+                'slot_key' => 'action',
+                'slot_label' => 'Call To Action',
+                'provider' => 'pexels',
+                'query' => trim($baseQuery . ' booking checkout action'),
+                'alt_text' => $companyName . ' action section image',
+                'visual_brief' => 'Use an image that reinforces momentum, action, booking, checkout, or contact.',
+                'status' => 'requested',
+            ],
+        ];
     }
 
     private function atlasWebsiteAssets(Company $company): array
@@ -659,9 +854,10 @@ class WebsiteAutopilotService
         return $companyName . ' now launches with ' . $offerLine . ' designed for ' . $icpName . $locationTail . ', using a direct-response structure inspired by Sell Like Crazy.';
     }
 
-    private function draftPricing(VerticalBlueprint $blueprint, string $websiteMode, string $companyName): array
+    private function draftPricing(VerticalBlueprint $blueprint, string $websiteMode, string $companyName, array $catalogItems = []): array
     {
         $tiers = $this->stringList(array_values((array) ($blueprint->default_pricing_json ?? [])));
+        $seedItem = $catalogItems[0] ?? null;
         $startingPrice = match ((string) $blueprint->code) {
             'dog-walking' => '20',
             'home-cleaning' => '60',
@@ -670,10 +866,13 @@ class WebsiteAutopilotService
             'handmade-products' => '45',
             default => $websiteMode === 'service' ? '35' : '49',
         };
+        if (is_array($seedItem) && trim((string) ($seedItem['price'] ?? '')) !== '') {
+            $startingPrice = trim((string) $seedItem['price']);
+        }
 
         return [
             'starting_price' => $startingPrice,
-            'anchor_offer' => $tiers[0] ?? ($websiteMode === 'service' ? 'Signature service' : 'Featured product'),
+            'anchor_offer' => (string) ($seedItem['title'] ?? ($tiers[0] ?? ($websiteMode === 'service' ? 'Signature service' : 'Featured product'))),
             'mid_offer' => $tiers[1] ?? '',
             'premium_offer' => $tiers[2] ?? '',
             'pricing_story' => $companyName . ' should lead with one easy first step, one stronger core package, and one premium upgrade.',
@@ -693,5 +892,277 @@ class WebsiteAutopilotService
         $location = $city !== '' ? ' in ' . $city : '';
 
         return $starterTitle . ' from ' . $companyName . ' is built for ' . $icpName . $location . ' who are tired of ' . $painPoint . ' and want ' . $outcome . '.';
+    }
+
+    private function websiteBuildConfig($brief): array
+    {
+        $constraints = is_array($brief?->constraints_json ?? null) ? $brief->constraints_json : [];
+        return is_array($constraints['website_build'] ?? null) ? $constraints['website_build'] : [];
+    }
+
+    private function resolveWebsiteMode(string $businessModel, string $focus): string
+    {
+        $businessModel = in_array($businessModel, ['product', 'service', 'hybrid'], true) ? $businessModel : 'service';
+        $focus = strtolower(trim($focus));
+
+        if (in_array($focus, ['product', 'service'], true)) {
+            return $focus;
+        }
+
+        return $businessModel === 'hybrid' ? 'service' : $businessModel;
+    }
+
+    private function catalogItemsFromWebsiteBuild(string $raw, string $websiteMode): array
+    {
+        $items = collect(preg_split("/\r\n|\n|\r/", trim($raw)) ?: [])
+            ->map(function (string $line) {
+                $parts = array_map('trim', explode('|', $line));
+                return [
+                    'title' => (string) ($parts[0] ?? ''),
+                    'price' => (string) ($parts[1] ?? ''),
+                    'description' => (string) ($parts[2] ?? ''),
+                ];
+            })
+            ->filter(fn (array $item) => $item['title'] !== '')
+            ->values()
+            ->all();
+
+        if ($items !== []) {
+            return $items;
+        }
+
+        return [[
+            'title' => $websiteMode === 'product' ? 'Featured product' : 'Signature service',
+            'price' => '',
+            'description' => '',
+        ]];
+    }
+
+    private function pagePlan(VerticalBlueprint $blueprint, string $mustIncludePages): array
+    {
+        $defaultPages = $this->stringList($blueprint->default_pages_json ?? []);
+        $requestedPages = $this->textareaList($mustIncludePages);
+
+        return collect(array_merge($defaultPages, $requestedPages, ['about us', 'faq', 'contact']))
+            ->map(fn (string $item) => trim($item))
+            ->filter()
+            ->unique()
+            ->take(8)
+            ->values()
+            ->all();
+    }
+
+    private function textareaList(string $value): array
+    {
+        return collect(preg_split("/\r\n|\n|\r|,/", trim($value)) ?: [])
+            ->map(fn ($item) => trim((string) $item))
+            ->filter()
+            ->values()
+            ->all();
+    }
+
+    private function contactBlock(array $websiteBuild, string $city, string $deliveryScope): array
+    {
+        return array_values(array_filter([
+            trim((string) ($websiteBuild['contact_email'] ?? '')) !== '' ? 'Email: ' . trim((string) $websiteBuild['contact_email']) : null,
+            trim((string) ($websiteBuild['contact_phone'] ?? '')) !== '' ? 'Phone: ' . trim((string) $websiteBuild['contact_phone']) : null,
+            trim((string) ($websiteBuild['whatsapp_number'] ?? '')) !== '' ? 'WhatsApp: ' . trim((string) $websiteBuild['whatsapp_number']) : null,
+            trim((string) ($websiteBuild['business_address'] ?? '')) !== '' ? 'Address: ' . trim((string) $websiteBuild['business_address']) : null,
+            trim((string) ($websiteBuild['business_hours'] ?? '')) !== '' ? 'Hours: ' . trim((string) $websiteBuild['business_hours']) : null,
+            $city !== '' ? 'City: ' . $city : null,
+            trim($deliveryScope) !== '' ? 'Coverage: ' . trim($deliveryScope) : null,
+        ]));
+    }
+
+    private function websiteDescription(array $draft): string
+    {
+        $hero = (array) ($draft['hero'] ?? []);
+        $sections = array_values(array_filter((array) ($draft['sections'] ?? []), fn ($item) => is_array($item)));
+        $sectionBody = trim((string) (($sections[0]['body'] ?? '') ?: ($sections[1]['body'] ?? '')));
+
+        return trim(implode(' ', array_filter([
+            trim((string) ($hero['subhead'] ?? '')),
+            trim((string) ($hero['brief'] ?? '')),
+            $sectionBody,
+        ])));
+    }
+
+    private function websiteMetaTitle(array $draft): string
+    {
+        $title = trim((string) ($draft['website_title'] ?? ''));
+        $hero = (array) ($draft['hero'] ?? []);
+        $eyebrow = trim((string) ($hero['eyebrow'] ?? ''));
+
+        return trim($title . ($eyebrow !== '' ? ' | ' . $eyebrow : ''));
+    }
+
+    private function websiteMetaDescription(array $draft): string
+    {
+        return mb_substr($this->websiteDescription($draft), 0, 255);
+    }
+
+    private function aboutContent(array $draft): string
+    {
+        $hero = (array) ($draft['hero'] ?? []);
+        $sections = array_values(array_filter((array) ($draft['sections'] ?? []), fn ($item) => is_array($item)));
+        $chunks = [];
+
+        if (trim((string) ($hero['headline'] ?? '')) !== '') {
+            $chunks[] = '<h2>' . e((string) $hero['headline']) . '</h2>';
+        }
+
+        foreach ($sections as $section) {
+            $title = trim((string) ($section['title'] ?? ''));
+            $body = trim((string) ($section['body'] ?? ''));
+            $bullets = array_values(array_filter((array) ($section['bullets'] ?? []), fn ($item) => trim((string) $item) !== ''));
+
+            if ($title !== '') {
+                $chunks[] = '<h3>' . e($title) . '</h3>';
+            }
+            if ($body !== '') {
+                $chunks[] = '<p>' . e($body) . '</p>';
+            }
+            if ($bullets !== []) {
+                $chunks[] = '<ul>' . implode('', array_map(fn (string $bullet): string => '<li>' . e($bullet) . '</li>', $bullets)) . '</ul>';
+            }
+        }
+
+        return implode("\n", $chunks);
+    }
+
+    private function faqItems(array $draft): array
+    {
+        $faq = array_values(array_filter((array) ($draft['funnel_blocks']['faq'] ?? []), fn ($item) => is_array($item)));
+
+        return array_values(array_filter(array_map(function (array $item): ?array {
+            $question = trim((string) ($item['question'] ?? ''));
+            $answer = trim((string) ($item['answer'] ?? ''));
+
+            if ($question === '' || $answer === '') {
+                return null;
+            }
+
+            return [
+                'question' => $question,
+                'answer' => $answer,
+            ];
+        }, $faq)));
+    }
+
+    private function socialLinks(string $raw): array
+    {
+        $links = [];
+
+        foreach (preg_split('/\r\n|\r|\n/', $raw) ?: [] as $line) {
+            $line = trim($line);
+            if ($line === '') {
+                continue;
+            }
+
+            [$network, $url] = array_pad(preg_split('/\s*[:|-]\s*/', $line, 2) ?: [], 2, '');
+            $network = trim((string) $network);
+            $url = trim((string) $url);
+
+            if ($url === '' && filter_var($network, FILTER_VALIDATE_URL)) {
+                $url = $network;
+                $network = (string) (parse_url($url, PHP_URL_HOST) ?: 'website');
+            }
+
+            if ($url === '') {
+                continue;
+            }
+
+            $links[] = [
+                'network' => $network !== '' ? $network : 'website',
+                'url' => $url,
+            ];
+        }
+
+        return $links;
+    }
+
+    private function featureItems(array $draft): array
+    {
+        $sections = array_values(array_filter((array) ($draft['sections'] ?? []), fn ($item) => is_array($item)));
+        $items = [];
+
+        foreach (array_slice($sections, 0, 3) as $section) {
+            $title = trim((string) ($section['title'] ?? ''));
+            $body = trim((string) ($section['body'] ?? ''));
+            if ($title === '' || $body === '') {
+                continue;
+            }
+
+            $items[] = [
+                'title' => $title,
+                'description' => $body,
+            ];
+        }
+
+        return $items;
+    }
+
+    private function testimonials(array $draft): array
+    {
+        $proof = array_values(array_filter((array) (($draft['funnel_blocks']['proof']['bullets'] ?? [])), fn ($item) => trim((string) $item) !== ''));
+        $items = [];
+
+        foreach (array_slice($proof, 0, 3) as $index => $bullet) {
+            $items[] = [
+                'name' => 'Happy Client ' . ($index + 1),
+                'position' => 'Verified customer outcome',
+                'description' => $bullet,
+                'star' => 5,
+            ];
+        }
+
+        return $items;
+    }
+
+    private function storyItems(array $draft): array
+    {
+        $sections = array_values(array_filter((array) ($draft['sections'] ?? []), fn ($item) => is_array($item)));
+        $items = [];
+
+        foreach ($sections as $section) {
+            $title = trim((string) ($section['title'] ?? ''));
+            $bullets = array_values(array_filter((array) ($section['bullets'] ?? []), fn ($item) => trim((string) $item) !== ''));
+            foreach (array_slice($bullets, 0, 3) as $bullet) {
+                if ($title === '') {
+                    continue;
+                }
+
+                $items[] = [
+                    'title' => $title,
+                    'description' => trim((string) $bullet),
+                ];
+            }
+            if ($items !== []) {
+                break;
+            }
+        }
+
+        return array_slice($items, 0, 3);
+    }
+
+    private function storyTitle(array $draft): string
+    {
+        $hero = (array) ($draft['hero'] ?? []);
+
+        return trim((string) ($hero['headline'] ?? ''));
+    }
+
+    private function storySubtitle(array $draft): string
+    {
+        $hero = (array) ($draft['hero'] ?? []);
+
+        return trim((string) ($hero['subhead'] ?? ''));
+    }
+
+    private function storyDescription(array $draft): string
+    {
+        $sections = array_values(array_filter((array) ($draft['sections'] ?? []), fn ($item) => is_array($item)));
+
+        return trim((string) (($sections[0]['body'] ?? '') ?: ($sections[1]['body'] ?? '')));
     }
 }

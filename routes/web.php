@@ -133,6 +133,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/admin/control/exceptions/{exception}/resolve', [OsShellController::class, 'adminResolveException'])->name('admin.control.exceptions.resolve');
     Route::get('/mentor/legacy-tools', [OsShellController::class, 'mentorLegacyTools'])->name('mentor.legacy-tools');
     Route::get('/website', [OsShellController::class, 'website'])->name('website');
+    Route::post('/website/build', [OsShellController::class, 'storeWebsiteBuildRequest'])->name('website.build.store');
     Route::post('/website/generate', [OsShellController::class, 'generateWebsiteDraft'])->name('website.generate');
     Route::post('/website/launch-system/apply', [OsShellController::class, 'founderApplyLaunchSystem'])->name('website.launch-system.apply');
     Route::post('/website/draft/regenerate-block', [OsShellController::class, 'founderRegenerateWebsiteDraftBlock'])->name('website.draft.regenerate-block');
