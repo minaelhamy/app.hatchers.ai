@@ -525,10 +525,10 @@
             [
                 'key' => 'settings',
                 'label' => 'Company Intelligence',
-                'route' => route('workspace.launch', ['module' => 'atlas', 'target' => '/company-intelligence']),
+                'route' => route('founder.settings', ['step' => 'basics']),
                 'class' => 'os-icon-automation',
                 'icon' => 'gear',
-                'external' => true,
+                'external' => false,
             ],
             [
                 'key' => 'atlas-brand-studio',

@@ -318,6 +318,9 @@ class OsShellController extends Controller
         if (!$user->isFounder()) {
             return redirect()->route('dashboard');
         }
+        if ($redirect = $this->ensureCompanyIntelligenceComplete($user)) {
+            return $redirect;
+        }
 
         return view('os.inbox', [
             'pageTitle' => 'Inbox',
@@ -331,6 +334,9 @@ class OsShellController extends Controller
         $user = Auth::user();
         if (!$user->isFounder()) {
             return redirect()->route('dashboard');
+        }
+        if ($redirect = $this->ensureCompanyIntelligenceComplete($user)) {
+            return $redirect;
         }
 
         return view('os.activity', [
@@ -348,6 +354,9 @@ class OsShellController extends Controller
         $user = Auth::user();
         if (!$user->isFounder()) {
             return redirect()->route('dashboard');
+        }
+        if ($redirect = $this->ensureCompanyIntelligenceComplete($user)) {
+            return $redirect;
         }
 
         $filters = $request->validate([
@@ -446,6 +455,9 @@ class OsShellController extends Controller
         if (!$user->isFounder()) {
             return redirect()->route('dashboard');
         }
+        if ($redirect = $this->ensureCompanyIntelligenceComplete($user)) {
+            return $redirect;
+        }
 
         return view('os.learning-plan', [
             'pageTitle' => 'Learning Plan',
@@ -459,6 +471,9 @@ class OsShellController extends Controller
         $user = Auth::user();
         if (!$user->isFounder()) {
             return redirect()->route('dashboard');
+        }
+        if ($redirect = $this->ensureCompanyIntelligenceComplete($user)) {
+            return $redirect;
         }
 
         return view('os.tasks', [
@@ -1743,6 +1758,9 @@ class OsShellController extends Controller
         if (!$user->isFounder()) {
             return redirect()->route('dashboard');
         }
+        if ($redirect = $this->ensureCompanyIntelligenceComplete($user)) {
+            return $redirect;
+        }
 
         $dashboard = $founderDashboardService->build($user);
         $atlasWorkspace = $atlasWorkspaceService->summary($user, $dashboard['atlas'] ?? []);
@@ -1764,6 +1782,9 @@ class OsShellController extends Controller
         $user = Auth::user();
         if (!$user->isFounder()) {
             return redirect()->route('dashboard');
+        }
+        if ($redirect = $this->ensureCompanyIntelligenceComplete($user)) {
+            return $redirect;
         }
 
         $target = $this->sanitizeAtlasWorkspaceTarget((string) $request->query('target', '/dashboard'));
@@ -1898,6 +1919,9 @@ class OsShellController extends Controller
         if (!$user->isFounder()) {
             return redirect()->route('dashboard');
         }
+        if ($redirect = $this->ensureCompanyIntelligenceComplete($user)) {
+            return $redirect;
+        }
 
         $dashboard = $founderDashboardService->build($user);
         $query = trim((string) $request->query('q', ''));
@@ -1920,6 +1944,9 @@ class OsShellController extends Controller
         if (!$user->isFounder()) {
             return redirect()->route('dashboard');
         }
+        if ($redirect = $this->ensureCompanyIntelligenceComplete($user)) {
+            return $redirect;
+        }
 
         $dashboard = $founderDashboardService->build($user);
         $atlasWorkspace = $atlasWorkspaceService->summary($user, $dashboard['atlas'] ?? []);
@@ -1940,6 +1967,9 @@ class OsShellController extends Controller
         if (!$user->isFounder()) {
             return redirect()->route('dashboard');
         }
+        if ($redirect = $this->ensureCompanyIntelligenceComplete($user)) {
+            return $redirect;
+        }
 
         $dashboard = $founderDashboardService->build($user);
 
@@ -1956,6 +1986,9 @@ class OsShellController extends Controller
         $user = Auth::user();
         if (!$user->isFounder()) {
             return redirect()->route('dashboard');
+        }
+        if ($redirect = $this->ensureCompanyIntelligenceComplete($user)) {
+            return $redirect;
         }
 
         return view('os.automations', [
@@ -2175,6 +2208,9 @@ class OsShellController extends Controller
         if (!$user->isFounder()) {
             return redirect()->route('dashboard');
         }
+        if ($redirect = $this->ensureCompanyIntelligenceComplete($user)) {
+            return $redirect;
+        }
 
         return view('os.marketing', [
             'pageTitle' => 'Marketing',
@@ -2198,6 +2234,9 @@ class OsShellController extends Controller
         $user = Auth::user();
         if (!$user->isFounder()) {
             return redirect()->route('dashboard');
+        }
+        if ($redirect = $this->ensureCompanyIntelligenceComplete($user)) {
+            return $redirect;
         }
 
         $offers = $this->commerceOffers($user);
@@ -2370,6 +2409,9 @@ class OsShellController extends Controller
         if (!$user->isFounder()) {
             return redirect()->route('dashboard');
         }
+        if ($redirect = $this->ensureCompanyIntelligenceComplete($user)) {
+            return $redirect;
+        }
 
         $filters = $request->validate([
             'entry_type' => ['nullable', 'string', Rule::in(['all', 'credit', 'debit'])],
@@ -2458,6 +2500,9 @@ class OsShellController extends Controller
         if (!$user->isFounder()) {
             return redirect()->route('dashboard');
         }
+        if ($redirect = $this->ensureCompanyIntelligenceComplete($user)) {
+            return $redirect;
+        }
 
         $filters = $request->validate([
             'status' => ['nullable', 'string', Rule::in(['all', 'pending', 'processing', 'completed', 'cancelled'])],
@@ -2489,6 +2534,9 @@ class OsShellController extends Controller
         $user = Auth::user();
         if (!$user->isFounder()) {
             return redirect()->route('dashboard');
+        }
+        if ($redirect = $this->ensureCompanyIntelligenceComplete($user)) {
+            return $redirect;
         }
 
         $filters = $request->validate([
@@ -3108,7 +3156,7 @@ class OsShellController extends Controller
         return $redirect;
     }
 
-    public function founderSettings(FounderDashboardService $founderDashboardService)
+    public function founderSettings(Request $request, FounderDashboardService $founderDashboardService)
     {
         /** @var \App\Models\Founder $user */
         $user = Auth::user();
@@ -3116,10 +3164,13 @@ class OsShellController extends Controller
             return redirect()->route('dashboard');
         }
 
+        $wizard = $this->companyIntelligenceWizardState($user, (string) $request->query('step', ''));
+
         return view('os.settings', [
-            'pageTitle' => 'Settings',
+            'pageTitle' => 'Company Intelligence',
             'dashboard' => $founderDashboardService->build($user),
             'intelligence' => $user->company?->intelligence,
+            'wizard' => $wizard,
         ]);
     }
 
@@ -3131,77 +3182,242 @@ class OsShellController extends Controller
             return redirect()->route('dashboard');
         }
 
-        $validated = $request->validate([
-            'full_name' => ['required', 'string', 'max:255'],
-            'phone' => ['nullable', 'string', 'max:50'],
-            'company_name' => ['required', 'string', 'max:255'],
-            'company_brief' => ['nullable', 'string', 'max:2000'],
-            'business_model' => ['required', Rule::in(['product', 'service', 'hybrid'])],
-            'company_logo' => ['nullable', 'image', 'max:4096'],
-            'target_audience' => ['nullable', 'string', 'max:255'],
-            'ideal_customer_profile' => ['nullable', 'string', 'max:1000'],
-            'primary_icp_name' => ['nullable', 'string', 'max:255'],
-            'problem_solved' => ['nullable', 'string', 'max:1000'],
-            'brand_voice' => ['nullable', 'string', 'max:255'],
-            'differentiators' => ['nullable', 'string', 'max:1000'],
-            'core_offer' => ['nullable', 'string', 'max:255'],
-            'primary_growth_goal' => ['nullable', 'string', 'max:255'],
-            'known_blockers' => ['nullable', 'string', 'max:500'],
-            'objections' => ['nullable', 'string', 'max:1200'],
-            'buying_triggers' => ['nullable', 'string', 'max:1200'],
-            'local_market_notes' => ['nullable', 'string', 'max:1200'],
-            'visual_style' => ['nullable', 'string', 'max:500'],
-        ]);
+        $step = (string) $request->input('current_step', 'basics');
+        $stepRules = [
+            'basics' => [
+                'full_name' => ['required', 'string', 'max:255'],
+                'phone' => ['nullable', 'string', 'max:50'],
+                'company_name' => ['required', 'string', 'max:255'],
+                'company_brief' => ['required', 'string', 'max:2000'],
+                'business_model' => ['required', Rule::in(['product', 'service', 'hybrid'])],
+                'company_logo' => ['nullable', 'image', 'max:4096'],
+            ],
+            'audience' => [
+                'target_audience' => ['required', 'string', 'max:255'],
+                'primary_icp_name' => ['required', 'string', 'max:255'],
+                'ideal_customer_profile' => ['required', 'string', 'max:1000'],
+                'problem_solved' => ['required', 'string', 'max:1000'],
+            ],
+            'offer' => [
+                'core_offer' => ['required', 'string', 'max:255'],
+                'differentiators' => ['required', 'string', 'max:1000'],
+                'objections' => ['required', 'string', 'max:1200'],
+                'buying_triggers' => ['required', 'string', 'max:1200'],
+            ],
+            'brand' => [
+                'brand_voice' => ['required', 'string', 'max:255'],
+                'visual_style' => ['required', 'string', 'max:500'],
+                'primary_growth_goal' => ['required', 'string', 'max:255'],
+                'known_blockers' => ['required', 'string', 'max:500'],
+                'local_market_notes' => ['nullable', 'string', 'max:1200'],
+            ],
+        ];
 
-        $user->forceFill([
-            'full_name' => (string) $validated['full_name'],
-            'phone' => (string) ($validated['phone'] ?? ''),
-        ])->save();
-
-        $company = $user->company ?: Company::create([
-            'founder_id' => $user->id,
-            'company_name' => (string) $validated['company_name'],
-            'business_model' => (string) $validated['business_model'],
-            'stage' => 'idea',
-            'website_status' => 'not_started',
-        ]);
-
-        $logoPath = (string) ($company->company_logo_path ?? '');
-        if ($request->hasFile('company_logo')) {
-            if ($logoPath !== '' && Storage::disk('public')->exists($logoPath)) {
-                Storage::disk('public')->delete($logoPath);
-            }
-            $logoPath = (string) $request->file('company_logo')->store('company-logos', 'public');
+        if (!array_key_exists($step, $stepRules)) {
+            $step = 'basics';
         }
 
-        $company->forceFill([
-            'company_name' => (string) $validated['company_name'],
-            'company_brief' => (string) ($validated['company_brief'] ?? ''),
-            'business_model' => (string) $validated['business_model'],
-            'company_logo_path' => $logoPath !== '' ? $logoPath : null,
-        ])->save();
+        $validated = $request->validate(array_merge([
+            'current_step' => ['required', Rule::in(array_keys($stepRules))],
+        ], $stepRules[$step]));
+
+        if ($step === 'basics') {
+            $user->forceFill([
+                'full_name' => (string) $validated['full_name'],
+                'phone' => (string) ($validated['phone'] ?? ''),
+            ])->save();
+        }
+
+        $company = $user->company;
+        if ($step !== 'basics' && !$company) {
+            return redirect()->route('founder.settings', ['step' => 'basics'])->with('error', 'Complete the company basics first.');
+        }
+
+        if (!$company) {
+            $company = Company::create([
+                'founder_id' => $user->id,
+                'company_name' => (string) $validated['company_name'],
+                'business_model' => (string) $validated['business_model'],
+                'stage' => 'idea',
+                'website_status' => 'not_started',
+            ]);
+        }
+
+        if ($step === 'basics') {
+            $logoPath = (string) ($company->company_logo_path ?? '');
+            if ($request->hasFile('company_logo')) {
+                if ($logoPath !== '' && Storage::disk('public')->exists($logoPath)) {
+                    Storage::disk('public')->delete($logoPath);
+                }
+                $logoPath = (string) $request->file('company_logo')->store('company-logos', 'public');
+            }
+
+            $company->forceFill([
+                'company_name' => (string) $validated['company_name'],
+                'company_brief' => (string) ($validated['company_brief'] ?? ''),
+                'business_model' => (string) $validated['business_model'],
+                'company_logo_path' => $logoPath !== '' ? $logoPath : null,
+            ])->save();
+        }
+
+        $currentIntelligence = $company->intelligence;
+        $intelligencePayload = [
+            'target_audience' => (string) ($currentIntelligence?->target_audience ?? ''),
+            'ideal_customer_profile' => (string) ($currentIntelligence?->ideal_customer_profile ?? ''),
+            'primary_icp_name' => (string) ($currentIntelligence?->primary_icp_name ?? ''),
+            'problem_solved' => (string) ($currentIntelligence?->problem_solved ?? ''),
+            'brand_voice' => (string) ($currentIntelligence?->brand_voice ?? ''),
+            'differentiators' => (string) ($currentIntelligence?->differentiators ?? ''),
+            'core_offer' => (string) ($currentIntelligence?->core_offer ?? ''),
+            'primary_growth_goal' => (string) ($currentIntelligence?->primary_growth_goal ?? ''),
+            'known_blockers' => (string) ($currentIntelligence?->known_blockers ?? ''),
+            'objections' => (string) ($currentIntelligence?->objections ?? ''),
+            'buying_triggers' => (string) ($currentIntelligence?->buying_triggers ?? ''),
+            'local_market_notes' => (string) ($currentIntelligence?->local_market_notes ?? ''),
+            'visual_style' => (string) ($currentIntelligence?->visual_style ?? ''),
+        ];
+
+        foreach (array_keys($intelligencePayload) as $field) {
+            if (array_key_exists($field, $validated)) {
+                $intelligencePayload[$field] = (string) ($validated[$field] ?? '');
+            }
+        }
 
         CompanyIntelligence::updateOrCreate(
             ['company_id' => $company->id],
-            [
-                'target_audience' => (string) ($validated['target_audience'] ?? ''),
-                'ideal_customer_profile' => (string) ($validated['ideal_customer_profile'] ?? ''),
-                'primary_icp_name' => (string) ($validated['primary_icp_name'] ?? ''),
-                'problem_solved' => (string) ($validated['problem_solved'] ?? ''),
-                'brand_voice' => (string) ($validated['brand_voice'] ?? ''),
-                'differentiators' => (string) ($validated['differentiators'] ?? ''),
-                'core_offer' => (string) ($validated['core_offer'] ?? ''),
-                'primary_growth_goal' => (string) ($validated['primary_growth_goal'] ?? ''),
-                'known_blockers' => (string) ($validated['known_blockers'] ?? ''),
-                'objections' => (string) ($validated['objections'] ?? ''),
-                'buying_triggers' => (string) ($validated['buying_triggers'] ?? ''),
-                'local_market_notes' => (string) ($validated['local_market_notes'] ?? ''),
-                'visual_style' => (string) ($validated['visual_style'] ?? ''),
+            array_merge($intelligencePayload, [
                 'intelligence_updated_at' => now(),
-            ]
+            ])
         );
 
-        return redirect()->route('founder.settings')->with('success', 'Founder settings updated from Hatchers Ai Business OS.');
+        $user->unsetRelation('company');
+        $user->load('company.intelligence');
+        $wizard = $this->companyIntelligenceWizardState($user);
+        $nextStep = $wizard['is_complete'] ? 'brand' : $wizard['current_step_key'];
+
+        return redirect()
+            ->route('founder.settings', ['step' => $nextStep])
+            ->with('success', $wizard['is_complete']
+                ? 'Company Intelligence is complete and ready to power the rest of Hatchers OS.'
+                : 'Saved. Continue to the next Company Intelligence step.');
+    }
+
+    private function companyIntelligenceWizardState(Founder $founder, string $requestedStep = ''): array
+    {
+        $company = $founder->company;
+        $intelligence = $company?->intelligence;
+
+        $steps = [
+            'basics' => [
+                'key' => 'basics',
+                'label' => 'Basics',
+                'headline' => 'Define the business basics',
+                'copy' => 'Start with the founder, company, and business model details that every other workspace depends on.',
+                'fields' => [
+                    'full_name' => trim((string) $founder->full_name),
+                    'phone' => trim((string) ($founder->phone ?? '')),
+                    'company_name' => trim((string) ($company?->company_name ?? '')),
+                    'company_brief' => trim((string) ($company?->company_brief ?? '')),
+                    'business_model' => trim((string) ($company?->business_model ?? '')),
+                ],
+                'required' => ['full_name', 'company_name', 'company_brief', 'business_model'],
+            ],
+            'audience' => [
+                'key' => 'audience',
+                'label' => 'Audience',
+                'headline' => 'Clarify who this business is for',
+                'copy' => 'Your target audience and ideal customer profile shape positioning, messaging, and every AI prompt that follows.',
+                'fields' => [
+                    'target_audience' => trim((string) ($intelligence?->target_audience ?? '')),
+                    'primary_icp_name' => trim((string) ($intelligence?->primary_icp_name ?? '')),
+                    'ideal_customer_profile' => trim((string) ($intelligence?->ideal_customer_profile ?? '')),
+                    'problem_solved' => trim((string) ($intelligence?->problem_solved ?? '')),
+                ],
+                'required' => ['target_audience', 'primary_icp_name', 'ideal_customer_profile', 'problem_solved'],
+            ],
+            'offer' => [
+                'key' => 'offer',
+                'label' => 'Offer',
+                'headline' => 'Define the offer and buying logic',
+                'copy' => 'This is where we capture what you sell, why people choose you, what they hesitate over, and what makes them buy.',
+                'fields' => [
+                    'core_offer' => trim((string) ($intelligence?->core_offer ?? '')),
+                    'differentiators' => trim((string) ($intelligence?->differentiators ?? '')),
+                    'objections' => trim((string) ($intelligence?->objections ?? '')),
+                    'buying_triggers' => trim((string) ($intelligence?->buying_triggers ?? '')),
+                ],
+                'required' => ['core_offer', 'differentiators', 'objections', 'buying_triggers'],
+            ],
+            'brand' => [
+                'key' => 'brand',
+                'label' => 'Brand + Growth',
+                'headline' => 'Capture voice, growth goals, and market notes',
+                'copy' => 'Keep this editable over time so the OS and Atlas keep getting sharper as your business understanding improves.',
+                'fields' => [
+                    'brand_voice' => trim((string) ($intelligence?->brand_voice ?? '')),
+                    'visual_style' => trim((string) ($intelligence?->visual_style ?? '')),
+                    'primary_growth_goal' => trim((string) ($intelligence?->primary_growth_goal ?? '')),
+                    'known_blockers' => trim((string) ($intelligence?->known_blockers ?? '')),
+                    'local_market_notes' => trim((string) ($intelligence?->local_market_notes ?? '')),
+                ],
+                'required' => ['brand_voice', 'visual_style', 'primary_growth_goal', 'known_blockers'],
+            ],
+        ];
+
+        $completedCount = 0;
+        $firstIncomplete = null;
+
+        foreach ($steps as $key => $step) {
+            $completed = true;
+            foreach ($step['required'] as $field) {
+                if (($step['fields'][$field] ?? '') === '') {
+                    $completed = false;
+                    break;
+                }
+            }
+
+            $steps[$key]['is_complete'] = $completed;
+            if ($completed) {
+                $completedCount++;
+            } elseif ($firstIncomplete === null) {
+                $firstIncomplete = $key;
+            }
+        }
+
+        $isComplete = $completedCount === count($steps);
+        $currentStepKey = $firstIncomplete ?? 'brand';
+
+        if ($requestedStep !== '' && isset($steps[$requestedStep])) {
+            $requestedIndex = array_search($requestedStep, array_keys($steps), true);
+            $currentIndex = array_search($currentStepKey, array_keys($steps), true);
+            if ($requestedIndex !== false && $currentIndex !== false && ($requestedIndex <= $currentIndex || $isComplete)) {
+                $currentStepKey = $requestedStep;
+            }
+        }
+
+        return [
+            'steps' => array_values($steps),
+            'step_map' => $steps,
+            'current_step_key' => $currentStepKey,
+            'current_step' => $steps[$currentStepKey],
+            'completed_steps' => $completedCount,
+            'total_steps' => count($steps),
+            'completion_percent' => (int) round(($completedCount / max(count($steps), 1)) * 100),
+            'is_complete' => $isComplete,
+        ];
+    }
+
+    private function ensureCompanyIntelligenceComplete(Founder $founder): ?RedirectResponse
+    {
+        $wizard = $this->companyIntelligenceWizardState($founder);
+
+        if ($wizard['is_complete']) {
+            return null;
+        }
+
+        return redirect()
+            ->route('founder.settings', ['step' => $wizard['current_step_key']])
+            ->with('error', 'Complete Company Intelligence before using the rest of Hatchers OS.');
     }
 
     public function founderCreateCampaign(
@@ -3592,6 +3808,9 @@ class OsShellController extends Controller
     {
         /** @var \App\Models\Founder $user */
         $user = Auth::user();
+        if ($user->isFounder() && ($redirect = $this->ensureCompanyIntelligenceComplete($user))) {
+            return $redirect;
+        }
 
         $target = '';
         if (request()->filled('target')) {
@@ -3615,6 +3834,9 @@ class OsShellController extends Controller
     {
         /** @var \App\Models\Founder $founder */
         $founder = Auth::user();
+        if ($founder->isFounder() && ($redirect = $this->ensureCompanyIntelligenceComplete($founder))) {
+            return $redirect;
+        }
 
         return view('os.website', [
             'pageTitle' => 'Website Workspace',

@@ -6,43 +6,360 @@
 @section('head')
     <style>
         .page.founder-home-page { padding: 0; }
-        .settings-shell { min-height: 100vh; display:grid; grid-template-columns:220px minmax(0,1fr) 220px; background:#f8f5ee; }
-        .settings-sidebar, .settings-rightbar { background: rgba(255,252,247,0.8); border-color: var(--line); border-style: solid; border-width:0 1px 0 0; min-height:100vh; display:flex; flex-direction:column; }
-        .settings-rightbar { border-width:0 0 0 1px; background: rgba(255,251,246,0.9); }
-        .settings-sidebar-inner, .settings-rightbar-inner { padding:22px 18px; }
-        .settings-brand { display:inline-block; margin-bottom:24px; }
-        .settings-brand img { width:168px; height:auto; display:block; }
-        .settings-nav { display:grid; gap:6px; }
-        .settings-nav-item { display:flex; align-items:center; gap:10px; padding:12px 14px; border-radius:14px; text-decoration:none; color:var(--ink); font-size:0.98rem; }
-        .settings-nav-item.active { background:#ece6db; }
-        .settings-nav-icon { width:18px; text-align:center; color:var(--muted); }
-        .settings-sidebar-footer { margin-top:auto; padding:18px; border-top:1px solid var(--line); display:flex; align-items:center; justify-content:space-between; gap:12px; }
-        .settings-user { display:flex; align-items:center; gap:10px; }
-        .settings-avatar { width:30px; height:30px; border-radius:999px; background:#b0a999; color:#fff; display:grid; place-items:center; font-weight:700; font-size:0.92rem; flex-shrink:0; }
-        .settings-main { padding:26px 28px 24px; }
-        .settings-main-inner { max-width:760px; margin:0 auto; }
-        .settings-main h1 { font-size: clamp(2rem, 3vw, 3rem); letter-spacing:-0.02em; margin-bottom:6px; }
-        .settings-main p { color:var(--muted); margin-bottom:24px; }
-        .settings-banner { border-radius:16px; padding:14px 16px; border:1px solid rgba(220,207,191,0.8); background: rgba(255,255,255,0.9); margin-bottom:14px; }
-        .settings-banner.success { border-color: rgba(44,122,87,0.26); background: rgba(226,245,236,0.9); }
-        .settings-grid { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:12px; }
-        .settings-card { background: rgba(255,255,255,0.92); border:1px solid rgba(220,207,191,0.65); border-radius:18px; padding:18px; box-shadow:0 10px 28px rgba(52,41,26,0.04); }
-        .settings-card-title { font-size:1rem; font-weight:700; margin-bottom:6px; }
-        .settings-card-copy { color:var(--muted); font-size:0.95rem; line-height:1.45; }
-        .settings-field { display:grid; gap:8px; margin-top:14px; }
-        .settings-field label { font-size:0.92rem; font-weight:600; }
-        .settings-field input, .settings-field textarea, .settings-field select { width:100%; border:1px solid rgba(220,207,191,0.9); background:#fff; border-radius:12px; padding:12px 14px; font:inherit; color:var(--ink); }
-        .settings-field textarea { min-height:110px; resize:vertical; }
-        .settings-actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:16px; }
-        .settings-button { border:0; cursor:pointer; font:inherit; padding:10px 14px; border-radius:10px; font-weight:600; }
-        .settings-button.primary { background:linear-gradient(90deg,#8e1c74,#ff2c35); color:#fff; }
-        .settings-chip { display:inline-block; margin-top:12px; padding:8px 14px; border-radius:10px; background:#f0ece4; color:#7a7267; font-size:0.92rem; }
-        .settings-rightbar h3 { font-size:0.83rem; letter-spacing:0.06em; text-transform:uppercase; color:var(--muted); margin-bottom:12px; }
-        .rail-list { display:grid; gap:10px; margin-top:14px; }
-        .rail-item, .mini-note { background: rgba(255,255,255,0.92); border:1px solid rgba(220,207,191,0.65); border-radius:14px; padding:12px 14px; }
-        .field-error { color:var(--rose); font-size:0.85rem; }
-        @media (max-width:1240px) { .settings-shell { grid-template-columns:220px 1fr; } .settings-rightbar { display:none; } }
-        @media (max-width:900px) { .settings-shell { grid-template-columns:1fr; } .settings-sidebar { min-height:auto; border-right:0; border-bottom:1px solid var(--line); } .settings-sidebar-footer { display:none; } .settings-main { padding:20px 16px 24px; } .settings-grid { grid-template-columns:1fr; } }
+        .intelligence-shell {
+            min-height: 100vh;
+            display: grid;
+            grid-template-columns: 220px minmax(0, 1fr);
+            background:
+                radial-gradient(circle at 18% 16%, rgba(255, 255, 255, 0.95), rgba(255, 248, 240, 0.82) 34%, rgba(245, 235, 224, 0.62) 74%),
+                linear-gradient(140deg, #ddd1c4 0%, #eadfd4 54%, #f2e9df 100%);
+        }
+        .intelligence-sidebar {
+            border-right: 1px solid rgba(208, 193, 175, 0.7);
+            background: rgba(255, 252, 248, 0.62);
+            backdrop-filter: blur(18px);
+        }
+        .intelligence-main {
+            padding: 28px;
+        }
+        .intelligence-wrap {
+            max-width: 980px;
+            margin: 0 auto;
+            display: grid;
+            gap: 18px;
+        }
+        .intelligence-hero,
+        .intelligence-card,
+        .step-card,
+        .checkpoint-card {
+            border: 1px solid rgba(216, 202, 186, 0.78);
+            background: rgba(255, 252, 248, 0.9);
+            box-shadow: 0 24px 60px rgba(96, 78, 59, 0.08);
+            backdrop-filter: blur(16px);
+        }
+        .intelligence-hero {
+            border-radius: 28px;
+            padding: 24px 24px 20px;
+        }
+        .intelligence-kicker {
+            font-size: 0.79rem;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            color: #9a8878;
+            margin-bottom: 10px;
+        }
+        .intelligence-hero h1 {
+            margin: 0 0 10px;
+            font-size: clamp(2rem, 4vw, 3.35rem);
+            line-height: 0.98;
+            letter-spacing: -0.045em;
+        }
+        .intelligence-copy {
+            max-width: 760px;
+            font-size: 1rem;
+            line-height: 1.7;
+            color: #746657;
+            margin: 0;
+        }
+        .intelligence-progress {
+            margin-top: 18px;
+            display: grid;
+            gap: 10px;
+        }
+        .intelligence-progress-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+            color: #6f6255;
+            font-size: 0.94rem;
+        }
+        .intelligence-bar {
+            height: 12px;
+            border-radius: 999px;
+            background: rgba(218, 204, 189, 0.58);
+            overflow: hidden;
+        }
+        .intelligence-bar-fill {
+            height: 100%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, #ff5c7d 0%, #ff7f50 45%, #f8b55c 100%);
+        }
+        .intelligence-layout {
+            display: grid;
+            grid-template-columns: 260px minmax(0, 1fr);
+            gap: 18px;
+            align-items: start;
+        }
+        .intelligence-card,
+        .step-card,
+        .checkpoint-card {
+            border-radius: 26px;
+        }
+        .intelligence-card {
+            padding: 20px;
+            display: grid;
+            gap: 14px;
+            position: sticky;
+            top: 24px;
+        }
+        .step-nav {
+            display: grid;
+            gap: 10px;
+        }
+        .step-link {
+            text-decoration: none;
+            color: inherit;
+            display: grid;
+            gap: 4px;
+            padding: 14px 15px;
+            border-radius: 18px;
+            border: 1px solid rgba(219, 206, 190, 0.72);
+            background: rgba(255, 255, 255, 0.62);
+            transition: transform 140ms ease, border-color 140ms ease, background 140ms ease;
+        }
+        .step-link:hover {
+            transform: translateY(-1px);
+            border-color: rgba(186, 164, 139, 0.9);
+        }
+        .step-link.active {
+            background: linear-gradient(135deg, rgba(255, 247, 240, 0.98), rgba(249, 238, 228, 0.88));
+            border-color: rgba(180, 158, 135, 0.94);
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55);
+        }
+        .step-link.complete {
+            background: rgba(245, 255, 248, 0.85);
+        }
+        .step-link-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            font-size: 0.82rem;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            color: #9b8b7a;
+        }
+        .step-link-title {
+            font-size: 1rem;
+            line-height: 1.35;
+            font-weight: 700;
+            color: #261d15;
+        }
+        .step-link-copy {
+            font-size: 0.88rem;
+            line-height: 1.5;
+            color: #756859;
+        }
+        .step-link-status {
+            width: 22px;
+            height: 22px;
+            border-radius: 999px;
+            border: 1px solid rgba(205, 191, 174, 0.9);
+            display: grid;
+            place-items: center;
+            font-size: 0.74rem;
+            background: rgba(255,255,255,0.82);
+        }
+        .step-link.complete .step-link-status {
+            background: #eaf7ee;
+            color: #1f7a43;
+            border-color: rgba(91, 160, 113, 0.35);
+        }
+        .step-card {
+            padding: 24px;
+        }
+        .step-card-top {
+            display: flex;
+            align-items: start;
+            justify-content: space-between;
+            gap: 18px;
+            margin-bottom: 18px;
+        }
+        .step-card-kicker {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.14em;
+            color: #9a8877;
+            margin-bottom: 8px;
+        }
+        .step-card h2 {
+            margin: 0 0 8px;
+            font-size: clamp(1.6rem, 3vw, 2.4rem);
+            line-height: 1.02;
+            letter-spacing: -0.04em;
+        }
+        .step-card p {
+            margin: 0;
+            color: #736555;
+            line-height: 1.7;
+            max-width: 680px;
+        }
+        .checkpoint-card {
+            min-width: 180px;
+            padding: 14px 16px;
+            display: grid;
+            gap: 8px;
+        }
+        .checkpoint-label {
+            font-size: 0.76rem;
+            text-transform: uppercase;
+            letter-spacing: 0.14em;
+            color: #9a8877;
+        }
+        .checkpoint-value {
+            font-size: 1.5rem;
+            letter-spacing: -0.04em;
+            font-weight: 800;
+            color: #231b14;
+        }
+        .checkpoint-note {
+            font-size: 0.9rem;
+            color: #786b5c;
+            line-height: 1.45;
+        }
+        .wizard-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 14px;
+        }
+        .wizard-field {
+            display: grid;
+            gap: 8px;
+        }
+        .wizard-field.full {
+            grid-column: 1 / -1;
+        }
+        .wizard-field label {
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: #31261d;
+        }
+        .wizard-field-note {
+            font-size: 0.84rem;
+            color: #8b7b6c;
+            margin-top: -2px;
+        }
+        .wizard-field input,
+        .wizard-field select,
+        .wizard-field textarea {
+            width: 100%;
+            border: 1px solid rgba(216, 201, 184, 0.96);
+            background: rgba(255, 255, 255, 0.96);
+            color: #241a13;
+            font: inherit;
+            border-radius: 16px;
+            padding: 13px 15px;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.7);
+        }
+        .wizard-field textarea {
+            min-height: 132px;
+            resize: vertical;
+        }
+        .wizard-field input[type="file"] {
+            padding: 12px;
+        }
+        .wizard-file-preview {
+            margin-top: 6px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: #756655;
+            font-size: 0.9rem;
+        }
+        .wizard-file-preview img {
+            width: 66px;
+            height: 66px;
+            object-fit: cover;
+            border-radius: 18px;
+            border: 1px solid rgba(216, 201, 184, 0.92);
+            background: #fff;
+        }
+        .wizard-actions {
+            margin-top: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+        .wizard-actions-left,
+        .wizard-actions-right {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .wizard-button,
+        .wizard-link {
+            border-radius: 999px;
+            padding: 12px 18px;
+            font: inherit;
+            font-weight: 700;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+        .wizard-button {
+            border: 0;
+            color: #fff;
+            background: linear-gradient(135deg, #14100d, #34261a);
+            min-width: 170px;
+            box-shadow: 0 18px 34px rgba(44, 29, 18, 0.18);
+        }
+        .wizard-link {
+            border: 1px solid rgba(216, 201, 184, 0.95);
+            color: #4d4033;
+            background: rgba(255, 255, 255, 0.74);
+        }
+        .wizard-edit-note {
+            font-size: 0.9rem;
+            color: #7d6f60;
+        }
+        .intelligence-banner {
+            border-radius: 18px;
+            padding: 14px 16px;
+            border: 1px solid rgba(219, 205, 188, 0.82);
+            background: rgba(255,255,255,0.84);
+            color: #56483b;
+        }
+        .intelligence-banner.success {
+            background: rgba(236, 249, 240, 0.94);
+            border-color: rgba(101, 165, 116, 0.34);
+            color: #245032;
+        }
+        .field-error {
+            color: #be3b58;
+            font-size: 0.84rem;
+        }
+        @media (max-width: 1080px) {
+            .intelligence-layout {
+                grid-template-columns: 1fr;
+            }
+            .intelligence-card {
+                position: static;
+            }
+        }
+        @media (max-width: 920px) {
+            .intelligence-shell {
+                grid-template-columns: 1fr;
+            }
+            .intelligence-sidebar {
+                border-right: 0;
+                border-bottom: 1px solid rgba(208, 193, 175, 0.7);
+            }
+            .intelligence-main {
+                padding: 18px 14px 24px;
+            }
+            .wizard-grid {
+                grid-template-columns: 1fr;
+            }
+            .step-card-top {
+                flex-direction: column;
+            }
+        }
     </style>
 @endsection
 
@@ -52,11 +369,15 @@
         $company = $dashboard['company'];
         $subscription = $dashboard['subscription'];
         $intelligence = $intelligence ?? $company?->intelligence;
+        $wizard = $wizard ?? [];
+        $steps = collect($wizard['steps'] ?? []);
+        $currentStep = $wizard['current_step'] ?? null;
+        $currentStepKey = $wizard['current_step_key'] ?? 'basics';
         $logoUrl = !empty($company?->company_logo_path) ? asset('storage/' . ltrim((string) $company->company_logo_path, '/')) : null;
     @endphp
 
-    <div class="settings-shell">
-        <aside class="settings-sidebar">
+    <div class="intelligence-shell">
+        <aside class="intelligence-sidebar">
             @include('os.partials.founder-sidebar', [
                 'founder' => $founder,
                 'businessModel' => $founder->company->business_model ?? 'hybrid',
@@ -72,166 +393,236 @@
             ])
         </aside>
 
-        <main class="settings-main">
-            <div class="settings-main-inner">
-                <h1>Settings</h1>
-                <p>Manage your company profile, logo, and brand intelligence from one OS workspace.</p>
+        <main class="intelligence-main">
+            <div class="intelligence-wrap">
+                <section class="intelligence-hero">
+                    <div class="intelligence-kicker">Company Intelligence</div>
+                    <h1>Build the business core once, then let the whole OS use it.</h1>
+                    <p class="intelligence-copy">This is the first task for every founder. Complete it before using the rest of Hatchers OS, then come back and refine it anytime as your business becomes clearer and stronger.</p>
+                    <div class="intelligence-progress">
+                        <div class="intelligence-progress-top">
+                            <span>{{ $wizard['completed_steps'] ?? 0 }} of {{ $wizard['total_steps'] ?? 4 }} steps complete</span>
+                            <strong>{{ $wizard['completion_percent'] ?? 0 }}%</strong>
+                        </div>
+                        <div class="intelligence-bar">
+                            <div class="intelligence-bar-fill" style="width: {{ $wizard['completion_percent'] ?? 0 }}%;"></div>
+                        </div>
+                    </div>
+                </section>
 
                 @if (session('success'))
-                    <div class="settings-banner success">{{ session('success') }}</div>
+                    <div class="intelligence-banner success">{{ session('success') }}</div>
                 @endif
 
-                <div class="settings-grid">
-                    <div class="settings-card">
-                        <div class="settings-card-title">Brand Studio</div>
-                        <div class="settings-card-copy">This is where you keep your company identity and the core business intelligence the OS uses for your website, campaigns, and AI assistance.</div>
+                @if (session('error'))
+                    <div class="intelligence-banner">{{ session('error') }}</div>
+                @endif
+
+                <section class="intelligence-layout">
+                    <aside class="intelligence-card">
+                        <div class="intelligence-kicker" style="margin-bottom:2px;">Step Guide</div>
+                        <div style="font-size:1rem;font-weight:700;color:#271d15;">Complete each step in order.</div>
+                        <div style="font-size:0.92rem;line-height:1.6;color:#766859;">Everything here stays editable later, but this foundation needs to be complete before the founder can use the rest of the system.</div>
+
+                        <div class="step-nav">
+                            @foreach ($steps as $step)
+                                @php
+                                    $isActive = ($step['key'] ?? '') === $currentStepKey;
+                                @endphp
+                                <a
+                                    class="step-link{{ !empty($step['is_complete']) ? ' complete' : '' }}{{ $isActive ? ' active' : '' }}"
+                                    href="{{ route('founder.settings', ['step' => $step['key']]) }}"
+                                >
+                                    <div class="step-link-top">
+                                        <span>Step {{ $loop->iteration }}</span>
+                                        <span class="step-link-status">{{ !empty($step['is_complete']) ? '✓' : $loop->iteration }}</span>
+                                    </div>
+                                    <div class="step-link-title">{{ $step['label'] }}</div>
+                                    <div class="step-link-copy">{{ $step['copy'] }}</div>
+                                </a>
+                            @endforeach
+                        </div>
+
+                        <div class="intelligence-banner" style="margin-top:2px;">
+                            <strong style="display:block;margin-bottom:4px;">Plan</strong>
+                            <span style="font-size:0.94rem;color:#77695a;">{{ $subscription?->plan_name ?: 'No active plan yet' }}</span>
+                        </div>
+                    </aside>
+
+                    <section class="step-card">
+                        <div class="step-card-top">
+                            <div>
+                                <div class="step-card-kicker">Current step</div>
+                                <h2>{{ $currentStep['headline'] ?? 'Complete Company Intelligence' }}</h2>
+                                <p>{{ $currentStep['copy'] ?? 'Fill this out once, then keep improving it over time as you learn more about your business.' }}</p>
+                            </div>
+
+                            <div class="checkpoint-card">
+                                <div class="checkpoint-label">Checkpoint</div>
+                                <div class="checkpoint-value">{{ $wizard['completion_percent'] ?? 0 }}%</div>
+                                <div class="checkpoint-note">
+                                    @if (!empty($wizard['is_complete']))
+                                        Company Intelligence is complete and ready to power the OS.
+                                    @else
+                                        Finish this step, then we’ll move you to the next incomplete part automatically.
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
 
                         <form method="POST" action="{{ route('founder.settings.update') }}" enctype="multipart/form-data">
                             @csrf
-                            <div class="settings-field">
-                                <label for="full-name">Founder name</label>
-                                <input id="full-name" name="full_name" type="text" value="{{ old('full_name', $founder->full_name) }}" required>
-                                @error('full_name')<div class="field-error">{{ $message }}</div>@enderror
-                            </div>
-                            <div class="settings-field">
-                                <label for="phone">Phone</label>
-                                <input id="phone" name="phone" type="text" value="{{ old('phone', $founder->phone) }}">
-                                @error('phone')<div class="field-error">{{ $message }}</div>@enderror
-                            </div>
-                            <div class="settings-field">
-                                <label for="company-name">Company name</label>
-                                <input id="company-name" name="company_name" type="text" value="{{ old('company_name', $company?->company_name) }}" required>
-                                @error('company_name')<div class="field-error">{{ $message }}</div>@enderror
-                            </div>
-                            <div class="settings-field">
-                                <label for="business-model">Business model</label>
-                                <select id="business-model" name="business_model" required>
-                                    @foreach (['product' => 'Product business', 'service' => 'Service business', 'hybrid' => 'Hybrid business'] as $value => $label)
-                                        <option value="{{ $value }}" @selected(old('business_model', $company?->business_model) === $value)>{{ $label }}</option>
-                                    @endforeach
-                                </select>
-                                @error('business_model')<div class="field-error">{{ $message }}</div>@enderror
-                            </div>
-                            <div class="settings-field">
-                                <label for="company-brief">Company brief</label>
-                                <textarea id="company-brief" name="company_brief">{{ old('company_brief', $company?->company_brief) }}</textarea>
-                                @error('company_brief')<div class="field-error">{{ $message }}</div>@enderror
-                            </div>
-                            <div class="settings-field">
-                                <label for="company-logo">Company logo</label>
-                                <input id="company-logo" name="company_logo" type="file" accept="image/*">
-                                @error('company_logo')<div class="field-error">{{ $message }}</div>@enderror
-                                @if ($logoUrl)
-                                    <div style="margin-top:10px;">
-                                        <img src="{{ $logoUrl }}" alt="{{ $company?->company_name ?: 'Company logo' }}" style="width:120px;height:auto;border-radius:14px;border:1px solid var(--line);display:block;">
+                            <input type="hidden" name="current_step" value="{{ $currentStepKey }}">
+
+                            @if ($currentStepKey === 'basics')
+                                <div class="wizard-grid">
+                                    <div class="wizard-field">
+                                        <label for="full-name">Founder name</label>
+                                        <input id="full-name" name="full_name" type="text" value="{{ old('full_name', $founder->full_name) }}" required>
+                                        @error('full_name')<div class="field-error">{{ $message }}</div>@enderror
                                     </div>
-                                @endif
-                            </div>
-                            <div class="settings-field">
-                                <label for="target-audience">Target audience</label>
-                                <input id="target-audience" name="target_audience" type="text" value="{{ old('target_audience', $intelligence?->target_audience) }}">
-                                @error('target_audience')<div class="field-error">{{ $message }}</div>@enderror
-                            </div>
-                            <div class="settings-field">
-                                <label for="primary-icp-name">Primary ICP</label>
-                                <input id="primary-icp-name" name="primary_icp_name" type="text" value="{{ old('primary_icp_name', $intelligence?->primary_icp_name) }}">
-                                @error('primary_icp_name')<div class="field-error">{{ $message }}</div>@enderror
-                            </div>
-                            <div class="settings-field">
-                                <label for="ideal-customer-profile">Ideal customer profile</label>
-                                <textarea id="ideal-customer-profile" name="ideal_customer_profile">{{ old('ideal_customer_profile', $intelligence?->ideal_customer_profile) }}</textarea>
-                                @error('ideal_customer_profile')<div class="field-error">{{ $message }}</div>@enderror
-                            </div>
-                            <div class="settings-field">
-                                <label for="problem-solved">Problem solved</label>
-                                <textarea id="problem-solved" name="problem_solved">{{ old('problem_solved', $intelligence?->problem_solved) }}</textarea>
-                                @error('problem_solved')<div class="field-error">{{ $message }}</div>@enderror
-                            </div>
-                            <div class="settings-field">
-                                <label for="brand-voice">Brand voice</label>
-                                <input id="brand-voice" name="brand_voice" type="text" value="{{ old('brand_voice', $intelligence?->brand_voice) }}" placeholder="Warm and supportive, premium and polished...">
-                                @error('brand_voice')<div class="field-error">{{ $message }}</div>@enderror
-                            </div>
-                            <div class="settings-field">
-                                <label for="visual-style">Visual direction</label>
-                                <input id="visual-style" name="visual_style" type="text" value="{{ old('visual_style', $intelligence?->visual_style) }}" placeholder="Clean, modern, neighborhood-friendly, premium...">
-                                @error('visual_style')<div class="field-error">{{ $message }}</div>@enderror
-                            </div>
-                            <div class="settings-field">
-                                <label for="differentiators">Why people choose you</label>
-                                <textarea id="differentiators" name="differentiators">{{ old('differentiators', $intelligence?->differentiators) }}</textarea>
-                                @error('differentiators')<div class="field-error">{{ $message }}</div>@enderror
-                            </div>
-                            <div class="settings-field">
-                                <label for="core-offer">Core offer</label>
-                                <input id="core-offer" name="core_offer" type="text" value="{{ old('core_offer', $intelligence?->core_offer) }}">
-                                @error('core_offer')<div class="field-error">{{ $message }}</div>@enderror
-                            </div>
-                            <div class="settings-field">
-                                <label for="primary-growth-goal">Primary growth goal</label>
-                                <input id="primary-growth-goal" name="primary_growth_goal" type="text" value="{{ old('primary_growth_goal', $intelligence?->primary_growth_goal) }}">
-                                @error('primary_growth_goal')<div class="field-error">{{ $message }}</div>@enderror
-                            </div>
-                            <div class="settings-field">
-                                <label for="known-blockers">Known blockers</label>
-                                <textarea id="known-blockers" name="known_blockers">{{ old('known_blockers', $intelligence?->known_blockers) }}</textarea>
-                                @error('known_blockers')<div class="field-error">{{ $message }}</div>@enderror
-                            </div>
-                            <div class="settings-field">
-                                <label for="objections">Common objections</label>
-                                <textarea id="objections" name="objections">{{ old('objections', $intelligence?->objections) }}</textarea>
-                                @error('objections')<div class="field-error">{{ $message }}</div>@enderror
-                            </div>
-                            <div class="settings-field">
-                                <label for="buying-triggers">Buying triggers</label>
-                                <textarea id="buying-triggers" name="buying_triggers">{{ old('buying_triggers', $intelligence?->buying_triggers) }}</textarea>
-                                @error('buying_triggers')<div class="field-error">{{ $message }}</div>@enderror
-                            </div>
-                            <div class="settings-field">
-                                <label for="local-market-notes">Local market notes</label>
-                                <textarea id="local-market-notes" name="local_market_notes">{{ old('local_market_notes', $intelligence?->local_market_notes) }}</textarea>
-                                @error('local_market_notes')<div class="field-error">{{ $message }}</div>@enderror
-                            </div>
-                            <div class="settings-actions">
-                                <button class="settings-button primary" type="submit">Save brand studio</button>
+                                    <div class="wizard-field">
+                                        <label for="phone">Phone</label>
+                                        <input id="phone" name="phone" type="text" value="{{ old('phone', $founder->phone) }}">
+                                        @error('phone')<div class="field-error">{{ $message }}</div>@enderror
+                                    </div>
+                                    <div class="wizard-field">
+                                        <label for="company-name">Company name</label>
+                                        <input id="company-name" name="company_name" type="text" value="{{ old('company_name', $company?->company_name) }}" required>
+                                        @error('company_name')<div class="field-error">{{ $message }}</div>@enderror
+                                    </div>
+                                    <div class="wizard-field">
+                                        <label for="business-model">Business model</label>
+                                        <select id="business-model" name="business_model" required>
+                                            @foreach (['product' => 'Product business', 'service' => 'Service business', 'hybrid' => 'Hybrid business'] as $value => $label)
+                                                <option value="{{ $value }}" @selected(old('business_model', $company?->business_model) === $value)>{{ $label }}</option>
+                                            @endforeach
+                                        </select>
+                                        @error('business_model')<div class="field-error">{{ $message }}</div>@enderror
+                                    </div>
+                                    <div class="wizard-field full">
+                                        <label for="company-brief">What does the business do?</label>
+                                        <div class="wizard-field-note">Keep it simple and clear. This becomes the seed for the rest of the system.</div>
+                                        <textarea id="company-brief" name="company_brief" required>{{ old('company_brief', $company?->company_brief) }}</textarea>
+                                        @error('company_brief')<div class="field-error">{{ $message }}</div>@enderror
+                                    </div>
+                                    <div class="wizard-field full">
+                                        <label for="company-logo">Logo</label>
+                                        <input id="company-logo" name="company_logo" type="file" accept="image/*">
+                                        @error('company_logo')<div class="field-error">{{ $message }}</div>@enderror
+                                        @if ($logoUrl)
+                                            <div class="wizard-file-preview">
+                                                <img src="{{ $logoUrl }}" alt="{{ $company?->company_name ?: 'Company logo' }}">
+                                                <span>Current company logo</span>
+                                            </div>
+                                        @endif
+                                    </div>
+                                </div>
+                            @elseif ($currentStepKey === 'audience')
+                                <div class="wizard-grid">
+                                    <div class="wizard-field full">
+                                        <label for="target-audience">Target audience</label>
+                                        <input id="target-audience" name="target_audience" type="text" value="{{ old('target_audience', $intelligence?->target_audience) }}" required>
+                                        @error('target_audience')<div class="field-error">{{ $message }}</div>@enderror
+                                    </div>
+                                    <div class="wizard-field full">
+                                        <label for="primary-icp-name">Primary ideal customer</label>
+                                        <input id="primary-icp-name" name="primary_icp_name" type="text" value="{{ old('primary_icp_name', $intelligence?->primary_icp_name) }}" required>
+                                        @error('primary_icp_name')<div class="field-error">{{ $message }}</div>@enderror
+                                    </div>
+                                    <div class="wizard-field full">
+                                        <label for="ideal-customer-profile">Ideal customer profile</label>
+                                        <div class="wizard-field-note">Who are they, what stage are they at, and what makes them a strong fit?</div>
+                                        <textarea id="ideal-customer-profile" name="ideal_customer_profile" required>{{ old('ideal_customer_profile', $intelligence?->ideal_customer_profile) }}</textarea>
+                                        @error('ideal_customer_profile')<div class="field-error">{{ $message }}</div>@enderror
+                                    </div>
+                                    <div class="wizard-field full">
+                                        <label for="problem-solved">Problem solved</label>
+                                        <div class="wizard-field-note">What pain, friction, or goal is the business helping this customer solve?</div>
+                                        <textarea id="problem-solved" name="problem_solved" required>{{ old('problem_solved', $intelligence?->problem_solved) }}</textarea>
+                                        @error('problem_solved')<div class="field-error">{{ $message }}</div>@enderror
+                                    </div>
+                                </div>
+                            @elseif ($currentStepKey === 'offer')
+                                <div class="wizard-grid">
+                                    <div class="wizard-field full">
+                                        <label for="core-offer">Core offer</label>
+                                        <input id="core-offer" name="core_offer" type="text" value="{{ old('core_offer', $intelligence?->core_offer) }}" required>
+                                        @error('core_offer')<div class="field-error">{{ $message }}</div>@enderror
+                                    </div>
+                                    <div class="wizard-field full">
+                                        <label for="differentiators">Why people choose you</label>
+                                        <textarea id="differentiators" name="differentiators" required>{{ old('differentiators', $intelligence?->differentiators) }}</textarea>
+                                        @error('differentiators')<div class="field-error">{{ $message }}</div>@enderror
+                                    </div>
+                                    <div class="wizard-field full">
+                                        <label for="objections">Common objections</label>
+                                        <textarea id="objections" name="objections" required>{{ old('objections', $intelligence?->objections) }}</textarea>
+                                        @error('objections')<div class="field-error">{{ $message }}</div>@enderror
+                                    </div>
+                                    <div class="wizard-field full">
+                                        <label for="buying-triggers">Buying triggers</label>
+                                        <textarea id="buying-triggers" name="buying_triggers" required>{{ old('buying_triggers', $intelligence?->buying_triggers) }}</textarea>
+                                        @error('buying_triggers')<div class="field-error">{{ $message }}</div>@enderror
+                                    </div>
+                                </div>
+                            @elseif ($currentStepKey === 'brand')
+                                <div class="wizard-grid">
+                                    <div class="wizard-field">
+                                        <label for="brand-voice">Brand voice</label>
+                                        <input id="brand-voice" name="brand_voice" type="text" value="{{ old('brand_voice', $intelligence?->brand_voice) }}" required>
+                                        @error('brand_voice')<div class="field-error">{{ $message }}</div>@enderror
+                                    </div>
+                                    <div class="wizard-field">
+                                        <label for="visual-style">Visual style</label>
+                                        <input id="visual-style" name="visual_style" type="text" value="{{ old('visual_style', $intelligence?->visual_style) }}" required>
+                                        @error('visual_style')<div class="field-error">{{ $message }}</div>@enderror
+                                    </div>
+                                    <div class="wizard-field full">
+                                        <label for="primary-growth-goal">Primary growth goal</label>
+                                        <input id="primary-growth-goal" name="primary_growth_goal" type="text" value="{{ old('primary_growth_goal', $intelligence?->primary_growth_goal) }}" required>
+                                        @error('primary_growth_goal')<div class="field-error">{{ $message }}</div>@enderror
+                                    </div>
+                                    <div class="wizard-field full">
+                                        <label for="known-blockers">Known blockers</label>
+                                        <textarea id="known-blockers" name="known_blockers" required>{{ old('known_blockers', $intelligence?->known_blockers) }}</textarea>
+                                        @error('known_blockers')<div class="field-error">{{ $message }}</div>@enderror
+                                    </div>
+                                    <div class="wizard-field full">
+                                        <label for="local-market-notes">Local market notes</label>
+                                        <div class="wizard-field-note">Optional. Add any local context, channel realities, or market notes worth remembering.</div>
+                                        <textarea id="local-market-notes" name="local_market_notes">{{ old('local_market_notes', $intelligence?->local_market_notes) }}</textarea>
+                                        @error('local_market_notes')<div class="field-error">{{ $message }}</div>@enderror
+                                    </div>
+                                </div>
+                            @endif
+
+                            <div class="wizard-actions">
+                                <div class="wizard-actions-left">
+                                    @php
+                                        $stepKeys = $steps->pluck('key')->values();
+                                        $currentIndex = $stepKeys->search($currentStepKey);
+                                        $previousKey = $currentIndex !== false && $currentIndex > 0 ? $stepKeys[$currentIndex - 1] : null;
+                                    @endphp
+                                    @if ($previousKey)
+                                        <a class="wizard-link" href="{{ route('founder.settings', ['step' => $previousKey]) }}">Back</a>
+                                    @endif
+                                    <span class="wizard-edit-note">You can return and edit this at any time as the business grows.</span>
+                                </div>
+                                <div class="wizard-actions-right">
+                                    <button class="wizard-button" type="submit">
+                                        @if (!empty($wizard['is_complete']) && $currentStepKey === 'brand')
+                                            Save Company Intelligence
+                                        @else
+                                            Save and continue
+                                        @endif
+                                    </button>
+                                </div>
                             </div>
                         </form>
-                    </div>
-
-                    <div class="settings-card">
-                        <div class="settings-card-title">Plan And Account Visibility</div>
-                        <div class="settings-card-copy">Keep your account visibility clear while your public website, campaigns, and commerce run from the OS.</div>
-                        <div class="settings-chip">Plan: {{ $subscription?->plan_name ?: 'No active plan yet' }}</div>
-                        <div class="settings-chip">Billing state: {{ $subscription?->billing_status ?: 'Unknown' }}</div>
-                        <div class="settings-chip">Account role: {{ ucfirst($founder->role) }}</div>
-                        <div class="settings-chip">Username: {{ $founder->username }}</div>
-                        <div class="settings-chip">Email: {{ $founder->email }}</div>
-                    </div>
-                </div>
+                    </section>
+                </section>
             </div>
         </main>
-
-        <aside class="settings-rightbar">
-            <div class="settings-rightbar-inner">
-                <h3>Brand Signals</h3>
-                <div class="rail-list">
-                    <div class="rail-item">
-                        <div style="font-weight:600;">Company</div>
-                        <div style="margin-top:4px;color:var(--muted);">{{ $company?->company_name ?: 'Not set yet' }}</div>
-                    </div>
-                    <div class="rail-item">
-                        <div style="font-weight:600;">Business Model</div>
-                        <div style="margin-top:4px;color:var(--muted);">{{ ucfirst($company?->business_model ?: 'not set') }}</div>
-                    </div>
-                    <div class="rail-item">
-                        <div style="font-weight:600;">Brand voice</div>
-                        <div style="margin-top:4px;color:var(--muted);">{{ $intelligence?->brand_voice ?: 'Not set yet' }}</div>
-                    </div>
-                </div>
-
-                <h3 style="margin-top:22px;">OS Direction</h3>
-                <div class="mini-note">This is your OS-native brand studio. Keep the company profile and messaging sharp here so the website, campaigns, and AI assistance stay aligned.</div>
-            </div>
-        </aside>
     </div>
 @endsection
