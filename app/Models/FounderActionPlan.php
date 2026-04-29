@@ -15,15 +15,20 @@ class FounderActionPlan extends Model
         'title',
         'description',
         'platform',
+        'context',
         'priority',
         'status',
         'cta_label',
         'cta_url',
         'completed_at',
+        'available_on',
+        'metadata_json',
     ];
 
     protected $casts = [
         'completed_at' => 'datetime',
+        'available_on' => 'date',
+        'metadata_json' => 'array',
     ];
 
     public function founder(): BelongsTo

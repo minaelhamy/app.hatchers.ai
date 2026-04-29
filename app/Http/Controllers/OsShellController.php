@@ -33,6 +33,7 @@ use App\Services\AdminOperationsService;
 use App\Services\AtlasIntelligenceService;
 use App\Services\AtlasWorkspaceService;
 use App\Services\FounderModuleSyncService;
+use App\Services\FounderAiMentorProgramService;
 use App\Services\FounderDashboardService;
 use App\Services\FounderRevenueOsService;
 use App\Services\IdentitySyncService;
@@ -3165,6 +3166,10 @@ class OsShellController extends Controller
             return redirect()->route('dashboard');
         }
 
+        app(FounderAiMentorProgramService::class)->ensureFounderProgram(
+            $user->loadMissing('company.intelligence', 'subscription', 'weeklyState', 'actionPlans')
+        );
+
         $wizard = $this->companyIntelligenceWizardState($user, (string) $request->query('step', ''));
 
         return view('os.settings', [
@@ -3298,6 +3303,11 @@ class OsShellController extends Controller
         $user->unsetRelation('company');
         $user->load('company.intelligence');
         $wizard = $this->companyIntelligenceWizardState($user);
+        if ($wizard['is_complete']) {
+            app(FounderAiMentorProgramService::class)->ensureFounderProgram(
+                $user->loadMissing('subscription', 'weeklyState', 'actionPlans')
+            );
+        }
         $nextStep = $wizard['is_complete'] ? 'brand' : $wizard['current_step_key'];
 
         return redirect()
@@ -3421,6 +3431,9 @@ class OsShellController extends Controller
         $embedMode = request()->boolean('os_embed');
 
         if ($wizard['is_complete']) {
+            app(FounderAiMentorProgramService::class)->ensureFounderProgram(
+                $founder->loadMissing('company.intelligence', 'subscription', 'weeklyState', 'actionPlans')
+            );
             return null;
         }
 
@@ -6197,6 +6210,7 @@ class OsShellController extends Controller
                     FounderActionPlan::firstOrCreate(
                         [
                             'founder_id' => $founder->id,
+                            'context' => 'task',
                             'title' => $action['title'],
                         ],
                         $action
@@ -6679,22 +6693,29 @@ class OsShellController extends Controller
     {
         $totals = $founder->actionPlans()
             ->selectRaw(
-                "COUNT(*) as total_count, SUM(CASE WHEN status IN ('completed', 'complete', 'done') OR completed_at IS NOT NULL THEN 1 ELSE 0 END) as completed_count"
+                "
+                SUM(CASE WHEN context = 'task' AND (status NOT IN ('completed', 'complete', 'done') AND completed_at IS NULL) THEN 1 ELSE 0 END) as open_task_count,
+                SUM(CASE WHEN context = 'task' AND (status IN ('completed', 'complete', 'done') OR completed_at IS NOT NULL) THEN 1 ELSE 0 END) as completed_task_count,
+                SUM(CASE WHEN context = 'lesson' AND (status NOT IN ('completed', 'complete', 'done') AND completed_at IS NULL) THEN 1 ELSE 0 END) as open_lesson_count,
+                SUM(CASE WHEN context = 'lesson' AND (status IN ('completed', 'complete', 'done') OR completed_at IS NOT NULL) THEN 1 ELSE 0 END) as completed_lesson_count
+                "
             )
             ->first();
 
-        $totalCount = (int) ($totals?->total_count ?? 0);
-        $completedCount = (int) ($totals?->completed_count ?? 0);
-        $openCount = max(0, $totalCount - $completedCount);
-        $progress = $totalCount > 0 ? (int) round(($completedCount / $totalCount) * 100) : 0;
+        $openTaskCount = (int) ($totals?->open_task_count ?? 0);
+        $completedTaskCount = (int) ($totals?->completed_task_count ?? 0);
+        $openLessonCount = (int) ($totals?->open_lesson_count ?? 0);
+        $completedLessonCount = (int) ($totals?->completed_lesson_count ?? 0);
+        $totalLessonCount = $openLessonCount + $completedLessonCount;
+        $progress = $totalLessonCount > 0 ? (int) round(($completedLessonCount / $totalLessonCount) * 100) : 0;
 
         FounderWeeklyState::updateOrCreate(
             ['founder_id' => $founder->id],
             [
-                'open_tasks' => $openCount,
-                'completed_tasks' => $completedCount,
-                'open_milestones' => $openCount,
-                'completed_milestones' => $completedCount,
+                'open_tasks' => $openTaskCount,
+                'completed_tasks' => $completedTaskCount,
+                'open_milestones' => $openLessonCount,
+                'completed_milestones' => $completedLessonCount,
                 'weekly_progress_percent' => max(0, min(100, $progress)),
                 'state_updated_at' => now(),
             ]

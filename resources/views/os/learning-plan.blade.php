@@ -52,6 +52,7 @@
         .drawer-badge { padding:8px 14px; border-radius:10px; background:#f0ece4; color:#7a7267; font-size:0.95rem; white-space:nowrap; display:inline-block; }
         .drawer-grid { display:grid; grid-template-columns:100px 1fr; gap:14px 10px; margin:24px 0; }
         .drawer-label { color:var(--muted); }
+        [data-drawer-description] { white-space: pre-line; line-height: 1.65; }
         .drawer-comment { display:flex; gap:12px; align-items:flex-start; background:white; border:1px solid rgba(220,207,191,0.65); border-radius:14px; padding:14px; margin-top:12px; }
         .drawer-actions { display:flex; align-items:center; gap:10px; margin:18px 0 8px; }
         @media (max-width:1240px) { .learning-shell { grid-template-columns:220px 1fr; } .learning-rightbar { display:none; } }

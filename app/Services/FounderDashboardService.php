@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Founder;
+use App\Models\FounderActionPlan;
 use App\Models\ModuleSnapshot;
 use Illuminate\Support\Carbon;
 
@@ -16,9 +17,18 @@ class FounderDashboardService
         $weeklyState = $founder->weeklyState;
         $commercialSummary = $founder->commercialSummary;
         $snapshots = $founder->moduleSnapshots->keyBy('module');
-        $actions = $founder->actionPlans()
+        $taskActions = $founder->actionPlans()
+            ->where('context', 'task')
+            ->orderByRaw("CASE WHEN status IN ('completed', 'complete', 'done') OR completed_at IS NOT NULL THEN 1 ELSE 0 END ASC")
             ->orderByDesc('priority')
             ->limit(5)
+            ->get();
+        $lessonActions = $founder->actionPlans()
+            ->where('context', 'lesson')
+            ->orderByRaw("CASE WHEN status IN ('completed', 'complete', 'done') OR completed_at IS NOT NULL THEN 1 ELSE 0 END ASC")
+            ->orderBy('available_on')
+            ->orderByDesc('priority')
+            ->limit(6)
             ->get();
         $moduleCards = $this->buildModuleCards($snapshots);
         $activityFeed = $this->buildActivityFeed($snapshots);
@@ -30,7 +40,7 @@ class FounderDashboardService
         $commerceOperations = $this->buildCommerceOperations($snapshots);
         $automationSummary = $this->buildAutomationSummary($founder, $commerceOperations);
         $revenueOs = app(FounderRevenueOsService::class)->dashboard($founder);
-        $workspace = $this->buildWorkspace($founder, $company, $weeklyState, $actions, $activityFeed, $execution, $atlas, $growth, $syncStatus, $commerceAlerts, $commerceOperations, $automationSummary, $revenueOs);
+        $workspace = $this->buildWorkspace($founder, $company, $weeklyState, $taskActions, $lessonActions, $activityFeed, $execution, $atlas, $growth, $syncStatus, $commerceAlerts, $commerceOperations, $automationSummary, $revenueOs);
 
         return [
             'founder' => $founder,
@@ -46,7 +56,7 @@ class FounderDashboardService
             'execution' => $execution,
             'growth' => $growth,
             'atlas' => $atlas,
-            'actions' => $actions,
+            'actions' => $taskActions,
             'workspace' => $workspace,
             'commerce_alerts' => $commerceAlerts,
             'commerce_operations' => $commerceOperations,
@@ -66,7 +76,8 @@ class FounderDashboardService
         Founder $founder,
         $company,
         $weeklyState,
-        $actions,
+        $taskActions,
+        $lessonActions,
         array $activityFeed,
         array $execution,
         array $atlas,
@@ -101,35 +112,37 @@ class FounderDashboardService
                 : 'This founder workspace is currently self-guided. Use Hatchers Ai OS to drive progress through tasks, lessons, marketing, commerce, and website workflows.',
         ];
 
-        $learningTitle = $actions->first()?->title ?: ($execution['weekly_focus'] ?: 'This week\'s founder sprint');
-        $learningDescription = $company?->company_brief ?: 'Keep moving through your weekly build plan inside Hatchers Ai OS.';
-        $primaryAction = $actions->first();
-        $primaryLessonCompleted = $primaryAction && ($primaryAction->completed_at !== null || in_array((string) $primaryAction->status, ['completed', 'complete', 'done'], true));
+        $primaryLesson = $lessonActions->first();
+        $primaryLessonCompleted = $primaryLesson && ($primaryLesson->completed_at !== null || in_array((string) $primaryLesson->status, ['completed', 'complete', 'done'], true));
+        $learningTitle = $primaryLesson?->title ?: ($execution['weekly_focus'] ?: 'Your AI founder curriculum starts here');
+        $learningDescription = $primaryLesson
+            ? $this->actionSummary($primaryLesson)
+            : 'Your daily AI mentor articles will appear here as soon as Company Intelligence is complete.';
         $learningItem = [
-            'id' => $primaryAction?->id,
+            'id' => $primaryLesson?->id,
             'title' => $learningTitle,
             'subtitle' => mb_strimwidth((string) $learningDescription, 0, 72, '...'),
-            'badge' => $primaryLessonCompleted ? 'Completed' : ($execution['open_milestones'] > 0 ? 'Lesson in 3d 2h' : 'Open lesson'),
+            'badge' => $this->lessonBadge($primaryLesson, $primaryLessonCompleted),
             'completed' => $primaryLessonCompleted,
             'status_label' => $primaryLessonCompleted ? 'Reopen lesson' : 'Complete lesson',
             'detail_type' => 'lesson',
             'detail_heading' => $learningTitle,
-            'detail_due' => $primaryLessonCompleted ? 'Completed' : ($execution['next_meeting_at'] ?: 'This week'),
-            'detail_owner' => $mentorLinked ? ('Mentor · ' . $mentorName) : 'Hatchers Ai OS',
-            'detail_description' => $learningDescription,
+            'detail_due' => $primaryLessonCompleted ? 'Completed' : $this->lessonDueLabel($primaryLesson),
+            'detail_owner' => $mentorLinked ? ('Mentor + Atlas · ' . $mentorName) : 'Atlas AI Mentor',
+            'detail_description' => $primaryLesson ? $this->actionArticle($primaryLesson) : $learningDescription,
             'mentor_name' => $mentorLinked ? $mentorName : '',
             'comments' => $this->buildDrawerComments($founder, $activityFeed, 'lesson'),
         ];
 
         $taskCards = [];
-        foreach ($actions->take(3) as $index => $action) {
+        foreach ($taskActions->take(3) as $index => $action) {
             $isCompleted = $action->completed_at !== null || in_array((string) $action->status, ['completed', 'complete', 'done'], true);
             $taskCards[] = [
                 'id' => $action->id,
-                'label' => 'Milestone name',
-                'due' => $isCompleted ? 'Completed' : ($index === 0 ? 'Due in 3 days' : ($index === 1 ? 'Due in 5 days' : 'Queued this week')),
+                'label' => 'Task',
+                'due' => $isCompleted ? 'Completed' : ($index === 0 ? 'Priority now' : ($index === 1 ? 'Next up' : 'Queued this week')),
                 'title' => $action->title,
-                'description' => $action->description,
+                'description' => $this->actionSummary($action),
                 'cta' => $isCompleted ? '' : ($index === 0 ? 'Build with AI' : 'Write with AI'),
                 'completed' => $isCompleted,
                 'mentor_name' => $mentorLinked ? $mentorName : '',
@@ -140,8 +153,8 @@ class FounderDashboardService
                 'detail_type' => 'task',
                 'detail_heading' => $action->title,
                 'detail_due' => $isCompleted ? 'Completed' : ($index === 0 ? strtoupper($today->copy()->addDays(3)->format('D, M j')) . ' - 1:00 PM' : strtoupper($today->copy()->addDays(5)->format('D, M j'))),
-                'detail_owner' => $mentorLinked ? ('Mentor linked · ' . $mentorName) : 'Milestone name',
-                'detail_description' => $action->description,
+                'detail_owner' => $mentorLinked ? ('Mentor linked · ' . $mentorName) : 'Atlas AI Mentor',
+                'detail_description' => $this->actionArticle($action),
                 'comments' => $this->buildDrawerComments($founder, $activityFeed, 'task'),
             ];
         }
@@ -175,7 +188,7 @@ class FounderDashboardService
             'first_name' => $firstName !== '' ? $firstName : 'Founder',
             'mentor_session' => $mentorSession,
             'learning_item' => $learningItem,
-            'learning_plan_entries' => $this->buildLearningPlanEntries($learningItem, $actions, $founder, $activityFeed),
+            'learning_plan_entries' => $this->buildLearningPlanEntries($learningItem, $lessonActions, $founder, $activityFeed),
             'guided_path' => $this->buildGuidedPath($company, $execution, $commerceOperations, $revenueOs),
             'task_cards' => array_slice($taskCards, 0, 3),
             'task_center_entries' => $taskCards,
@@ -199,7 +212,7 @@ class FounderDashboardService
                 $growth,
                 $atlas,
                 $syncStatus,
-                $actions,
+                $taskActions,
                 $commerceAlerts,
                 $commerceOperations,
                 $automationSummary,
@@ -319,24 +332,24 @@ class FounderDashboardService
         ];
     }
 
-    private function buildLearningPlanEntries(array $learningItem, $actions, Founder $founder, array $activityFeed): array
+    private function buildLearningPlanEntries(array $learningItem, $lessons, Founder $founder, array $activityFeed): array
     {
         $entries = [$learningItem];
 
-        foreach ($actions->slice(1, 2)->values() as $index => $action) {
+        foreach ($lessons->slice(1, 2)->values() as $action) {
             $isCompleted = $action->completed_at !== null || in_array((string) $action->status, ['completed', 'complete', 'done'], true);
             $entries[] = [
                 'id' => $action->id,
                 'title' => $action->title,
-                'subtitle' => mb_strimwidth((string) $action->description, 0, 72, '...'),
-                'badge' => $isCompleted ? 'Completed' : ($index === 0 ? 'Lesson in 5d 1h' : 'Queued this week'),
+                'subtitle' => mb_strimwidth($this->actionSummary($action), 0, 72, '...'),
+                'badge' => $this->lessonBadge($action, $isCompleted),
                 'completed' => $isCompleted,
                 'status_label' => $isCompleted ? 'Reopen lesson' : 'Complete lesson',
                 'detail_type' => 'lesson',
                 'detail_heading' => $action->title,
-                'detail_due' => $isCompleted ? 'Completed' : ($index === 0 ? 'Later this week' : 'Next up'),
-                'detail_owner' => !empty($learningItem['mentor_name']) ? ('Mentor · ' . $learningItem['mentor_name']) : 'Hatchers Ai OS',
-                'detail_description' => $action->description,
+                'detail_due' => $isCompleted ? 'Completed' : $this->lessonDueLabel($action),
+                'detail_owner' => !empty($learningItem['mentor_name']) ? ('Mentor + Atlas · ' . $learningItem['mentor_name']) : 'Atlas AI Mentor',
+                'detail_description' => $this->actionArticle($action),
                 'mentor_name' => $learningItem['mentor_name'] ?? '',
                 'comments' => $this->buildDrawerComments($founder, $activityFeed, 'lesson'),
             ];
@@ -431,6 +444,58 @@ class FounderDashboardService
             'author' => $founder->full_name,
             'message' => $message,
         ], $messages);
+    }
+
+    private function actionSummary(FounderActionPlan $actionPlan): string
+    {
+        $meta = is_array($actionPlan->metadata_json) ? $actionPlan->metadata_json : [];
+
+        return trim((string) ($meta['summary'] ?? $actionPlan->description ?? ''));
+    }
+
+    private function actionArticle(FounderActionPlan $actionPlan): string
+    {
+        $meta = is_array($actionPlan->metadata_json) ? $actionPlan->metadata_json : [];
+
+        return trim((string) ($meta['article_body'] ?? $actionPlan->description ?? ''));
+    }
+
+    private function lessonBadge(?FounderActionPlan $lesson, bool $isCompleted): string
+    {
+        if ($isCompleted) {
+            return 'Completed';
+        }
+
+        if (!$lesson?->available_on) {
+            return 'Open lesson';
+        }
+
+        $availableOn = $lesson->available_on instanceof Carbon ? $lesson->available_on->copy()->startOfDay() : Carbon::parse($lesson->available_on)->startOfDay();
+
+        if ($availableOn->isToday()) {
+            return 'Today';
+        }
+
+        if ($availableOn->isTomorrow()) {
+            return 'Tomorrow';
+        }
+
+        if ($availableOn->isFuture()) {
+            return 'Unlocks ' . $availableOn->format('D, M j');
+        }
+
+        return 'Open lesson';
+    }
+
+    private function lessonDueLabel(?FounderActionPlan $lesson): string
+    {
+        if (!$lesson?->available_on) {
+            return 'Today';
+        }
+
+        $availableOn = $lesson->available_on instanceof Carbon ? $lesson->available_on : Carbon::parse($lesson->available_on);
+
+        return $availableOn->isToday() ? 'Today' : $availableOn->format('D, M j');
     }
 
     private function buildModuleCards($snapshots): array
