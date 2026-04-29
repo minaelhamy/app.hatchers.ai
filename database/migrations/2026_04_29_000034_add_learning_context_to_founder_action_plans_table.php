@@ -27,12 +27,6 @@ return new class extends Migration
             });
         }
 
-        if (!$this->indexExists('founder_action_plans', 'founder_action_plans_context_status_idx')) {
-            Schema::table('founder_action_plans', function (Blueprint $table): void {
-                $table->index(['founder_id', 'context', 'status'], 'founder_action_plans_context_status_idx');
-            });
-        }
-
         if (Schema::hasColumn('founder_action_plans', 'context')) {
             DB::table('founder_action_plans')
                 ->whereNull('context')
@@ -42,12 +36,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        if ($this->indexExists('founder_action_plans', 'founder_action_plans_context_status_idx')) {
-            Schema::table('founder_action_plans', function (Blueprint $table): void {
-                $table->dropIndex('founder_action_plans_context_status_idx');
-            });
-        }
-
         $columnsToDrop = array_values(array_filter([
             Schema::hasColumn('founder_action_plans', 'context') ? 'context' : null,
             Schema::hasColumn('founder_action_plans', 'available_on') ? 'available_on' : null,
@@ -61,14 +49,4 @@ return new class extends Migration
         }
     }
 
-    private function indexExists(string $table, string $indexName): bool
-    {
-        $database = DB::getDatabaseName();
-
-        return DB::table('information_schema.statistics')
-            ->where('table_schema', $database)
-            ->where('table_name', $table)
-            ->where('index_name', $indexName)
-            ->exists();
-    }
 };
