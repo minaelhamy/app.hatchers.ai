@@ -3301,6 +3301,8 @@ class OsShellController extends Controller
             ])
         );
 
+        $this->syncFounderBusinessContextModels($user, $company);
+
         $user->unsetRelation('company');
         $user->load('company.intelligence');
         $wizard = $this->companyIntelligenceWizardState($user);
@@ -3444,6 +3446,77 @@ class OsShellController extends Controller
                 'os_embed' => $embedMode ? 1 : null,
             ]))
             ->with('error', 'Complete Company Intelligence before using the rest of Hatchers OS.');
+    }
+
+    private function syncFounderBusinessContextModels(Founder $founder, Company $company): void
+    {
+        $company->loadMissing('intelligence', 'verticalBlueprint', 'businessBrief', 'icpProfiles');
+
+        if (!$company->vertical_blueprint_id) {
+            $fallbackCode = $this->defaultVerticalBlueprintCodeForBusinessModel((string) ($company->business_model ?? 'service'));
+            $blueprint = $this->upsertVerticalBlueprint($fallbackCode);
+            $company->forceFill([
+                'vertical_blueprint_id' => $blueprint->id,
+            ])->save();
+            $company->setRelation('verticalBlueprint', $blueprint);
+        }
+
+        $intelligence = $company->intelligence;
+        $blueprint = $company->verticalBlueprint;
+
+        FounderBusinessBrief::updateOrCreate(
+            ['founder_id' => $founder->id, 'company_id' => $company->id],
+            [
+                'vertical_blueprint_id' => $blueprint?->id,
+                'business_name' => (string) ($company->company_name ?? $founder->full_name),
+                'business_summary' => (string) ($company->company_brief ?? ''),
+                'problem_solved' => (string) ($intelligence?->problem_solved ?? ''),
+                'core_offer' => (string) ($intelligence?->core_offer ?? ''),
+                'business_type_detail' => (string) ($blueprint?->name ?? ucfirst((string) ($company->business_model ?? 'Business'))),
+                'location_city' => (string) ($company->primary_city ?? ''),
+                'location_country' => (string) ($company->businessBrief?->location_country ?? ''),
+                'service_radius' => (string) ($company->service_radius ?? ''),
+                'delivery_scope' => (string) ($company->businessBrief?->delivery_scope ?? $company->service_radius ?? ''),
+                'proof_points' => (string) ($intelligence?->differentiators ?? ''),
+                'founder_story' => (string) ($company->company_brief ?? ''),
+                'constraints_json' => is_array($company->businessBrief?->constraints_json) ? $company->businessBrief->constraints_json : [],
+                'status' => 'captured',
+            ]
+        );
+
+        FounderIcpProfile::updateOrCreate(
+            ['founder_id' => $founder->id, 'company_id' => $company->id],
+            [
+                'primary_icp_name' => (string) ($intelligence?->primary_icp_name ?? ''),
+                'pain_points_json' => is_array($company->icpProfiles()->latest()->first()?->pain_points_json)
+                    ? $company->icpProfiles()->latest()->first()->pain_points_json
+                    : [],
+                'desired_outcomes_json' => $this->newlineSeparatedValues((string) ($intelligence?->buying_triggers ?? '')),
+                'buying_triggers_json' => $this->newlineSeparatedValues((string) ($intelligence?->buying_triggers ?? '')),
+                'objections_json' => $this->newlineSeparatedValues((string) ($intelligence?->objections ?? '')),
+                'price_sensitivity' => 'unknown',
+                'primary_channels_json' => $blueprint?->default_channels_json ?? [],
+                'local_area_focus_json' => array_values(array_filter([(string) ($company->primary_city ?? '')])),
+                'language_style' => (string) ($intelligence?->brand_voice ?? ''),
+            ]
+        );
+    }
+
+    private function defaultVerticalBlueprintCodeForBusinessModel(string $businessModel): string
+    {
+        return match (strtolower(trim($businessModel))) {
+            'product' => 'handmade-products',
+            'hybrid' => 'tutoring-coaching',
+            default => 'dog-walking',
+        };
+    }
+
+    private function newlineSeparatedValues(string $value): array
+    {
+        return array_values(array_filter(array_map(
+            static fn (string $item): string => trim($item),
+            preg_split('/[\r\n,]+/', $value) ?: []
+        )));
     }
 
     public function founderCreateCampaign(
@@ -3870,17 +3943,25 @@ class OsShellController extends Controller
         ]);
     }
 
-    public function generateWebsiteDraft(WebsiteAutopilotService $websiteAutopilotService): RedirectResponse
+    public function generateWebsiteDraft(Request $request, WebsiteAutopilotService $websiteAutopilotService): RedirectResponse
     {
         /** @var \App\Models\Founder $founder */
         $founder = Auth::user();
 
-        $result = $websiteAutopilotService->generate($founder);
-        if (!($result['ok'] ?? false)) {
-            return redirect()->route('website')->with('error', (string) ($result['error'] ?? 'Hatchers OS could not generate the website draft yet.'));
+        if ($founder->company) {
+            $this->syncFounderBusinessContextModels($founder, $founder->company);
         }
 
-        return redirect()->route('website')->with('success', 'Your first website draft is ready. Hatchers OS prefilled the site setup and built the first offer path for review.');
+        $result = $websiteAutopilotService->generate($founder);
+        if (!($result['ok'] ?? false)) {
+            return redirect()->route('website', array_filter([
+                'os_embed' => $request->boolean('os_embed') ? 1 : null,
+            ]))->with('error', (string) ($result['error'] ?? 'Hatchers OS could not generate the website draft yet.'));
+        }
+
+        return redirect()->route('website', array_filter([
+            'os_embed' => $request->boolean('os_embed') ? 1 : null,
+        ]))->with('success', 'Your first website draft is ready. Hatchers OS prefilled the site setup and built the first offer path for review.');
     }
 
     public function storeWebsiteBuildRequest(
@@ -3919,8 +4000,13 @@ class OsShellController extends Controller
         $founder->loadMissing('company.intelligence', 'businessBrief', 'icpProfiles', 'actionPlans');
         $company = $founder->company;
         if (!$company) {
-            return redirect()->route('founder.settings', ['step' => 'basics'])->with('error', 'Complete the company basics before building the website.');
+            return redirect()->route('founder.settings', array_filter([
+                'step' => 'basics',
+                'os_embed' => $request->boolean('os_embed') ? 1 : null,
+            ]))->with('error', 'Complete the company basics before building the website.');
         }
+
+        $this->syncFounderBusinessContextModels($founder, $company);
 
         $brief = FounderBusinessBrief::updateOrCreate(
             ['founder_id' => $founder->id, 'company_id' => $company->id],
@@ -3990,7 +4076,10 @@ class OsShellController extends Controller
             ])->save();
 
             return redirect()
-                ->route('website', ['stage' => 'build'])
+                ->route('website', array_filter([
+                    'stage' => 'build',
+                    'os_embed' => $request->boolean('os_embed') ? 1 : null,
+                ]))
                 ->with('error', (string) ($result['error'] ?? 'Hatchers OS could not build the website yet.'));
         }
 
@@ -4000,11 +4089,14 @@ class OsShellController extends Controller
         $founderNotificationService->websiteReady($founder, $engineAppKey, $websiteUrl);
 
         return redirect()
-            ->route('website', ['stage' => 'overview'])
+            ->route('website', array_filter([
+                'stage' => 'overview',
+                'os_embed' => $request->boolean('os_embed') ? 1 : null,
+            ]))
             ->with('success', 'Your website draft is ready. Hatchers selected the template, filled the core site sections, and prepared the first storefront for review.');
     }
 
-    public function founderApplyLaunchSystem(WebsiteAutopilotService $websiteAutopilotService): RedirectResponse
+    public function founderApplyLaunchSystem(Request $request, WebsiteAutopilotService $websiteAutopilotService): RedirectResponse
     {
         /** @var \App\Models\Founder $founder */
         $founder = Auth::user();
@@ -4017,7 +4109,9 @@ class OsShellController extends Controller
         $latestRun = $company?->websiteGenerationRuns()->latest('id')->first();
 
         if (!$company || !$latestRun || !$draft) {
-            return redirect()->route('website')->with('error', 'Generate a website draft before locking the launch system.');
+            return redirect()->route('website', array_filter([
+                'os_embed' => $request->boolean('os_embed') ? 1 : null,
+            ]))->with('error', 'Generate a website draft before locking the launch system.');
         }
 
         $launchSystem = FounderLaunchSystem::query()->updateOrCreate(
@@ -4058,7 +4152,9 @@ class OsShellController extends Controller
             'website_generation_status' => 'approved',
         ])->save();
 
-        return redirect()->route('website')->with('success', 'Your website funnel is now locked into the active launch system.');
+        return redirect()->route('website', array_filter([
+            'os_embed' => $request->boolean('os_embed') ? 1 : null,
+        ]))->with('success', 'Your website funnel is now locked into the active launch system.');
     }
 
     public function founderRegenerateWebsiteDraftBlock(Request $request, WebsiteAutopilotService $websiteAutopilotService): RedirectResponse
@@ -4075,10 +4171,14 @@ class OsShellController extends Controller
 
         $result = $websiteAutopilotService->regenerateDraftBlock($founder, (string) $validated['block']);
         if (!($result['ok'] ?? false)) {
-            return redirect()->route('website')->with('error', (string) ($result['error'] ?? 'Hatchers OS could not regenerate that draft block.'));
+            return redirect()->route('website', array_filter([
+                'os_embed' => $request->boolean('os_embed') ? 1 : null,
+            ]))->with('error', (string) ($result['error'] ?? 'Hatchers OS could not regenerate that draft block.'));
         }
 
-        return redirect()->route('website')->with('success', ucfirst(str_replace('_', ' ', (string) $validated['block'])) . ' regenerated inside your launch system draft.');
+        return redirect()->route('website', array_filter([
+            'os_embed' => $request->boolean('os_embed') ? 1 : null,
+        ]))->with('success', ucfirst(str_replace('_', ' ', (string) $validated['block'])) . ' regenerated inside your launch system draft.');
     }
 
     public function adminControl(AdminOperationsService $adminOperationsService)
@@ -4426,7 +4526,9 @@ class OsShellController extends Controller
             ? 'Website setup saved in Hatchers OS. Your public OS website path is ready now, and engine sync can be completed later.'
             : 'Website setup saved. Hatchers OS updated the underlying website engine for you.';
 
-        return redirect()->route('website')->with('success', $successMessage);
+        return redirect()->route('website', array_filter([
+            'os_embed' => $request->boolean('os_embed') ? 1 : null,
+        ]))->with('success', $successMessage);
     }
 
     public function publishWebsite(
@@ -4469,7 +4571,9 @@ class OsShellController extends Controller
             ? 'Website published on Hatchers OS. Your app.hatchers.ai public site is live now, while engine bridge sync remains optional.'
             : 'Website published from Hatchers OS.';
 
-        return redirect()->route('website')->with('success', $successMessage);
+        return redirect()->route('website', array_filter([
+            'os_embed' => $request->boolean('os_embed') ? 1 : null,
+        ]))->with('success', $successMessage);
     }
 
     public function publicWebsite(string $websitePath, PublicWebsiteService $publicWebsiteService)

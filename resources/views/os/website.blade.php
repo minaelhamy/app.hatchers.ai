@@ -36,6 +36,7 @@
 @section('content')
     @php
         $founder = auth()->user();
+        $osEmbedMode = request()->boolean('os_embed');
         $companyName = $website['company_name'];
         $businessModel = $website['business_model'];
         $websiteStatus = $website['website_status'];
@@ -77,7 +78,8 @@
         ];
     @endphp
 
-    <div class="workspace-shell">
+    <div class="workspace-shell" @if($osEmbedMode) style="grid-template-columns:minmax(0,1fr);" @endif>
+        @unless($osEmbedMode)
         <aside class="workspace-sidebar">
             @include('os.partials.founder-sidebar', [
                 'founder' => $founder,
@@ -93,6 +95,7 @@
                 'avatarClass' => 'workspace-avatar',
             ])
         </aside>
+        @endunless
 
         <main class="workspace-main">
             <div class="workspace-main-inner">
@@ -122,10 +125,10 @@
                     <span class="pill">Launch draft: {{ ucfirst(str_replace('_', ' ', $generationStatus)) }}</span>
                 </div>
                 <div class="workspace-stage-nav">
-                    <a class="workspace-stage-tab {{ $websiteStage === 'build' ? 'active' : '' }}" href="{{ route('website', ['stage' => 'build']) }}">1. Build My Website</a>
-                    <a class="workspace-stage-tab {{ $websiteStage === 'overview' ? 'active' : '' }}" href="{{ route('website', ['stage' => 'overview']) }}">2. Review Draft</a>
-                    <a class="workspace-stage-tab {{ $websiteStage === 'setup' ? 'active' : '' }}" href="{{ route('website', ['stage' => 'setup']) }}">3. Finish Setup</a>
-                    <a class="workspace-stage-tab {{ $websiteStage === 'publish' ? 'active' : '' }}" href="{{ route('website', ['stage' => 'publish']) }}">4. Publish</a>
+                    <a class="workspace-stage-tab {{ $websiteStage === 'build' ? 'active' : '' }}" href="{{ route('website', array_filter(['stage' => 'build', 'os_embed' => $osEmbedMode ? 1 : null])) }}">1. Build My Website</a>
+                    <a class="workspace-stage-tab {{ $websiteStage === 'overview' ? 'active' : '' }}" href="{{ route('website', array_filter(['stage' => 'overview', 'os_embed' => $osEmbedMode ? 1 : null])) }}">2. Review Draft</a>
+                    <a class="workspace-stage-tab {{ $websiteStage === 'setup' ? 'active' : '' }}" href="{{ route('website', array_filter(['stage' => 'setup', 'os_embed' => $osEmbedMode ? 1 : null])) }}">3. Finish Setup</a>
+                    <a class="workspace-stage-tab {{ $websiteStage === 'publish' ? 'active' : '' }}" href="{{ route('website', array_filter(['stage' => 'publish', 'os_embed' => $osEmbedMode ? 1 : null])) }}">4. Publish</a>
                 </div>
                 <div class="workspace-stage-helper">{{ $stageHelp[$websiteStage] }}</div>
             </section>
@@ -160,6 +163,9 @@
                     <p class="muted" style="margin-bottom: 14px;">We'll prepare the first website draft for you using the details below. Leave anything blank if you do not know it yet.</p>
                     <form method="POST" action="{{ route('website.build.store') }}" class="stack">
                         @csrf
+                        @if($osEmbedMode)
+                            <input type="hidden" name="os_embed" value="1">
+                        @endif
                         <div class="stack-item">
                             <strong>What should this website do first?</strong><br>
                             <textarea name="website_goal" rows="3" style="margin-top:10px;width:100%;padding:12px;border-radius:14px;border:1px solid var(--line);background:#fff;">{{ old('website_goal', $buildIntake['website_goal'] ?? '') }}</textarea>
@@ -301,17 +307,26 @@
                     @endif
                     <form method="POST" action="{{ route('website.generate') }}" style="margin-top: 18px;">
                         @csrf
+                        @if($osEmbedMode)
+                            <input type="hidden" name="os_embed" value="1">
+                        @endif
                         <button class="btn primary" type="submit">{{ $autopilotDraft ? 'Regenerate Website Draft' : 'Generate My First Website' }}</button>
                     </form>
                     @if ($autopilotDraft)
                         <form method="POST" action="{{ route('website.launch-system.apply') }}" style="margin-top: 12px;">
                             @csrf
+                            @if($osEmbedMode)
+                                <input type="hidden" name="os_embed" value="1">
+                            @endif
                             <button class="btn secondary" type="submit">{{ $launchSystem ? 'Refresh Active Launch System' : 'Apply Funnel To Launch System' }}</button>
                         </form>
                         <div class="cta-row" style="margin-top:12px;flex-wrap:wrap;">
                             @foreach (['hero' => 'Regenerate Hero', 'cta' => 'Regenerate CTA', 'offer_stack' => 'Regenerate Offer Stack', 'faq' => 'Regenerate FAQ'] as $blockKey => $label)
                                 <form method="POST" action="{{ route('website.draft.regenerate-block') }}" style="margin:0;">
                                     @csrf
+                                    @if($osEmbedMode)
+                                        <input type="hidden" name="os_embed" value="1">
+                                    @endif
                                     <input type="hidden" name="block" value="{{ $blockKey }}">
                                     <button class="btn" type="submit">{{ $label }}</button>
                                 </form>
@@ -357,6 +372,9 @@
                     <p class="muted" style="margin-bottom: 14px;">Set the public name, page path, business type, and theme for the site Hatchers will publish for you.</p>
                     <form method="POST" action="/website/setup" class="stack">
                         @csrf
+                        @if($osEmbedMode)
+                            <input type="hidden" name="os_embed" value="1">
+                        @endif
                         <div class="stack-item">
                             <strong>Storefront type</strong><br>
                             @if (count($engines) === 1)
@@ -430,6 +448,9 @@
                     <p class="muted" style="margin-bottom: 14px;">This lets founders create the first product or service directly from Hatchers OS without jumping into engine dashboards first.</p>
                     <form method="POST" action="/website/starter" class="stack">
                         @csrf
+                        @if($osEmbedMode)
+                            <input type="hidden" name="os_embed" value="1">
+                        @endif
                         <div class="stack-item">
                             <strong>Engine</strong><br>
                             @if (count($engines) === 1)
@@ -500,6 +521,9 @@
                     </div>
                     <form method="POST" action="/website/publish" style="margin-top: 18px;">
                         @csrf
+                        @if($osEmbedMode)
+                            <input type="hidden" name="os_embed" value="1">
+                        @endif
                         <input type="hidden" name="website_engine" value="{{ $recommendedEngine }}" data-publish-engine>
                         <button class="btn primary" type="submit">Publish Website</button>
                     </form>
@@ -527,6 +551,9 @@
                     <p class="muted" style="margin-bottom: 14px;">Use this after launch when you want the site to live on your own branded address.</p>
                     <form method="POST" action="/website/domain" class="stack">
                         @csrf
+                        @if($osEmbedMode)
+                            <input type="hidden" name="os_embed" value="1">
+                        @endif
                         <div class="stack-item">
                             <strong>Storefront type</strong><br>
                             @if (count($engines) === 1)
@@ -724,6 +751,7 @@
             </div>
         </main>
 
+        @unless($osEmbedMode)
         <aside class="workspace-rightbar">
             <div class="workspace-rightbar-inner">
                 <h3>Launch Flow</h3>
@@ -767,6 +795,7 @@
                 </div>
             </div>
         </aside>
+        @endunless
     </div>
 
     <script>

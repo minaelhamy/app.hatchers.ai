@@ -6,6 +6,7 @@ use App\Models\Company;
 use App\Models\CompanyIntelligence;
 use App\Models\Founder;
 use App\Models\FounderActionPlan;
+use App\Models\FounderBusinessBrief;
 use App\Models\FounderIcpProfile;
 use App\Models\FounderWebsiteGenerationRun;
 use App\Models\VerticalBlueprint;
@@ -83,9 +84,10 @@ class WebsiteAutopilotService
         ]);
 
         $company = $founder->company;
-        $blueprint = $company?->verticalBlueprint;
-        $brief = $founder->businessBrief;
-        $icp = $founder->icpProfiles()->latest()->first();
+        $intelligence = $company?->intelligence;
+        $blueprint = $company?->verticalBlueprint ?: ($company ? $this->fallbackBlueprint($company) : null);
+        $brief = $founder->businessBrief ?: $company?->businessBrief ?: ($company ? $this->fallbackBusinessBrief($founder, $company, $intelligence, $blueprint) : null);
+        $icp = $founder->icpProfiles()->latest()->first() ?: $company?->icpProfiles()->latest()->first() ?: ($company ? $this->fallbackIcp($founder, $company, $intelligence, $blueprint) : null);
 
         if (!$company || !$blueprint || !$brief) {
             return [
@@ -1164,5 +1166,105 @@ class WebsiteAutopilotService
         $sections = array_values(array_filter((array) ($draft['sections'] ?? []), fn ($item) => is_array($item)));
 
         return trim((string) (($sections[0]['body'] ?? '') ?: ($sections[1]['body'] ?? '')));
+    }
+
+    private function fallbackBlueprint(Company $company): ?VerticalBlueprint
+    {
+        $businessModel = strtolower(trim((string) ($company->business_model ?? 'service')));
+
+        return match ($businessModel) {
+            'product' => new VerticalBlueprint([
+                'code' => 'fallback-product',
+                'name' => 'Product Business',
+                'business_model' => 'product',
+                'engine' => 'bazaar',
+                'description' => 'Fallback product website blueprint.',
+                'default_offer_json' => ['core_offer' => 'Products', 'upsells' => ['Bundle', 'Best seller', 'Limited offer']],
+                'default_pricing_json' => ['tier_1' => 'Core product', 'tier_2' => 'Bundle', 'tier_3' => 'Premium option'],
+                'default_pages_json' => ['hero', 'featured_collection', 'product_grid', 'about', 'faq', 'offer_cta'],
+                'default_tasks_json' => ['Define the core product', 'Add pricing', 'Review the first website draft'],
+                'default_channels_json' => ['Instagram', 'Facebook', 'WhatsApp', 'Referrals'],
+                'default_cta_json' => ['primary' => 'Shop now', 'secondary' => 'See collection'],
+                'default_image_queries_json' => ['product showcase', 'product flatlay', 'brand packaging'],
+                'funnel_framework_json' => ['Problem', 'Offer', 'Proof', 'CTA', 'FAQ'],
+            ]),
+            'hybrid' => new VerticalBlueprint([
+                'code' => 'fallback-hybrid',
+                'name' => 'Hybrid Business',
+                'business_model' => 'hybrid',
+                'engine' => 'servio',
+                'description' => 'Fallback hybrid website blueprint.',
+                'default_offer_json' => ['core_offer' => 'Services and products', 'upsells' => ['Starter package', 'Bundle', 'Upgrade']],
+                'default_pricing_json' => ['tier_1' => 'Starter offer', 'tier_2' => 'Core package', 'tier_3' => 'Premium package'],
+                'default_pages_json' => ['hero', 'services', 'products', 'about', 'faq', 'cta'],
+                'default_tasks_json' => ['Clarify the main offer', 'Add starter items', 'Review the website draft'],
+                'default_channels_json' => ['Instagram', 'WhatsApp', 'Referrals', 'Local SEO'],
+                'default_cta_json' => ['primary' => 'Get started', 'secondary' => 'See offers'],
+                'default_image_queries_json' => ['small business service', 'customer experience', 'product and service brand'],
+                'funnel_framework_json' => ['Problem', 'Offer', 'Proof', 'CTA', 'FAQ'],
+            ]),
+            default => new VerticalBlueprint([
+                'code' => 'fallback-service',
+                'name' => 'Service Business',
+                'business_model' => 'service',
+                'engine' => 'servio',
+                'description' => 'Fallback service website blueprint.',
+                'default_offer_json' => ['core_offer' => 'Services', 'upsells' => ['Package', 'Priority booking', 'Upgrade']],
+                'default_pricing_json' => ['tier_1' => 'Starter service', 'tier_2' => 'Popular package', 'tier_3' => 'Premium package'],
+                'default_pages_json' => ['hero', 'services', 'how_it_works', 'about', 'faq', 'booking_cta'],
+                'default_tasks_json' => ['Define the service offer', 'Add proof points', 'Review the first website draft'],
+                'default_channels_json' => ['WhatsApp', 'Referrals', 'Local SEO', 'Community groups'],
+                'default_cta_json' => ['primary' => 'Book now', 'secondary' => 'See services'],
+                'default_image_queries_json' => ['service business', 'customer consultation', 'local business team'],
+                'funnel_framework_json' => ['Problem', 'Offer', 'Proof', 'CTA', 'FAQ'],
+            ]),
+        };
+    }
+
+    private function fallbackBusinessBrief(Founder $founder, Company $company, ?CompanyIntelligence $intelligence, ?VerticalBlueprint $blueprint): FounderBusinessBrief
+    {
+        return new FounderBusinessBrief([
+            'founder_id' => $founder->id,
+            'company_id' => $company->id,
+            'vertical_blueprint_id' => $blueprint?->id,
+            'business_name' => (string) ($company->company_name ?? $founder->full_name),
+            'business_summary' => (string) ($company->company_brief ?? ''),
+            'problem_solved' => (string) ($intelligence?->problem_solved ?? ''),
+            'core_offer' => (string) ($intelligence?->core_offer ?? ''),
+            'business_type_detail' => (string) ($blueprint?->name ?? ucfirst((string) ($company->business_model ?? 'Business'))),
+            'location_city' => (string) ($company->primary_city ?? ''),
+            'location_country' => '',
+            'service_radius' => (string) ($company->service_radius ?? ''),
+            'delivery_scope' => (string) ($company->service_radius ?? ''),
+            'proof_points' => (string) ($intelligence?->differentiators ?? ''),
+            'founder_story' => (string) ($company->company_brief ?? ''),
+            'constraints_json' => [],
+            'status' => 'captured',
+        ]);
+    }
+
+    private function fallbackIcp(Founder $founder, Company $company, ?CompanyIntelligence $intelligence, ?VerticalBlueprint $blueprint): FounderIcpProfile
+    {
+        return new FounderIcpProfile([
+            'founder_id' => $founder->id,
+            'company_id' => $company->id,
+            'primary_icp_name' => (string) ($intelligence?->primary_icp_name ?? 'Ideal customer'),
+            'pain_points_json' => [],
+            'desired_outcomes_json' => $this->stringListFromText((string) ($intelligence?->buying_triggers ?? '')),
+            'buying_triggers_json' => $this->stringListFromText((string) ($intelligence?->buying_triggers ?? '')),
+            'objections_json' => $this->stringListFromText((string) ($intelligence?->objections ?? '')),
+            'price_sensitivity' => 'unknown',
+            'primary_channels_json' => $blueprint?->default_channels_json ?? [],
+            'local_area_focus_json' => array_values(array_filter([(string) ($company->primary_city ?? '')])),
+            'language_style' => (string) ($intelligence?->brand_voice ?? ''),
+        ]);
+    }
+
+    private function stringListFromText(string $value): array
+    {
+        return array_values(array_filter(array_map(
+            static fn (string $item): string => trim($item),
+            preg_split('/[\r\n,]+/', $value) ?: []
+        )));
     }
 }
