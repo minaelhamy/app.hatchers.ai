@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Founder;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 
 class WebsiteProvisioningService
 {
@@ -251,9 +252,11 @@ class WebsiteProvisioningService
 
             $data = $response->json();
             if (!$response->successful() || !is_array($data) || empty($data['success'])) {
+                $fallbackError = trim((string) Str::of((string) $response->body())->replaceMatches('/\s+/', ' ')->limit(220, '...'));
+
                 return [
                     'ok' => false,
-                    'error' => (string) ($data['error'] ?? 'The website engine could not complete the request.'),
+                    'error' => (string) ($data['error'] ?? ($fallbackError !== '' ? 'The website engine could not complete the request: ' . $fallbackError : 'The website engine could not complete the request.')),
                 ];
             }
 
