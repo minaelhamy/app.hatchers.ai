@@ -3184,6 +3184,7 @@ class OsShellController extends Controller
         }
 
         $step = (string) $request->input('current_step', 'basics');
+        $embedMode = $request->boolean('os_embed');
         $stepRules = [
             'basics' => [
                 'full_name' => ['required', 'string', 'max:255'],
@@ -3231,7 +3232,10 @@ class OsShellController extends Controller
 
         $company = $user->company;
         if ($step !== 'basics' && !$company) {
-            return redirect()->route('founder.settings', ['step' => 'basics'])->with('error', 'Complete the company basics first.');
+            return redirect()->route('founder.settings', array_filter([
+                'step' => 'basics',
+                'os_embed' => $embedMode ? 1 : null,
+            ]))->with('error', 'Complete the company basics first.');
         }
 
         if (!$company) {
@@ -3297,7 +3301,10 @@ class OsShellController extends Controller
         $nextStep = $wizard['is_complete'] ? 'brand' : $wizard['current_step_key'];
 
         return redirect()
-            ->route('founder.settings', ['step' => $nextStep])
+            ->route('founder.settings', array_filter([
+                'step' => $nextStep,
+                'os_embed' => $embedMode ? 1 : null,
+            ]))
             ->with('success', $wizard['is_complete']
                 ? 'Company Intelligence is complete and ready to power the rest of Hatchers OS.'
                 : 'Saved. Continue to the next Company Intelligence step.');
@@ -3411,13 +3418,17 @@ class OsShellController extends Controller
     private function ensureCompanyIntelligenceComplete(Founder $founder): ?RedirectResponse
     {
         $wizard = $this->companyIntelligenceWizardState($founder);
+        $embedMode = request()->boolean('os_embed');
 
         if ($wizard['is_complete']) {
             return null;
         }
 
         return redirect()
-            ->route('founder.settings', ['step' => $wizard['current_step_key']])
+            ->route('founder.settings', array_filter([
+                'step' => $wizard['current_step_key'],
+                'os_embed' => $embedMode ? 1 : null,
+            ]))
             ->with('error', 'Complete Company Intelligence before using the rest of Hatchers OS.');
     }
 

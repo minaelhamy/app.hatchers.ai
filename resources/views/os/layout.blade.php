@@ -848,6 +848,18 @@
         }
 
         body.os-embed-mode .founder-sidebar,
+        body.os-embed-mode .founder-sidebar-inner,
+        body.os-embed-mode .founder-sidebar-footer,
+        body.os-embed-mode .os-launcher,
+        body.os-embed-mode .os-launcher-header,
+        body.os-embed-mode .os-launcher-status,
+        body.os-embed-mode .os-launcher-note,
+        body.os-embed-mode .os-launcher-nav,
+        body.os-embed-mode .os-dock,
+        body.os-embed-mode .os-dock-pins,
+        body.os-embed-mode .os-dock-user,
+        body.os-embed-mode .os-dock-user-copy,
+        body.os-embed-mode .os-dock-logout,
         body.os-embed-mode .workspace-sidebar,
         body.os-embed-mode .tracker-sidebar,
         body.os-embed-mode .marketing-sidebar,

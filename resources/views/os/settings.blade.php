@@ -374,6 +374,7 @@
         $currentStep = $wizard['current_step'] ?? null;
         $currentStepKey = $wizard['current_step_key'] ?? 'basics';
         $logoUrl = !empty($company?->company_logo_path) ? asset('storage/' . ltrim((string) $company->company_logo_path, '/')) : null;
+        $osEmbedMode = request()->boolean('os_embed');
     @endphp
 
     <div class="intelligence-shell">
@@ -431,7 +432,7 @@
                                 @endphp
                                 <a
                                     class="step-link{{ !empty($step['is_complete']) ? ' complete' : '' }}{{ $isActive ? ' active' : '' }}"
-                                    href="{{ route('founder.settings', ['step' => $step['key']]) }}"
+                                    href="{{ route('founder.settings', array_filter(['step' => $step['key'], 'os_embed' => $osEmbedMode ? 1 : null])) }}"
                                 >
                                     <div class="step-link-top">
                                         <span>Step {{ $loop->iteration }}</span>
@@ -473,6 +474,9 @@
                         <form method="POST" action="{{ route('founder.settings.update') }}" enctype="multipart/form-data">
                             @csrf
                             <input type="hidden" name="current_step" value="{{ $currentStepKey }}">
+                            @if ($osEmbedMode)
+                                <input type="hidden" name="os_embed" value="1">
+                            @endif
 
                             @if ($currentStepKey === 'basics')
                                 <div class="wizard-grid">
@@ -605,7 +609,7 @@
                                         $previousKey = $currentIndex !== false && $currentIndex > 0 ? $stepKeys[$currentIndex - 1] : null;
                                     @endphp
                                     @if ($previousKey)
-                                        <a class="wizard-link" href="{{ route('founder.settings', ['step' => $previousKey]) }}">Back</a>
+                                        <a class="wizard-link" href="{{ route('founder.settings', array_filter(['step' => $previousKey, 'os_embed' => $osEmbedMode ? 1 : null])) }}">Back</a>
                                     @endif
                                     <span class="wizard-edit-note">You can return and edit this at any time as the business grows.</span>
                                 </div>
