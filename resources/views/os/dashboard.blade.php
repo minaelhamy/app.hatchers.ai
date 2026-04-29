@@ -560,7 +560,7 @@
             if (!desktop) return;
 
             const founderId = @json((string) ($dashboard['founder']->id ?? 'guest'));
-            const todayKey = @json($desktopDateKey);
+            const todayKey = @json(now()->timezone(config('app.timezone'))->format('Y-m-d'));
             const openedStorageKey = `hatchers-os-opened-icons-${founderId}`;
             const tasksBeatKey = `hatchers-os-tasks-heartbeat-${founderId}`;
 
