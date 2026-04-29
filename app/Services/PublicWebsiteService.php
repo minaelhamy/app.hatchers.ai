@@ -45,18 +45,18 @@ class PublicWebsiteService
         if ($storefrontUrl === '') {
             $storefrontUrl = trim((string) ($company->engine_public_url ?? ''));
         }
-        $engineVendorSlug = $this->resolveEngineVendorSlug($storefrontUrl, $payload, $founder?->username);
+        $engineVendorSlug = $this->resolveEngineVendorSlug($storefrontUrl, $payload, $founder?->username, $websitePath);
         $engineBaseUrl = rtrim((string) config('modules.' . $engine . '.base_url', ''), '/');
         $osBaseUrl = rtrim((string) config('app.url'), '/');
         $engineProxyUrl = '';
 
-        if ($storefrontUrl !== '' && !$this->isRecursiveOsStorefrontUrl($storefrontUrl, $osBaseUrl, $websitePath)) {
-            $engineProxyUrl = $storefrontUrl;
-        } elseif ($engineBaseUrl !== '' && $engineVendorSlug !== '') {
+        if ($engineBaseUrl !== '' && $engineVendorSlug !== '') {
             $candidateProxyUrl = $engineBaseUrl . '/' . ltrim($engineVendorSlug, '/');
             if (!$this->isRecursiveOsStorefrontUrl($candidateProxyUrl, $osBaseUrl, $websitePath)) {
                 $engineProxyUrl = $candidateProxyUrl;
             }
+        } elseif ($storefrontUrl !== '' && !$this->isRecursiveOsStorefrontUrl($storefrontUrl, $osBaseUrl, $websitePath)) {
+            $engineProxyUrl = $storefrontUrl;
         }
 
         $usesEngineStorefront = $engineProxyUrl !== '';
@@ -126,7 +126,7 @@ class PublicWebsiteService
             ->all();
     }
 
-    private function resolveEngineVendorSlug(string $storefrontUrl, array $payload, ?string $founderUsername): string
+    private function resolveEngineVendorSlug(string $storefrontUrl, array $payload, ?string $founderUsername, string $websitePath = ''): string
     {
         $path = trim((string) parse_url($storefrontUrl, PHP_URL_PATH), '/');
         if ($path !== '') {
@@ -141,7 +141,9 @@ class PublicWebsiteService
             return $payloadSlug;
         }
 
-        return trim((string) $founderUsername);
+        return trim((string) $websitePath) !== ''
+            ? trim((string) $websitePath)
+            : trim((string) $founderUsername);
     }
 
     private function isRecursiveOsStorefrontUrl(string $candidateUrl, string $osBaseUrl, string $websitePath): bool

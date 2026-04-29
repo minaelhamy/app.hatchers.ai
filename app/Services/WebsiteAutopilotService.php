@@ -276,7 +276,13 @@ class WebsiteAutopilotService
         $starterSeed = $catalogItems[0] ?? null;
         $starterTitle = trim((string) ($starterSeed['title'] ?? $pricing['anchor_offer'] ?? ($coreOffer !== '' ? $coreOffer : ($starterMode === 'service' ? 'Signature service' : 'Signature product'))));
         $starterDescription = trim((string) ($starterSeed['description'] ?? $this->starterDescription($companyName, $starterTitle, $icpName, $city, $painPoints, $outcomes)));
-        $starterPrice = (string) ($starterSeed['price'] ?? ($pricing['starting_price'] ?? '49'));
+        $starterPrice = trim((string) ($starterSeed['price'] ?? ''));
+        if ($starterPrice === '') {
+            $starterPrice = trim((string) ($pricing['starting_price'] ?? '49'));
+        }
+        if ($starterPrice === '') {
+            $starterPrice = '49';
+        }
         $contactBlock = $this->contactBlock($websiteBuild, $city, (string) $brief->delivery_scope);
 
         return [
@@ -465,7 +471,9 @@ class WebsiteAutopilotService
             'starter_mode' => $starterOffer['mode'] ?? 'service',
             'starter_title' => $title,
             'starter_description' => $starterOffer['description'] ?? '',
-            'starter_price' => $starterOffer['price'] ?? '0',
+            'starter_price' => trim((string) ($starterOffer['price'] ?? '')) !== ''
+                ? (string) $starterOffer['price']
+                : '49',
             'media_assets' => $this->starterRecordMedia($draft, 0),
         ]);
 
@@ -479,7 +487,7 @@ class WebsiteAutopilotService
             'description' => trim(implode("\n", [
                 'Type: ' . ($starterOffer['mode'] ?? 'service'),
                 'Engine: ' . (string) $draft['website_engine'],
-                'Price: ' . (string) ($starterOffer['price'] ?? '0'),
+                'Price: ' . (trim((string) ($starterOffer['price'] ?? '')) !== '' ? (string) $starterOffer['price'] : '49'),
                 '',
                 (string) ($starterOffer['description'] ?? ''),
             ])),
@@ -500,7 +508,9 @@ class WebsiteAutopilotService
                 'starter_mode' => $starterOffer['mode'] ?? 'service',
                 'starter_title' => (string) $item['title'],
                 'starter_description' => (string) ($item['description'] ?? ''),
-                'starter_price' => (string) ($item['price'] ?? '0'),
+                'starter_price' => trim((string) ($item['price'] ?? '')) !== ''
+                    ? (string) $item['price']
+                    : (trim((string) ($starterOffer['price'] ?? '')) !== '' ? (string) $starterOffer['price'] : '49'),
                 'media_assets' => $this->starterRecordMedia($draft, $index + 1),
             ]);
         }
