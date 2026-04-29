@@ -98,7 +98,7 @@ class WebsiteAutopilotService
 
         $draft = $this->buildDraft($founder, $company, $blueprint, $brief, $icp);
 
-        $run = DB::transaction(function () use ($founder, $company, $blueprint, $brief, $icp, $draft): FounderWebsiteGenerationRun {
+        $result = DB::transaction(function () use ($founder, $company, $blueprint, $brief, $icp, $draft): array {
             $run = FounderWebsiteGenerationRun::create([
                 'founder_id' => $founder->id,
                 'company_id' => $company->id,
@@ -120,9 +120,16 @@ class WebsiteAutopilotService
             $this->syncDraftToAtlas($founder, $draft);
             $engineSync = $this->syncDraftToWebsiteEngine($founder, $draft);
             $starterSync = $this->syncStarterOffer($founder, $draft);
+            $engineSyncOk = (bool) ($engineSync['ok'] ?? false);
+            $starterSyncOk = (bool) ($starterSync['ok'] ?? false);
+            $generationOk = $engineSyncOk && $starterSyncOk;
+            $failureMessage = trim(implode(' ', array_filter([
+                !$engineSyncOk ? (string) ($engineSync['message'] ?? 'The website engine could not be updated.') : null,
+                !$starterSyncOk ? (string) ($starterSync['message'] ?? 'The starter offers could not be created.') : null,
+            ])));
 
             $run->forceFill([
-                'status' => 'ready',
+                'status' => $generationOk ? 'ready' : 'failed',
                 'output_json' => array_merge($draft, [
                     'engine_sync' => $engineSync,
                     'starter_sync' => $starterSync,
@@ -134,23 +141,30 @@ class WebsiteAutopilotService
                 'business_model' => (string) $draft['website_mode'],
                 'website_engine' => (string) $draft['website_engine'],
                 'website_path' => (string) $draft['website_path'],
-                'website_status' => 'in_progress',
-                'website_generation_status' => 'ready_for_review',
-                'launch_stage' => 'website_draft_ready',
+                'website_status' => $generationOk ? 'in_progress' : 'not_started',
+                'website_generation_status' => $generationOk ? 'ready_for_review' : 'queued',
+                'launch_stage' => $generationOk ? 'website_draft_ready' : 'company_intelligence_complete',
                 'website_url' => 'https://app.hatchers.ai/' . ltrim((string) $draft['website_path'], '/'),
             ])->save();
 
             $this->updateCompanyIntelligence($company, $draft);
-            $this->upsertReviewTasks($founder, $draft);
+            if ($generationOk) {
+                $this->upsertReviewTasks($founder, $draft);
+            }
 
-            return $run;
+            return [
+                'run' => $run,
+                'ok' => $generationOk,
+                'error' => $failureMessage,
+            ];
         });
 
-        return [
-            'ok' => true,
-            'run' => $run,
+        return array_filter([
+            'ok' => (bool) ($result['ok'] ?? false),
+            'error' => (string) ($result['error'] ?? ''),
+            'run' => $result['run'] ?? null,
             'draft' => $this->latestDraft($company),
-        ];
+        ], fn ($value) => $value !== null && $value !== '');
     }
 
     public function regenerateDraftBlock(Founder $founder, string $block): array

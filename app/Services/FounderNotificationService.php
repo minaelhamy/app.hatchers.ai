@@ -51,6 +51,24 @@ class FounderNotificationService
         ]);
     }
 
+    public function websiteBuildFailed(Founder $founder, string $message = ''): FounderNotification
+    {
+        $meta = trim($message);
+        if ($meta === '') {
+            $meta = 'We could not finish the first website build yet. Open Build My Website to try again after the latest fixes.';
+        }
+
+        return $this->create($founder, [
+            'kind' => 'website_build_failed',
+            'title' => 'We could not finish your website yet.',
+            'meta' => $meta,
+            'app_key' => 'build-website',
+            'data_json' => [
+                'status' => 'failed',
+            ],
+        ]);
+    }
+
     private function engineLabelFromAppKey(string $engineAppKey): string
     {
         return match ($engineAppKey) {

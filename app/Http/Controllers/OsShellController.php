@@ -4094,6 +4094,13 @@ class OsShellController extends Controller
                         ])->save();
                     }
 
+                    if ($freshFounder) {
+                        $founderNotificationService->websiteBuildFailed(
+                            $freshFounder,
+                            (string) ($result['error'] ?? 'We could not finish the website build yet. Please try again after the latest fixes.')
+                        );
+                    }
+
                     Log::warning('Website build failed during after-response generation.', [
                         'founder_id' => $founderId,
                         'error' => (string) ($result['error'] ?? 'Unknown website generation error.'),
@@ -4106,6 +4113,21 @@ class OsShellController extends Controller
                 $engineAppKey = strtolower((string) ($freshCompany?->website_engine ?? 'servio')) === 'bazaar' ? 'bazaar-engine' : 'servio-engine';
                 $founderNotificationService->websiteReady($freshFounder, $engineAppKey, $websiteUrl);
             } catch (Throwable $e) {
+                $crashedFounder = Founder::query()->with('company')->find($founderId);
+                if ($crashedFounder?->company) {
+                    $crashedFounder->company->forceFill([
+                        'website_generation_status' => 'queued',
+                        'website_status' => 'not_started',
+                    ])->save();
+                }
+
+                if ($crashedFounder) {
+                    app(FounderNotificationService::class)->websiteBuildFailed(
+                        $crashedFounder,
+                        'The website build ran into a technical issue before it could finish. Please try again after the latest fixes.'
+                    );
+                }
+
                 Log::error('Website build crashed during after-response generation.', [
                     'founder_id' => $founderId,
                     'message' => $e->getMessage(),
