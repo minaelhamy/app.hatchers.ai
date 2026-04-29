@@ -774,7 +774,7 @@ class WebsiteAutopilotService
         $payload = is_array($atlasSnapshot?->payload_json) ? $atlasSnapshot->payload_json : [];
 
         return collect((array) ($payload['website_autopilot']['asset_slots'] ?? []))
-            ->filter('is_array')
+            ->filter(fn ($asset): bool => is_array($asset))
             ->values()
             ->all();
     }
@@ -782,7 +782,7 @@ class WebsiteAutopilotService
     private function hydrateSectionsWithAssets(array $sections, array $assetSlots): array
     {
         return collect($sections)
-            ->filter('is_array')
+            ->filter(fn ($section): bool => is_array($section))
             ->values()
             ->map(function (array $section, int $index) use ($assetSlots): array {
                 $asset = is_array($assetSlots[$index] ?? null) ? $assetSlots[$index] : [];
