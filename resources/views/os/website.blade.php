@@ -28,6 +28,52 @@
         .workspace-stage-tab { display:inline-flex; align-items:center; gap:8px; padding:10px 14px; border-radius:999px; text-decoration:none; color:var(--ink); background:rgba(255,255,255,0.88); border:1px solid rgba(220,207,191,0.8); font-weight:600; }
         .workspace-stage-tab.active { background:#ece6db; }
         .workspace-stage-helper { margin-top:14px; padding:14px 16px; border-radius:16px; background:rgba(255,255,255,0.92); border:1px solid rgba(220,207,191,0.7); color:var(--muted); }
+        .website-build-loading {
+            min-height: 460px;
+            display: grid;
+            place-items: center;
+            text-align: center;
+            border-radius: 28px;
+            border: 1px solid rgba(216, 202, 186, 0.78);
+            background: rgba(255, 252, 248, 0.92);
+            box-shadow: 0 24px 60px rgba(96, 78, 59, 0.08);
+            padding: 28px;
+        }
+        .website-build-loading-mark {
+            width: 104px;
+            height: 104px;
+            border-radius: 28px;
+            margin: 0 auto 18px;
+            background: linear-gradient(180deg, #ff4f7a 0%, #ff6a5c 100%);
+            box-shadow: 0 18px 40px rgba(255, 95, 108, 0.28);
+            position: relative;
+        }
+        .website-build-loading-mark::after {
+            content: "";
+            position: absolute;
+            inset: -10px;
+            border-radius: 34px;
+            border: 1px solid rgba(255, 120, 132, 0.28);
+            animation: websiteBuildPulse 1.8s ease-out infinite;
+        }
+        .website-build-loading h2 {
+            margin: 0 0 10px;
+            font-size: clamp(2rem, 3.5vw, 3rem);
+            letter-spacing: -0.05em;
+            line-height: 1;
+        }
+        .website-build-loading p {
+            margin: 0;
+            color: #746657;
+            font-size: 1rem;
+            line-height: 1.7;
+            max-width: 560px;
+        }
+        @keyframes websiteBuildPulse {
+            0% { transform: scale(0.92); opacity: 0.75; }
+            70% { transform: scale(1.18); opacity: 0; }
+            100% { transform: scale(1.18); opacity: 0; }
+        }
         @media (max-width:1240px) { .workspace-shell { grid-template-columns:220px 1fr; } .workspace-rightbar { display:none; } }
         @media (max-width:900px) { .workspace-shell { grid-template-columns:1fr; } .workspace-sidebar { min-height:auto; border-right:0; border-bottom:1px solid var(--line); } .workspace-sidebar-footer { display:none; } .workspace-main { padding:20px 16px 24px; } }
     </style>
@@ -133,7 +179,16 @@
                 <div class="workspace-stage-helper">{{ $stageHelp[$websiteStage] }}</div>
             </section>
 
-            @if ($websiteStage === 'build')
+            @if ($websiteStage === 'build' && $generationStatus === 'in_progress')
+            <section class="website-build-loading" style="margin-top: 22px;">
+                <div>
+                    <div class="website-build-loading-mark" aria-hidden="true"></div>
+                    <div class="eyebrow" style="margin-bottom:8px;">Website Build In Progress</div>
+                    <h2>Working on your website</h2>
+                    <p>We are preparing your first website draft now. You can close this window and we will notify you as soon as it is ready.</p>
+                </div>
+            </section>
+            @elseif ($websiteStage === 'build')
             <section class="grid-2" style="margin-top: 22px;">
                 <div class="card">
                     <h2>Company Intelligence Brief</h2>

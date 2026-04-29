@@ -613,7 +613,7 @@ class WebsiteAutopilotService
     private function normalizeResolvedAssets(array $assets): array
     {
         return collect($assets)
-            ->filter('is_array')
+            ->filter(fn ($asset): bool => is_array($asset))
             ->map(function (array $asset): ?array {
                 $sourceUrl = trim((string) ($asset['asset_url'] ?? $asset['preview_url'] ?? ''));
                 if ($sourceUrl === '') {

@@ -4059,41 +4059,66 @@ class OsShellController extends Controller
         ])->save();
 
         $founderNotificationService->websiteBuildStarted($founder, $engineLabel);
+        $founderId = (int) $founder->id;
 
-        $result = $websiteAutopilotService->generate($founder->fresh([
-            'company.verticalBlueprint',
-            'company.intelligence',
-            'company.websiteGenerationRuns',
-            'businessBrief',
-            'icpProfiles',
-            'actionPlans',
-        ]));
+        app()->terminating(function () use ($founderId) {
+            try {
+                /** @var Founder|null $backgroundFounder */
+                $backgroundFounder = Founder::query()->find($founderId);
+                if (!$backgroundFounder) {
+                    return;
+                }
 
-        if (!($result['ok'] ?? false)) {
-            $company->forceFill([
-                'website_generation_status' => 'queued',
-                'website_status' => 'not_started',
-            ])->save();
+                /** @var WebsiteAutopilotService $websiteAutopilotService */
+                $websiteAutopilotService = app(WebsiteAutopilotService::class);
+                /** @var FounderNotificationService $founderNotificationService */
+                $founderNotificationService = app(FounderNotificationService::class);
 
-            return redirect()
-                ->route('website', array_filter([
-                    'stage' => 'build',
-                    'os_embed' => $request->boolean('os_embed') ? 1 : null,
-                ]))
-                ->with('error', (string) ($result['error'] ?? 'Hatchers OS could not build the website yet.'));
-        }
+                $result = $websiteAutopilotService->generate($backgroundFounder->fresh([
+                    'company.verticalBlueprint',
+                    'company.intelligence',
+                    'company.websiteGenerationRuns',
+                    'businessBrief',
+                    'icpProfiles',
+                    'actionPlans',
+                ]));
 
-        $freshCompany = $founder->fresh()->company;
-        $websiteUrl = (string) ($freshCompany?->website_url ?: ('https://app.hatchers.ai/' . ltrim((string) ($freshCompany?->website_path ?? ''), '/')));
-        $engineAppKey = strtolower((string) ($freshCompany?->website_engine ?? 'servio')) === 'bazaar' ? 'bazaar-engine' : 'servio-engine';
-        $founderNotificationService->websiteReady($founder, $engineAppKey, $websiteUrl);
+                $freshFounder = $backgroundFounder->fresh(['company']);
+                $freshCompany = $freshFounder?->company;
+
+                if (!($result['ok'] ?? false)) {
+                    if ($freshCompany) {
+                        $freshCompany->forceFill([
+                            'website_generation_status' => 'queued',
+                            'website_status' => 'not_started',
+                        ])->save();
+                    }
+
+                    Log::warning('Website build failed during after-response generation.', [
+                        'founder_id' => $founderId,
+                        'error' => (string) ($result['error'] ?? 'Unknown website generation error.'),
+                    ]);
+
+                    return;
+                }
+
+                $websiteUrl = (string) ($freshCompany?->website_url ?: ('https://app.hatchers.ai/' . ltrim((string) ($freshCompany?->website_path ?? ''), '/')));
+                $engineAppKey = strtolower((string) ($freshCompany?->website_engine ?? 'servio')) === 'bazaar' ? 'bazaar-engine' : 'servio-engine';
+                $founderNotificationService->websiteReady($freshFounder, $engineAppKey, $websiteUrl);
+            } catch (Throwable $e) {
+                Log::error('Website build crashed during after-response generation.', [
+                    'founder_id' => $founderId,
+                    'message' => $e->getMessage(),
+                ]);
+            }
+        });
 
         return redirect()
             ->route('website', array_filter([
-                'stage' => 'overview',
+                'stage' => 'build',
                 'os_embed' => $request->boolean('os_embed') ? 1 : null,
             ]))
-            ->with('success', 'Your website draft is ready. Hatchers selected the template, filled the core site sections, and prepared the first storefront for review.');
+            ->with('success', 'We are working on your website now. You can close this window and we will notify you when it is ready.');
     }
 
     public function founderApplyLaunchSystem(Request $request, WebsiteAutopilotService $websiteAutopilotService): RedirectResponse
