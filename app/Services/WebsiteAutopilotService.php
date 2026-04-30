@@ -406,12 +406,26 @@ class WebsiteAutopilotService
         ];
     }
 
-    private function syncDraftToWebsiteEngine(Founder $founder, array $draft): array
+    private function syncDraftToWebsiteEngine(Founder $founder, array &$draft): array
     {
         $founder->loadMissing('businessBrief', 'company');
         $brief = $founder->businessBrief;
         $websiteBuild = $brief ? $this->websiteBuildConfig($brief) : [];
-        $mediaAssets = $this->websiteMediaAssets($founder, $draft);
+        $mediaState = $this->resolvedWebsiteMediaState($founder, $draft);
+        $draft['atlas_handoff'] = array_merge(
+            is_array($draft['atlas_handoff'] ?? null) ? $draft['atlas_handoff'] : [],
+            ['asset_slots' => $mediaState['asset_slots']]
+        );
+        $mediaAssets = $mediaState['media_assets'];
+
+        if ($mediaAssets === []) {
+            return [
+                'ok' => false,
+                'message' => 'Website media could not be prepared yet, so Hatchers stopped the build before publishing a placeholder site.',
+                'public_url' => '',
+                'media_assets_count' => 0,
+            ];
+        }
 
         $result = $this->websiteProvisioningService->applyWebsiteSetup($founder, [
             'website_engine' => $draft['website_engine'],
@@ -609,12 +623,7 @@ class WebsiteAutopilotService
 
     private function websiteMediaAssets(Founder $founder, array $draft): array
     {
-        $atlasAssets = $this->atlasWorkspaceService->websiteAssets($founder);
-        $resolved = $this->normalizeResolvedAssets((array) ($atlasAssets['asset_slots'] ?? []));
-
-        if ($resolved === []) {
-            $resolved = $this->normalizeResolvedAssets((array) ($draft['atlas_handoff']['asset_slots'] ?? []));
-        }
+        $resolved = $this->normalizeResolvedAssets((array) ($draft['atlas_handoff']['asset_slots'] ?? []));
 
         if ($resolved === []) {
             return [];
@@ -646,6 +655,36 @@ class WebsiteAutopilotService
             $this->slotMedia('gallery_tertiary', 'gallery image three', $action ?? $proof ?? $hero),
             $this->slotMedia('why_choose_item', 'why choose us image', $story ?? $features ?? $hero),
         ]));
+    }
+
+    private function resolvedWebsiteMediaState(Founder $founder, array $draft): array
+    {
+        $assetSlots = (array) ($draft['atlas_handoff']['asset_slots'] ?? []);
+        $resolved = $this->normalizeResolvedAssets($assetSlots);
+
+        for ($attempt = 0; $attempt < 4 && $resolved === []; $attempt++) {
+            $atlasAssets = $this->atlasWorkspaceService->websiteAssets($founder);
+            $assetSlots = is_array($atlasAssets['asset_slots'] ?? null) ? $atlasAssets['asset_slots'] : [];
+            $resolved = $this->normalizeResolvedAssets($assetSlots);
+
+            if ($resolved !== []) {
+                break;
+            }
+
+            if ($attempt < 3) {
+                usleep(750000);
+            }
+        }
+
+        $draft['atlas_handoff'] = array_merge(
+            is_array($draft['atlas_handoff'] ?? null) ? $draft['atlas_handoff'] : [],
+            ['asset_slots' => $assetSlots]
+        );
+
+        return [
+            'asset_slots' => $assetSlots,
+            'media_assets' => $this->websiteMediaAssets($founder, $draft),
+        ];
     }
 
     private function normalizeResolvedAssets(array $assets): array
