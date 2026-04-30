@@ -411,21 +411,7 @@ class WebsiteAutopilotService
         $founder->loadMissing('businessBrief', 'company');
         $brief = $founder->businessBrief;
         $websiteBuild = $brief ? $this->websiteBuildConfig($brief) : [];
-        $mediaState = $this->resolvedWebsiteMediaState($founder, $draft);
-        $draft['atlas_handoff'] = array_merge(
-            is_array($draft['atlas_handoff'] ?? null) ? $draft['atlas_handoff'] : [],
-            ['asset_slots' => $mediaState['asset_slots']]
-        );
-        $mediaAssets = $mediaState['media_assets'];
-
-        if ($mediaAssets === []) {
-            return [
-                'ok' => false,
-                'message' => 'Website media could not be prepared yet, so Hatchers stopped the build before publishing a placeholder site.',
-                'public_url' => '',
-                'media_assets_count' => 0,
-            ];
-        }
+        $draftAssetSlots = array_values(array_filter((array) ($draft['atlas_handoff']['asset_slots'] ?? []), fn ($item) => is_array($item)));
 
         $result = $this->websiteProvisioningService->applyWebsiteSetup($founder, [
             'website_engine' => $draft['website_engine'],
@@ -449,7 +435,9 @@ class WebsiteAutopilotService
             'story_title' => $this->storyTitle($draft),
             'story_subtitle' => $this->storySubtitle($draft),
             'story_description' => $this->storyDescription($draft),
-            'media_assets' => $mediaAssets,
+            // Engines now generate storefront media locally from the shared business payload.
+            'media_assets' => [],
+            'media_queries' => $draftAssetSlots,
             'hero_headline' => (string) ($draft['hero']['headline'] ?? ''),
             'hero_subhead' => (string) ($draft['hero']['subhead'] ?? ''),
             'hero_brief' => (string) ($draft['hero']['brief'] ?? ''),
@@ -459,7 +447,7 @@ class WebsiteAutopilotService
             'ok' => (bool) ($result['ok'] ?? false),
             'message' => (string) ($result['error'] ?? ''),
             'public_url' => (string) ($result['public_url'] ?? ''),
-            'media_assets_count' => count($mediaAssets),
+            'media_assets_count' => 0,
         ];
     }
 

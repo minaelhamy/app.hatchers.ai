@@ -109,6 +109,7 @@ class WebsiteProvisioningService
             'hero_subhead' => trim((string) ($input['hero_subhead'] ?? '')),
             'hero_brief' => trim((string) ($input['hero_brief'] ?? '')),
             'media_assets' => array_values(array_filter((array) ($input['media_assets'] ?? []), fn ($item) => is_array($item))),
+            'media_queries' => array_values(array_filter((array) ($input['media_queries'] ?? []), fn ($item) => is_array($item))),
         ];
 
         $response = $this->postToEngine($engine, $payload);
