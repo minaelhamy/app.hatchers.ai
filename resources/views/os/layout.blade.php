@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>{{ $pageTitle ?? 'Hatchers OS' }}</title>
+    <title>{{ $pageTitle ?? 'Hatchers AI OS' }}</title>
     @php
         $osEmbedMode = request()->boolean('os_embed');
     @endphp
@@ -1333,7 +1333,7 @@
         <div class="os-boot-screen" data-os-boot>
             <div class="os-boot-inner">
                 <div class="os-boot-mark"></div>
-                <div class="os-boot-title">Hatchers OS</div>
+                <div class="os-boot-title">Hatchers AI OS</div>
                 <div class="os-boot-copy">Loading your workspace…</div>
             </div>
         </div>
@@ -1392,7 +1392,7 @@
                             @else
                                 <div class="assistant-bubble atlas">
                                     <span class="assistant-bubble-title">Atlas</span>
-                                    <div class="assistant-bubble-content" data-assistant-message-content data-message-type="atlas">Ask me anything you are facing in Hatchers OS and I’ll help you work through it.</div>
+                                    <div class="assistant-bubble-content" data-assistant-message-content data-message-type="atlas">Ask me anything you are facing in Hatchers AI OS and I’ll help you work through it.</div>
                                 </div>
                             @endif
                         </div>

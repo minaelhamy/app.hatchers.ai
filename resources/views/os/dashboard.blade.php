@@ -939,9 +939,25 @@
             [
                 'key' => 'automations',
                 'label' => 'Automations',
-                'route' => route('founder.automations'),
+                'route' => route('founder.coming-soon', ['feature' => 'automations']),
                 'class' => 'os-icon-automation',
                 'icon' => 'gear',
+                'external' => false,
+            ],
+            [
+                'key' => 'affiliate-network',
+                'label' => 'Affiliate Network',
+                'route' => route('founder.coming-soon', ['feature' => 'affiliate-network']),
+                'class' => 'os-icon-growth',
+                'icon' => 'target',
+                'external' => false,
+            ],
+            [
+                'key' => 'offer-engineering',
+                'label' => 'Offer Engineering',
+                'route' => route('founder.coming-soon', ['feature' => 'offer-engineering']),
+                'class' => 'os-icon-brand',
+                'icon' => 'spark',
                 'external' => false,
             ],
             [
@@ -973,16 +989,6 @@
             ];
         }
 
-        if ($supportsServices) {
-            $desktopApps[] = [
-                'key' => 'bookings',
-                'label' => 'Bookings',
-                'route' => route('founder.commerce.bookings'),
-                'class' => 'os-icon-bookings',
-                'icon' => 'calendar-check',
-                'external' => false,
-            ];
-        }
     @endphp
 
     <div class="os-desktop-scene" data-os-desktop-home data-os-open="{{ e((string) $desktopOpen) }}">
@@ -991,7 +997,7 @@
                 <div class="os-desktop-bar-left">
                     <a class="os-desktop-brand" href="/dashboard/founder">
                         <span class="os-desktop-brand-mark"></span>
-                        <span class="os-desktop-brand-name">Hatchers</span>
+                        <span class="os-desktop-brand-name">Hatchers AI OS</span>
                     </a>
                     <div class="os-desktop-search">
                         <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -1050,6 +1056,14 @@
                     </form>
                 </div>
             </div>
+
+            @if (session('info') || session('success') || session('error'))
+                <div style="padding: 0 18px 12px; position: relative; z-index: 2;">
+                    <div style="border-radius: 18px; border: 1px solid rgba(220, 207, 191, 0.86); background: rgba(255, 251, 247, 0.76); box-shadow: 0 12px 24px rgba(71, 52, 31, 0.05); padding: 12px 14px; color: rgba(72, 58, 49, 0.88); font-size: 0.88rem;">
+                        {{ session('error') ?? session('success') ?? session('info') }}
+                    </div>
+                </div>
+            @endif
 
             <div class="os-desktop-icons" data-os-launcher data-storage-key="hatchers-os-desktop-order-{{ $dashboard['founder']->id ?? 'guest' }}">
                 @foreach ($desktopApps as $app)

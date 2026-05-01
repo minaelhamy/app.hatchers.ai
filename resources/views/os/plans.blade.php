@@ -324,7 +324,7 @@
     <div class="plans-scene">
         <section class="plans-wrap">
             <div class="plans-mark"></div>
-            <div class="plans-brand">Hatchers OS</div>
+            <div class="plans-brand">Hatchers AI OS</div>
 
             <div class="plans-card">
                 <div class="plans-kicker">Plans</div>
@@ -365,7 +365,7 @@
     <div class="plans-launch-overlay" data-plan-launch-overlay aria-hidden="true">
         <div class="plans-launch-core">
             <div class="plans-mark"></div>
-            <div class="plans-launch-title" data-plan-launch-title>Entering Hatchers OS</div>
+            <div class="plans-launch-title" data-plan-launch-title>Entering Hatchers AI OS</div>
             <div class="plans-launch-copy" data-plan-launch-copy>Preparing your founder workspace…</div>
             <div class="plans-launch-line"></div>
         </div>
@@ -384,7 +384,7 @@
                 cards.forEach((item) => item.classList.toggle('is-active', item === card));
                 overlay.classList.add('is-visible');
 
-                const planName = card.dataset.planName || 'Hatchers OS';
+                const planName = card.dataset.planName || 'Hatchers AI OS';
                 overlayTitle.textContent = `Entering ${planName}`;
 
                 try {

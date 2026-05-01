@@ -76,7 +76,7 @@ class OsShellController extends Controller
     public function plans()
     {
         return view('os.plans', [
-            'pageTitle' => 'Choose Your Hatchers OS Plan',
+            'pageTitle' => 'Choose Your Hatchers AI OS Plan',
             'plans' => collect($this->founderSignupPlans())->values()->all(),
         ]);
     }
@@ -107,7 +107,7 @@ class OsShellController extends Controller
     public function login()
     {
         return view('os.login', [
-            'pageTitle' => 'Hatchers OS Login',
+            'pageTitle' => 'Hatchers AI OS Login',
         ]);
     }
 
@@ -1989,7 +1989,7 @@ class OsShellController extends Controller
         ]);
     }
 
-    public function founderAutomations(FounderDashboardService $founderDashboardService)
+    public function founderComingSoon(string $feature): RedirectResponse
     {
         /** @var \App\Models\Founder $user */
         $user = Auth::user();
@@ -2000,14 +2000,21 @@ class OsShellController extends Controller
             return $redirect;
         }
 
-        return view('os.automations', [
-            'pageTitle' => 'Automations',
-            'dashboard' => $founderDashboardService->build($user),
-            'automations' => $user->automationRules()->latest()->get(),
-            'triggerOptions' => $this->automationTriggerOptions(),
-            'scopeOptions' => $this->automationScopeOptions(),
-            'recommendedTemplates' => $this->automationTemplates(),
-        ]);
+        $label = match (strtolower(trim($feature))) {
+            'automations' => 'Automations',
+            'affiliate-network' => 'Affiliate Network',
+            'offer-engineering' => 'Offer Engineering',
+            default => 'This area',
+        };
+
+        return redirect()
+            ->route('dashboard.founder')
+            ->with('info', $label . ' is coming soon in Hatchers AI OS.');
+    }
+
+    public function founderAutomations(FounderDashboardService $founderDashboardService)
+    {
+        return $this->founderComingSoon('automations');
     }
 
     public function founderStoreAutomation(Request $request): RedirectResponse

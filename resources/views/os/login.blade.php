@@ -189,7 +189,7 @@
     <div class="entry-scene">
         <section class="entry-wrap">
             <div class="entry-mark"></div>
-            <div class="entry-brand">Hatchers OS</div>
+            <div class="entry-brand">Hatchers AI OS</div>
             <div class="entry-copy">Enter your workspace.</div>
 
             <div class="entry-card">

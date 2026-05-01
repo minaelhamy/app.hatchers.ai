@@ -174,7 +174,7 @@
                 <div class="verify-mark"></div>
                 <div class="verify-eyebrow">Founder Sign-In Verification</div>
                 <h1>Complete your login</h1>
-                <p class="verify-copy">We sent a 6-digit code to {{ $email ?? 'your founder email' }}. Enter it to continue into Hatchers OS.</p>
+                <p class="verify-copy">We sent a 6-digit code to {{ $email ?? 'your founder email' }}. Enter it to continue into Hatchers AI OS.</p>
 
                 @if (session('success'))
                     <div class="verify-alert">{{ session('success') }}</div>

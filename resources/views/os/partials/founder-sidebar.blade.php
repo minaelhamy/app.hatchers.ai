@@ -3,7 +3,6 @@
     $sidebarFounder = $founder ?? $dashboard['founder'] ?? auth()->user();
     $sidebarBusinessModel = strtolower(trim((string) ($businessModel ?? $sidebarFounder?->company?->business_model ?? 'hybrid')));
     $sidebarSupportsProducts = in_array($sidebarBusinessModel, ['product', 'hybrid'], true);
-    $sidebarSupportsServices = in_array($sidebarBusinessModel, ['service', 'hybrid'], true);
     $sidebarNavClass = $navClass ?? 'founder-nav';
     $sidebarItemClass = $itemClass ?? 'founder-nav-item';
     $sidebarIconClass = $iconClass ?? 'founder-nav-icon';
@@ -31,15 +30,13 @@
         $sidebarItems[] = ['key' => 'orders', 'label' => 'Orders', 'icon' => 'ORD', 'accent' => 'copper', 'href' => route('founder.commerce.orders')];
     }
 
-    if ($sidebarSupportsServices) {
-        $sidebarItems[] = ['key' => 'bookings', 'label' => 'Bookings', 'icon' => 'BK', 'accent' => 'mint', 'href' => route('founder.commerce.bookings')];
-    }
-
     $sidebarItems = array_merge($sidebarItems, [
         ['key' => 'inbox', 'label' => 'Inbox', 'icon' => 'IN', 'accent' => 'sky', 'href' => route('founder.inbox')],
         ['key' => 'search', 'label' => 'Search', 'icon' => 'Q', 'accent' => 'amber', 'href' => route('founder.search')],
         ['key' => 'ai-tools', 'label' => 'AI Studio', 'icon' => 'AI', 'accent' => 'rose', 'href' => route('founder.ai-tools')],
-        ['key' => 'automations', 'label' => 'Automations', 'icon' => 'BOT', 'accent' => 'plum', 'href' => route('founder.automations')],
+        ['key' => 'automations', 'label' => 'Automations', 'icon' => 'BOT', 'accent' => 'plum', 'href' => route('founder.coming-soon', ['feature' => 'automations'])],
+        ['key' => 'affiliate-network', 'label' => 'Affiliate Network', 'icon' => 'AF', 'accent' => 'rose', 'href' => route('founder.coming-soon', ['feature' => 'affiliate-network'])],
+        ['key' => 'offer-engineering', 'label' => 'Offer Engineering', 'icon' => 'OF', 'accent' => 'amber', 'href' => route('founder.coming-soon', ['feature' => 'offer-engineering'])],
         ['key' => 'analytics', 'label' => 'Analytics', 'icon' => 'AN', 'accent' => 'mint', 'href' => route('founder.analytics')],
         ['key' => 'media-library', 'label' => 'Media Library', 'icon' => 'ML', 'accent' => 'copper', 'href' => route('founder.media-library')],
         ['key' => 'learning-plan', 'label' => 'Learning Plan', 'icon' => 'LP', 'accent' => 'gold', 'href' => route('founder.learning-plan')],
@@ -59,7 +56,7 @@
             <img src="/brand/hatchers-ai-logo.png" alt="Hatchers AI">
         </a>
         <div class="os-launcher-status">
-            <span>Founder desktop</span>
+            <span>Hatchers AI OS</span>
             <strong>{{ $sidebarToday }}</strong>
         </div>
     </div>

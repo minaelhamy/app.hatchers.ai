@@ -320,7 +320,7 @@
     <div class="signup-scene" data-signup-scene>
         <section class="signup-wrap">
             <div class="signup-mark"></div>
-            <div class="signup-brand">Hatchers OS</div>
+            <div class="signup-brand">Hatchers AI OS</div>
             <div class="signup-copy">Create your workspace.</div>
 
             <div class="signup-card">
@@ -558,7 +558,7 @@
                         <button class="signup-submit" type="submit">Complete founder signup</button>
                         <a class="signup-secondary" href="{{ route('plans') }}">Back to plans</a>
                     </div>
-                    <p class="signup-footnote">Every field is still required so Hatchers OS can personalize the workspace from day one.</p>
+                    <p class="signup-footnote">Every field is still required so Hatchers AI OS can personalize the workspace from day one.</p>
                 </form>
             </div>
         </section>

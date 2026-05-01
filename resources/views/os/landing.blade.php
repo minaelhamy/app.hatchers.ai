@@ -4,7 +4,7 @@
     <section class="hero">
         <div class="eyebrow">The Founder Operating System</div>
         <h1>One platform to build, run, and scale any founder-led business.</h1>
-        <p class="muted">Hatchers OS combines mentoring, AI intelligence, website creation, commerce, service operations, and growth execution into one founder workspace at <strong>app.hatchers.ai</strong>.</p>
+        <p class="muted">Hatchers AI OS combines mentoring, AI intelligence, website creation, commerce, service operations, and growth execution into one founder workspace at <strong>app.hatchers.ai</strong>.</p>
         <div class="cta-row">
             <a class="btn primary" href="/plans">Choose a plan</a>
             <a class="btn" href="/onboarding">Preview onboarding</a>

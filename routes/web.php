@@ -87,6 +87,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/search', [OsShellController::class, 'founderSearch'])->name('founder.search');
     Route::get('/media-library', [OsShellController::class, 'founderMediaLibrary'])->name('founder.media-library');
     Route::get('/analytics', [OsShellController::class, 'founderAnalytics'])->name('founder.analytics');
+    Route::get('/coming-soon/{feature}', [OsShellController::class, 'founderComingSoon'])->name('founder.coming-soon');
     Route::get('/automations', [OsShellController::class, 'founderAutomations'])->name('founder.automations');
     Route::post('/automations', [OsShellController::class, 'founderStoreAutomation'])->name('founder.automations.store');
     Route::post('/automations/templates', [OsShellController::class, 'founderStoreAutomationTemplate'])->name('founder.automations.templates.store');
