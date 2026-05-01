@@ -8144,7 +8144,7 @@ class OsShellController extends Controller
         if (!$company) {
             $founder = Founder::query()
                 ->with(['company', 'moduleSnapshots'])
-                ->where('role', 'founder')
+                ->whereNotNull('id')
                 ->get()
                 ->first(function (Founder $founder) use ($normalizedPath): bool {
                     $fullNameSlug = trim(strtolower((string) str($founder->full_name ?: '')->slug('-')->value()), '/');
@@ -8262,6 +8262,11 @@ class OsShellController extends Controller
 
         $founderUsername = trim(strtolower((string) ($company->founder?->username ?? '')), '/');
         if ($founderUsername !== '' && $founderUsername === $normalizedPath) {
+            return true;
+        }
+
+        $founderFullNameSlug = trim(strtolower((string) str($company->founder?->full_name ?: '')->slug('-')->value()), '/');
+        if ($founderFullNameSlug !== '' && $founderFullNameSlug === $normalizedPath) {
             return true;
         }
 

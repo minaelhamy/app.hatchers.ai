@@ -2461,6 +2461,12 @@
             const openApp = (key, sourceNode = null) => {
                 const app = routeMap[key];
                 if (!app) return;
+
+                if (app.openInBrowser) {
+                    window.open(app.route, '_blank', 'noopener,noreferrer');
+                    return;
+                }
+
                 if (windows.has(key)) {
                     focusWindow(key);
                     return;
