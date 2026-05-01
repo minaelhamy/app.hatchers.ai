@@ -4916,8 +4916,6 @@ class OsShellController extends Controller
 
                 return redirect()->away($canonicalUrl);
             }
-
-            return $this->proxyEngineStorefront($company, '', request(), $publicWebsiteService);
         }
 
         return view('os.public-website', [
