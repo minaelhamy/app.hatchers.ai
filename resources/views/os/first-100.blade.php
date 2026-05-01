@@ -1,26 +1,13 @@
 @extends('os.layout')
 
-@section('hide_topbar', '1')
-@section('page_class', 'founder-home-page')
+@section('page_class', 'lead-tracker-page')
 
 @section('head')
     <style>
-        .page.founder-home-page { padding: 0; }
-        .tracker-shell { min-height:100vh; display:grid; grid-template-columns:220px minmax(0,1fr) 250px; background:#f8f5ee; }
-        .tracker-sidebar, .tracker-rightbar { background:rgba(255,252,247,0.8); border-color:var(--line); border-style:solid; border-width:0 1px 0 0; min-height:100vh; display:flex; flex-direction:column; }
-        .tracker-rightbar { border-width:0 0 0 1px; background:rgba(255,251,246,0.9); }
-        .tracker-sidebar-inner, .tracker-rightbar-inner { padding:22px 18px; }
-        .tracker-brand { display:inline-block; margin-bottom:24px; }
-        .tracker-brand img { width:168px; height:auto; display:block; }
-        .tracker-nav { display:grid; gap:6px; }
-        .tracker-nav-item { display:flex; align-items:center; gap:10px; padding:12px 14px; border-radius:14px; text-decoration:none; color:var(--ink); font-size:0.98rem; }
-        .tracker-nav-item.active { background:#ece6db; }
-        .tracker-nav-icon { width:18px; text-align:center; color:var(--muted); }
-        .tracker-sidebar-footer { margin-top:auto; padding:18px; border-top:1px solid var(--line); display:flex; align-items:center; justify-content:space-between; gap:12px; }
-        .tracker-user { display:flex; align-items:center; gap:10px; }
-        .tracker-avatar { width:30px; height:30px; border-radius:999px; background:#b0a999; color:#fff; display:grid; place-items:center; font-weight:700; font-size:0.92rem; flex-shrink:0; }
-        .tracker-main { padding:26px 28px 24px; }
-        .tracker-main-inner { max-width:930px; margin:0 auto; }
+        .page.lead-tracker-page { padding: 30px 32px 48px; }
+        .tracker-shell { max-width:1240px; margin:0 auto; display:grid; grid-template-columns:minmax(0,1fr) 280px; gap:18px; align-items:start; }
+        .tracker-main { min-width:0; }
+        .tracker-main-inner { max-width:none; }
         .tracker-main h1 { font-size:clamp(2rem, 3vw, 3rem); letter-spacing:-0.02em; margin-bottom:6px; }
         .tracker-main p { color:var(--muted); margin-bottom:24px; }
         .tracker-banner { border-radius:16px; padding:14px 16px; border:1px solid rgba(220,207,191,0.8); background:rgba(255,255,255,0.9); margin-bottom:14px; }
@@ -55,8 +42,8 @@
         .tracker-mode-tab { display:inline-flex; align-items:center; gap:8px; padding:10px 14px; border-radius:999px; text-decoration:none; color:var(--ink); background:rgba(255,255,255,0.88); border:1px solid rgba(220,207,191,0.8); font-weight:600; }
         .tracker-mode-tab.active { background:#ece6db; }
         .tracker-helper { margin-bottom:18px; padding:14px 16px; border-radius:16px; background:rgba(255,255,255,0.92); border:1px solid rgba(220,207,191,0.7); color:var(--muted); }
-        @media (max-width:1240px) { .tracker-shell { grid-template-columns:220px 1fr; } .tracker-rightbar { display:none; } }
-        @media (max-width:900px) { .tracker-shell { grid-template-columns:1fr; } .tracker-sidebar { min-height:auto; border-right:0; border-bottom:1px solid var(--line); } .tracker-sidebar-footer { display:none; } .tracker-main { padding:20px 16px 24px; } .tracker-grid, .tracker-metrics, .tracker-form-grid { grid-template-columns:1fr; } }
+        @media (max-width:1100px) { .tracker-shell { grid-template-columns:1fr; } .tracker-rightbar { order:2; } }
+        @media (max-width:900px) { .page.lead-tracker-page { padding:20px 16px 28px; } .tracker-grid, .tracker-metrics, .tracker-form-grid { grid-template-columns:1fr; } }
     </style>
 @endsection
 
@@ -87,22 +74,6 @@
     @endphp
 
     <div class="tracker-shell">
-        <aside class="tracker-sidebar">
-            @include('os.partials.founder-sidebar', [
-                'founder' => $founder,
-                'businessModel' => $founder->company->business_model ?? 'hybrid',
-                'activeKey' => 'first-100',
-                'navClass' => 'tracker-nav',
-                'itemClass' => 'tracker-nav-item',
-                'iconClass' => 'tracker-nav-icon',
-                'innerClass' => 'tracker-sidebar-inner',
-                'brandClass' => 'tracker-brand',
-                'footerClass' => 'tracker-sidebar-footer',
-                'userClass' => 'tracker-user',
-                'avatarClass' => 'tracker-avatar',
-            ])
-        </aside>
-
         <main class="tracker-main">
             <div class="tracker-main-inner">
                 <h1>Lead Tracker</h1>
