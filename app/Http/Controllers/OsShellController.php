@@ -8164,6 +8164,19 @@ class OsShellController extends Controller
             return true;
         }
 
+        $engineUrlPath = trim((string) parse_url((string) ($company->engine_public_url ?? ''), PHP_URL_PATH), '/');
+        if ($engineUrlPath !== '') {
+            $engineSegments = array_values(array_filter(explode('/', strtolower($engineUrlPath))));
+            if (in_array($normalizedPath, $engineSegments, true) || strtolower($engineUrlPath) === $normalizedPath) {
+                return true;
+            }
+        }
+
+        $founderUsername = trim(strtolower((string) ($company->founder?->username ?? '')), '/');
+        if ($founderUsername !== '' && $founderUsername === $normalizedPath) {
+            return true;
+        }
+
         return false;
     }
 
