@@ -141,9 +141,12 @@ class PublicWebsiteService
             return $payloadSlug;
         }
 
-        return trim((string) $websitePath) !== ''
-            ? trim((string) $websitePath)
-            : trim((string) $founderUsername);
+        $founderUsername = trim((string) $founderUsername);
+        if ($founderUsername !== '') {
+            return $founderUsername;
+        }
+
+        return trim((string) $websitePath);
     }
 
     private function isRecursiveOsStorefrontUrl(string $candidateUrl, string $osBaseUrl, string $websitePath): bool
