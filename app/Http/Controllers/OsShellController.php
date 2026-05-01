@@ -4072,7 +4072,8 @@ class OsShellController extends Controller
     public function storeWebsiteBuildRequest(
         Request $request,
         WebsiteAutopilotService $websiteAutopilotService,
-        FounderNotificationService $founderNotificationService
+        FounderNotificationService $founderNotificationService,
+        FounderModuleSyncService $founderModuleSyncService
     ): RedirectResponse {
         /** @var \App\Models\Founder $founder */
         $founder = Auth::user();
@@ -4248,6 +4249,49 @@ class OsShellController extends Controller
                 $websiteProvisioningService = app(WebsiteProvisioningService::class);
                 /** @var FounderNotificationService $founderNotificationService */
                 $founderNotificationService = app(FounderNotificationService::class);
+                /** @var FounderModuleSyncService $founderModuleSyncService */
+                $founderModuleSyncService = app(FounderModuleSyncService::class);
+
+                $backgroundFounder = $backgroundFounder->fresh([
+                    'company.verticalBlueprint',
+                    'company.intelligence',
+                    'company.websiteGenerationRuns',
+                    'businessBrief',
+                    'icpProfiles',
+                    'actionPlans',
+                ]);
+                if (!$backgroundFounder) {
+                    return;
+                }
+
+                $engineTarget = strtolower(trim((string) ($backgroundFounder->company?->website_engine ?? '')));
+                if (!in_array($engineTarget, ['servio', 'bazaar'], true)) {
+                    $engineTarget = strtolower(trim((string) ($backgroundFounder->company?->business_model ?? ''))) === 'product'
+                        ? 'bazaar'
+                        : 'servio';
+                }
+
+                $syncResult = $founderModuleSyncService->syncFounder($backgroundFounder, $engineTarget);
+                if (empty($syncResult['ok'])) {
+                    $backgroundFounder->company?->forceFill([
+                        'website_generation_status' => 'queued',
+                        'website_status' => 'not_started',
+                    ])->save();
+
+                    $founderNotificationService->websiteBuildFailed(
+                        $backgroundFounder,
+                        (string) ($syncResult['message'] ?? 'We could not provision your founder account in the website engine yet.')
+                    );
+
+                    Log::warning('Website build stopped because founder engine sync failed.', [
+                        'founder_id' => $founderId,
+                        'engine_target' => $engineTarget,
+                        'message' => (string) ($syncResult['message'] ?? 'Founder engine sync failed.'),
+                        'results' => $syncResult['results'] ?? [],
+                    ]);
+
+                    return;
+                }
 
                 $result = $websiteAutopilotService->generate($backgroundFounder->fresh([
                     'company.verticalBlueprint',

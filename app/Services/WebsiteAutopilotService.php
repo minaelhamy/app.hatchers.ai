@@ -19,7 +19,8 @@ class WebsiteAutopilotService
     public function __construct(
         private WebsiteProvisioningService $websiteProvisioningService,
         private AtlasIntelligenceService $atlasIntelligenceService,
-        private AtlasWorkspaceService $atlasWorkspaceService
+        private AtlasWorkspaceService $atlasWorkspaceService,
+        private FounderModuleSyncService $founderModuleSyncService
     )
     {
     }
@@ -102,6 +103,13 @@ class WebsiteAutopilotService
         }
 
         $draft = $this->buildDraft($founder, $company, $blueprint, $brief, $icp);
+        $engineSyncBootstrap = $this->founderModuleSyncService->syncFounder($founder, (string) $draft['website_engine']);
+        if (!($engineSyncBootstrap['ok'] ?? false)) {
+            return [
+                'ok' => false,
+                'error' => (string) ($engineSyncBootstrap['message'] ?? 'We could not provision the founder account in the website engine yet.'),
+            ];
+        }
 
         $result = DB::transaction(function () use ($founder, $company, $blueprint, $brief, $icp, $draft): array {
             $run = FounderWebsiteGenerationRun::create([
