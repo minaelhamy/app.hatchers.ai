@@ -4350,6 +4350,11 @@ class OsShellController extends Controller
                 }
 
                 if ($freshCompany) {
+                    $this->syncCompanyWebsitePathFromEnginePublicUrl(
+                        $freshCompany,
+                        (string) ($publishResult['public_url'] ?? ''),
+                        (string) ($freshCompany->website_engine ?? 'servio')
+                    );
                     $freshCompany->forceFill([
                         'website_status' => 'live',
                         'website_generation_status' => 'published',
@@ -4828,6 +4833,7 @@ class OsShellController extends Controller
             if (!empty($result['public_url']) && !$this->isOsHostedWebsiteUrl((string) $result['public_url'])) {
                 $company->engine_public_url = (string) $result['public_url'];
             }
+            $this->syncCompanyWebsitePathFromEnginePublicUrl($company, (string) ($result['public_url'] ?? ''), $validated['website_engine']);
             $company->save();
         }
 
@@ -4873,6 +4879,7 @@ class OsShellController extends Controller
             if (!empty($result['public_url']) && !$this->isOsHostedWebsiteUrl((string) $result['public_url'])) {
                 $company->engine_public_url = (string) $result['public_url'];
             }
+            $this->syncCompanyWebsitePathFromEnginePublicUrl($company, (string) ($result['public_url'] ?? ''), $validated['website_engine']);
             $company->save();
         }
 
@@ -9683,6 +9690,50 @@ class OsShellController extends Controller
         }
 
         return 'https://' . $host . ($path !== '' ? '/' . $path : '');
+    }
+
+    private function syncCompanyWebsitePathFromEnginePublicUrl(Company $company, string $publicUrl, string $engine): void
+    {
+        $publicUrl = trim($publicUrl);
+        if ($publicUrl === '') {
+            return;
+        }
+
+        $canonicalPath = $this->extractCanonicalWebsitePathFromEnginePublicUrl($publicUrl, $engine);
+        if ($canonicalPath === '') {
+            return;
+        }
+
+        $company->website_path = $canonicalPath;
+        $company->website_url = $this->buildCompanyWebsiteUrl($company, $engine);
+    }
+
+    private function extractCanonicalWebsitePathFromEnginePublicUrl(string $publicUrl, string $engine): string
+    {
+        $publicUrl = trim($publicUrl);
+        if ($publicUrl === '') {
+            return '';
+        }
+
+        $path = trim((string) parse_url($publicUrl, PHP_URL_PATH), '/');
+        if ($path !== '') {
+            $segments = array_values(array_filter(explode('/', strtolower($path))));
+            if (!empty($segments)) {
+                return trim((string) $segments[0], '/');
+            }
+        }
+
+        $publicHost = strtolower((string) parse_url($publicUrl, PHP_URL_HOST));
+        $engineBaseUrl = rtrim((string) config('modules.' . strtolower(trim($engine)) . '.base_url', ''), '/');
+        $engineHost = strtolower((string) parse_url($engineBaseUrl, PHP_URL_HOST));
+        if ($publicHost !== '' && $engineHost !== '' && $publicHost !== $engineHost) {
+            $suffix = '.' . $engineHost;
+            if (str_ends_with($publicHost, $suffix)) {
+                return trim((string) substr($publicHost, 0, -strlen($suffix)), '/');
+            }
+        }
+
+        return '';
     }
 
     private function isOsHostedWebsiteUrl(string $url): bool
