@@ -4781,14 +4781,21 @@ class OsShellController extends Controller
 
         $site = $publicWebsiteService->build($company);
         $this->logPublicWebsiteResolutionSuccess($websitePath, $company, $site, 'page');
+
         if (($site['uses_engine_storefront'] ?? false) && !empty($site['engine_proxy_url'])) {
-            $targetUrl = (string) $site['engine_proxy_url'];
-            if (request()->getQueryString()) {
-                $separator = str_contains($targetUrl, '?') ? '&' : '?';
-                $targetUrl .= $separator . request()->getQueryString();
+            $canonicalPath = trim((string) ($site['engine_vendor_slug'] ?? $site['path'] ?? $websitePath), '/');
+            $requestedPath = trim($websitePath, '/');
+
+            if ($canonicalPath !== '' && $canonicalPath !== $requestedPath) {
+                $canonicalUrl = rtrim((string) config('app.url'), '/') . '/' . $canonicalPath;
+                if (request()->getQueryString()) {
+                    $canonicalUrl .= '?' . request()->getQueryString();
+                }
+
+                return redirect()->away($canonicalUrl);
             }
 
-            return redirect()->away($targetUrl);
+            return $this->proxyEngineStorefront($company, '', request(), $publicWebsiteService);
         }
 
         return view('os.public-website', [
@@ -4810,23 +4817,7 @@ class OsShellController extends Controller
             abort(404);
         }
 
-        $site = $publicWebsiteService->build($company);
-        $targetUrl = rtrim((string) ($site['engine_proxy_url'] ?? ''), '/');
-        if ($targetUrl === '') {
-            abort(404);
-        }
-
-        $proxyPath = trim($proxyPath, '/');
-        if ($proxyPath !== '') {
-            $targetUrl .= '/' . $proxyPath;
-        }
-
-        if ($request->getQueryString()) {
-            $separator = str_contains($targetUrl, '?') ? '&' : '?';
-            $targetUrl .= $separator . $request->getQueryString();
-        }
-
-        return redirect()->away($targetUrl);
+        return $this->proxyEngineStorefront($company, $proxyPath, $request, $publicWebsiteService);
     }
 
     public function publicWebsiteIntroRequest(string $websitePath, Request $request): RedirectResponse
