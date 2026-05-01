@@ -50,7 +50,9 @@ class PublicWebsiteService
         $osBaseUrl = rtrim((string) config('app.url'), '/');
         $engineProxyUrl = '';
 
-        if ($engineBaseUrl !== '' && $engineVendorSlug !== '') {
+        if ($storefrontUrl !== '' && $this->shouldUseDirectStorefrontUrl($storefrontUrl, $engineBaseUrl) && !$this->isRecursiveOsStorefrontUrl($storefrontUrl, $osBaseUrl, $websitePath)) {
+            $engineProxyUrl = $storefrontUrl;
+        } elseif ($engineBaseUrl !== '' && $engineVendorSlug !== '') {
             $candidateProxyUrl = $engineBaseUrl . '/' . ltrim($engineVendorSlug, '/');
             if (!$this->isRecursiveOsStorefrontUrl($candidateProxyUrl, $osBaseUrl, $websitePath)) {
                 $engineProxyUrl = $candidateProxyUrl;
@@ -147,6 +149,27 @@ class PublicWebsiteService
         }
 
         return trim((string) $websitePath);
+    }
+
+    private function shouldUseDirectStorefrontUrl(string $storefrontUrl, string $engineBaseUrl): bool
+    {
+        $storefrontHost = strtolower((string) parse_url($storefrontUrl, PHP_URL_HOST));
+        $engineHost = strtolower((string) parse_url($engineBaseUrl, PHP_URL_HOST));
+        $storefrontPath = trim((string) parse_url($storefrontUrl, PHP_URL_PATH), '/');
+
+        if ($storefrontHost === '') {
+            return false;
+        }
+
+        if ($engineHost === '') {
+            return true;
+        }
+
+        if ($storefrontHost !== $engineHost) {
+            return true;
+        }
+
+        return $storefrontPath === '';
     }
 
     private function isRecursiveOsStorefrontUrl(string $candidateUrl, string $osBaseUrl, string $websitePath): bool

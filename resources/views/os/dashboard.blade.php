@@ -869,7 +869,6 @@
                 'class' => 'os-icon-website',
                 'icon' => 'window',
                 'external' => !empty($launchCards->get('servio')['url']),
-                'openInBrowser' => true,
             ],
             [
                 'key' => 'learning-plan',
