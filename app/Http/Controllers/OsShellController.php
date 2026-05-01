@@ -8117,7 +8117,7 @@ class OsShellController extends Controller
         }
 
         $company = Company::query()
-            ->with('founder')
+            ->with('founder.moduleSnapshots')
             ->get()
             ->first(function (Company $company) use ($normalizedPath): bool {
                 if (!$this->companyMatchesPublicWebsitePath($company, $normalizedPath)) {
@@ -8129,7 +8129,7 @@ class OsShellController extends Controller
 
         if (!$company) {
             $company = Company::query()
-                ->with('founder')
+                ->with('founder.moduleSnapshots')
                 ->get()
                 ->first(fn (Company $company): bool => $this->companyMatchesPublicWebsitePath($company, $normalizedPath));
         }
@@ -8175,6 +8175,24 @@ class OsShellController extends Controller
         $founderUsername = trim(strtolower((string) ($company->founder?->username ?? '')), '/');
         if ($founderUsername !== '' && $founderUsername === $normalizedPath) {
             return true;
+        }
+
+        $moduleSnapshots = $company->founder?->moduleSnapshots ?? collect();
+        foreach ($moduleSnapshots as $snapshot) {
+            $payload = is_array($snapshot->payload_json ?? null) ? $snapshot->payload_json : [];
+            $snapshotSlug = trim(strtolower((string) ($payload['slug'] ?? $payload['vendor_slug'] ?? '')), '/');
+            if ($snapshotSlug !== '' && $snapshotSlug === $normalizedPath) {
+                return true;
+            }
+
+            $summaryWebsiteUrl = trim((string) ($payload['summary']['website_url'] ?? ''));
+            $summaryPath = trim(strtolower((string) parse_url($summaryWebsiteUrl, PHP_URL_PATH)), '/');
+            if ($summaryPath !== '') {
+                $summarySegments = array_values(array_filter(explode('/', $summaryPath)));
+                if (strtolower($summaryPath) === $normalizedPath || in_array($normalizedPath, $summarySegments, true)) {
+                    return true;
+                }
+            }
         }
 
         return false;
