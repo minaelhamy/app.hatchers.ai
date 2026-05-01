@@ -8146,6 +8146,11 @@ class OsShellController extends Controller
                 ->where('role', 'founder')
                 ->get()
                 ->first(function (Founder $founder) use ($normalizedPath): bool {
+                    $fullNameSlug = trim(strtolower((string) str($founder->full_name ?: '')->slug('-')->value()), '/');
+                    if ($fullNameSlug !== '' && $fullNameSlug === $normalizedPath) {
+                        return true;
+                    }
+
                     $username = trim(strtolower((string) ($founder->username ?? '')), '/');
                     if ($username !== '' && $username === $normalizedPath) {
                         return true;
