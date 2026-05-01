@@ -507,13 +507,15 @@
                             @if (!empty($autopilotDraft['funnel_blocks'] ?? []))
                                 <div class="stack-item">
                                     <strong>Direct-response sections</strong><br>
-                                    @php($funnelBlocks = is_array($autopilotDraft['funnel_blocks'] ?? null) ? $autopilotDraft['funnel_blocks'] : [])
-                                    @foreach ($funnelBlocks as $blockKey => $block)
+                                    @php
+                                        $funnelBlocks = is_array($autopilotDraft['funnel_blocks'] ?? null) ? $autopilotDraft['funnel_blocks'] : [];
+                                    @endphp
+                                    <?php foreach ($funnelBlocks as $blockKey => $block): ?>
                                         <div class="muted" style="margin-top:8px;">
-                                            {{ ucwords(str_replace('_', ' ', $blockKey)) }} ·
+                                            {{ ucwords(str_replace('_', ' ', (string) $blockKey)) }} ·
                                             {{ is_array($block) ? (($block['title'] ?? $block['body'] ?? ($block[0]['question'] ?? 'Configured'))) : 'Configured' }}
                                         </div>
-                                    @endforeach
+                                    <?php endforeach; ?>
                                 </div>
                             @endif
                             <div class="stack-item">
