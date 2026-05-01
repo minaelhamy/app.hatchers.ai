@@ -8004,9 +8004,14 @@ class OsShellController extends Controller
         }
 
         $targetUrl = rtrim($engineProxyUrl, '/');
+        $engineOrigin = $this->engineStorefrontOrigin($engineProxyUrl);
         $proxyPath = trim($proxyPath, '/');
         if ($proxyPath !== '') {
-            $targetUrl .= '/' . $proxyPath;
+            if ($this->isEngineRootAssetPath($proxyPath) && $engineOrigin !== '') {
+                $targetUrl = rtrim($engineOrigin, '/') . '/' . $proxyPath;
+            } else {
+                $targetUrl .= '/' . $proxyPath;
+            }
         }
 
         $options = [
@@ -8057,7 +8062,7 @@ class OsShellController extends Controller
         $body = $upstream->body();
         if (str_contains($contentType, 'text/html')) {
             $body = $this->rewriteStorefrontHtmlForOs($body, $engineProxyUrl, $websiteRoot);
-        } elseif (str_contains($contentType, 'javascript') || str_contains($contentType, 'json')) {
+        } elseif (str_contains($contentType, 'javascript') || str_contains($contentType, 'json') || str_contains($contentType, 'css')) {
             $body = $this->rewriteStorefrontTextForOs($body, $engineProxyUrl, $websiteRoot);
         }
 
@@ -8097,12 +8102,14 @@ class OsShellController extends Controller
     {
         $osBaseUrl = rtrim((string) config('app.url'), '/') . '/' . trim($websiteRoot, '/');
         $normalizedEngineUrl = rtrim($engineProxyUrl, '/');
+        $engineOrigin = $this->engineStorefrontOrigin($engineProxyUrl);
         $escapedEngineUrl = str_replace('/', '\\/', $normalizedEngineUrl);
+        $escapedEngineOrigin = str_replace('/', '\\/', $engineOrigin);
         $escapedOsBaseUrl = str_replace('/', '\\/', $osBaseUrl);
 
         $rewritten = str_replace(
-            [$normalizedEngineUrl, $escapedEngineUrl],
-            [$osBaseUrl, $escapedOsBaseUrl],
+            array_filter([$normalizedEngineUrl, $escapedEngineUrl, $engineOrigin, $escapedEngineOrigin], static fn ($value) => $value !== ''),
+            array_filter([$osBaseUrl, $escapedOsBaseUrl, $osBaseUrl, $escapedOsBaseUrl], static fn ($value) => $value !== ''),
             $content
         );
 
@@ -8121,6 +8128,32 @@ class OsShellController extends Controller
         }
 
         return $rewritten;
+    }
+
+    private function engineStorefrontOrigin(string $engineProxyUrl): string
+    {
+        $scheme = parse_url($engineProxyUrl, PHP_URL_SCHEME);
+        $host = parse_url($engineProxyUrl, PHP_URL_HOST);
+        $port = parse_url($engineProxyUrl, PHP_URL_PORT);
+
+        if (!$scheme || !$host) {
+            return '';
+        }
+
+        return $scheme . '://' . $host . ($port ? ':' . $port : '');
+    }
+
+    private function isEngineRootAssetPath(string $proxyPath): bool
+    {
+        $normalized = ltrim(str_replace('\\', '/', $proxyPath), '/');
+
+        foreach (['storage/', 'front/', 'admin-assets/', 'landing/', 'widget_asstes/'] as $prefix) {
+            if (str_starts_with($normalized, $prefix)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function rewriteStorefrontUrlToOsPath(string $url, string $engineProxyUrl, string $websiteRoot): string
