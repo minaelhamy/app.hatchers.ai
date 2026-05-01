@@ -59,6 +59,9 @@ class WebsiteAutopilotService
             'generated_at' => optional($run->generated_at ?? $run->updated_at)->toDateTimeString(),
             'title' => (string) ($output['website_title'] ?? ''),
             'theme_template' => (string) ($output['theme_template'] ?? ''),
+            'theme_label' => (string) ($output['theme_label'] ?? ''),
+            'theme_match_reasons' => array_values(array_filter(array_map('strval', (array) ($output['theme_match_reasons'] ?? [])))),
+            'theme_candidates' => array_values(array_filter((array) ($output['theme_candidates'] ?? []), fn ($item) => is_array($item))),
             'website_path' => (string) ($output['website_path'] ?? ''),
             'hero' => is_array($output['hero'] ?? null) ? $output['hero'] : [],
             'sections' => is_array($output['sections'] ?? null) ? $output['sections'] : [],
@@ -69,6 +72,7 @@ class WebsiteAutopilotService
             'launch_checklist' => array_values(array_filter(array_map('strval', (array) ($output['launch_checklist'] ?? [])))),
             'atlas_handoff' => is_array($output['atlas_handoff'] ?? null) ? $output['atlas_handoff'] : [],
             'engine_sync' => is_array($output['engine_sync'] ?? null) ? $output['engine_sync'] : [],
+            'quality_audit' => is_array($output['quality_audit'] ?? null) ? $output['quality_audit'] : [],
         ];
     }
 
@@ -253,18 +257,26 @@ class WebsiteAutopilotService
         $outcomes = $this->stringList($icp?->desired_outcomes_json ?? []);
         $objections = $this->stringList($icp?->objections_json ?? []);
         $channels = $this->stringList($blueprint->default_channels_json ?? []);
-        $catalogItems = $this->catalogItemsFromWebsiteBuild((string) ($websiteBuild['offer_items'] ?? ''), $websiteMode);
-        $pages = $this->pagePlan($blueprint, (string) ($websiteBuild['must_include_pages'] ?? ''));
+        $catalogItems = $this->catalogItemsFromWebsiteBuild($websiteBuild, $websiteMode);
+        $pages = $this->pagePlan($blueprint, $websiteBuild);
         $tasks = $this->stringList($blueprint->default_tasks_json ?? []);
-        $imageQueries = $this->imageQueries($blueprint, $company, $icpName, (string) ($websiteBuild['image_preferences'] ?? ''));
+        $imageQueries = $this->imageQueries($blueprint, $company, $icpName, $websiteBuild);
         $pricing = $this->draftPricing($blueprint, $websiteMode, $companyName, $catalogItems);
         $primaryCta = trim((string) (($websiteBuild['primary_cta'] ?? '') !== '' ? $websiteBuild['primary_cta'] : ($blueprint->default_cta_json['primary'] ?? ($websiteMode === 'service' ? 'Book now' : 'Shop now'))));
         $secondaryCta = trim((string) ($blueprint->default_cta_json['secondary'] ?? 'See how it works'));
         $websitePath = trim((string) ($company->website_path ?: Str::slug($companyName)));
-        $theme = $this->pickTheme($engine, (string) ($websiteBuild['image_preferences'] ?? ''), (string) ($company->intelligence?->visual_style ?? ''));
+        $themeRankings = $this->rankThemes(
+            $this->websiteProvisioningService->availableThemes($engine),
+            $this->imageDirectionText($websiteBuild) . ' ' . trim((string) ($websiteBuild['special_requests'] ?? '')),
+            (string) ($company->intelligence?->visual_style ?? ''),
+            (string) $blueprint->code,
+            $websiteMode,
+            $engine
+        );
+        $theme = $themeRankings[0] ?? ['id' => '1', 'label' => 'Theme 1'];
         $websiteGoal = trim((string) ($websiteBuild['website_goal'] ?? ''));
-        $faqPoints = $this->textareaList((string) ($websiteBuild['faq_points'] ?? ''));
-        $proofPoints = $this->textareaList((string) ($websiteBuild['proof_points'] ?? ''));
+        $faqPoints = $this->websiteBuildFaqQuestions($websiteBuild);
+        $proofPoints = $this->websiteBuildTrustPoints($websiteBuild);
 
         $headline = $this->heroHeadline($blueprint, $companyName, $problemSolved, $city);
         $subhead = $this->heroSubhead($companyName, $coreOffer, $icpName, $city);
@@ -292,6 +304,15 @@ class WebsiteAutopilotService
             'website_path' => $websitePath !== '' ? $websitePath : 'your-business',
             'theme_template' => $theme['id'],
             'theme_label' => $theme['label'],
+            'theme_match_reasons' => array_values((array) ($theme['match_reasons'] ?? [])),
+            'theme_candidates' => array_values(array_map(function (array $candidate): array {
+                return [
+                    'id' => (string) ($candidate['id'] ?? ''),
+                    'label' => (string) ($candidate['label'] ?? ''),
+                    'score' => (int) ($candidate['score'] ?? 0),
+                    'match_reasons' => array_values((array) ($candidate['match_reasons'] ?? [])),
+                ];
+            }, array_slice($themeRankings, 0, 3))),
             'hero' => [
                 'eyebrow' => strtoupper($city !== '' ? $city . ' · ' . $blueprint->name : $blueprint->name),
                 'headline' => $headline,
@@ -403,6 +424,21 @@ class WebsiteAutopilotService
             ])),
             'image_queries' => $imageQueries,
             'page_plan' => $pages,
+            'quality_audit' => [
+                'theme_strength' => count((array) ($theme['match_reasons'] ?? [])) >= 2 ? 'strong' : 'moderate',
+                'theme_match_reasons' => array_values((array) ($theme['match_reasons'] ?? [])),
+                'offers_count' => count($catalogItems),
+                'faq_count' => count($faqPoints),
+                'proof_count' => count($proofPoints),
+                'page_count' => count($pages),
+                'media_slot_count' => 6,
+                'cta_ready' => $primaryCta !== '',
+                'menus' => [
+                    'online_booking' => $this->enableOnlineBooking(['website_mode' => $websiteMode]),
+                    'service_menu' => $this->enableServiceMenu(['website_mode' => $websiteMode, 'website_engine' => $engine]),
+                    'shop_menu' => $this->enableShopMenu(['website_mode' => $websiteMode]),
+                ],
+            ],
         ];
     }
 
@@ -411,6 +447,12 @@ class WebsiteAutopilotService
         $founder->loadMissing('businessBrief', 'company');
         $brief = $founder->businessBrief;
         $websiteBuild = $brief ? $this->websiteBuildConfig($brief) : [];
+        $mediaState = $this->resolvedWebsiteMediaState($founder, $draft);
+        $draft['atlas_handoff'] = array_merge(
+            is_array($draft['atlas_handoff'] ?? null) ? $draft['atlas_handoff'] : [],
+            ['asset_slots' => array_values(array_filter((array) ($mediaState['asset_slots'] ?? []), fn ($item) => is_array($item)))]
+        );
+        $draft['media_assets'] = array_values(array_filter((array) ($mediaState['media_assets'] ?? []), fn ($item) => is_array($item)));
         $draftAssetSlots = array_values(array_filter((array) ($draft['atlas_handoff']['asset_slots'] ?? []), fn ($item) => is_array($item)));
 
         $result = $this->websiteProvisioningService->applyWebsiteSetup($founder, [
@@ -425,7 +467,12 @@ class WebsiteAutopilotService
             'contact_email' => (string) ($websiteBuild['contact_email'] ?? $founder->email ?? ''),
             'contact_phone' => (string) ($websiteBuild['contact_phone'] ?? $websiteBuild['contact_phone_number'] ?? $websiteBuild['contact_mobile'] ?? $founder->phone ?? ''),
             'business_address' => (string) ($websiteBuild['business_address'] ?? ''),
+            'business_hours' => (string) ($websiteBuild['business_hours'] ?? ''),
             'whatsapp_number' => (string) ($websiteBuild['whatsapp_number'] ?? ''),
+            'google_review_url' => (string) ($websiteBuild['google_review_url'] ?? ''),
+            'enable_online_booking' => $this->enableOnlineBooking($draft),
+            'enable_service_menu' => $this->enableServiceMenu($draft),
+            'enable_shop_menu' => $this->enableShopMenu($draft),
             'about_content' => $this->aboutContent($draft),
             'faq_items' => $this->faqItems($draft),
             'social_links' => $this->socialLinks((string) ($websiteBuild['social_links'] ?? '')),
@@ -435,8 +482,7 @@ class WebsiteAutopilotService
             'story_title' => $this->storyTitle($draft),
             'story_subtitle' => $this->storySubtitle($draft),
             'story_description' => $this->storyDescription($draft),
-            // Engines now generate storefront media locally from the shared business payload.
-            'media_assets' => [],
+            'media_assets' => array_values(array_filter((array) ($draft['media_assets'] ?? []), fn ($item) => is_array($item))),
             'media_queries' => $draftAssetSlots,
             'hero_headline' => (string) ($draft['hero']['headline'] ?? ''),
             'hero_subhead' => (string) ($draft['hero']['subhead'] ?? ''),
@@ -741,18 +787,14 @@ class WebsiteAutopilotService
         ];
     }
 
-    private function pickTheme(string $engine, string $imagePreferences = '', string $visualStyle = ''): array
+    private function pickTheme(string $engine, string $imagePreferences = '', string $visualStyle = '', string $blueprintCode = '', string $websiteMode = 'service'): array
     {
         $themes = $this->websiteProvisioningService->availableThemes($engine);
         if ($themes === []) {
             return ['id' => '1', 'label' => 'Theme 1'];
         }
 
-        $styleSignal = strtolower(trim($imagePreferences . ' ' . $visualStyle));
-        $preferredIndex = str_contains($styleSignal, 'luxury') || str_contains($styleSignal, 'premium')
-            ? 2
-            : (str_contains($styleSignal, 'friendly') || str_contains($styleSignal, 'playful') || str_contains($styleSignal, 'warm') ? 1 : 0);
-        $theme = $themes[$preferredIndex] ?? $themes[0] ?? null;
+        $theme = $this->rankThemes($themes, $imagePreferences, $visualStyle, $blueprintCode, $websiteMode, $engine)[0] ?? null;
 
         if (is_array($theme) && !empty($theme['id'])) {
             return $theme;
@@ -761,21 +803,122 @@ class WebsiteAutopilotService
         return ['id' => '1', 'label' => 'Theme 1'];
     }
 
-    private function imageQueries(VerticalBlueprint $blueprint, Company $company, string $icpName, string $imagePreferences = ''): array
+    private function rankThemes(
+        array $themes,
+        string $imagePreferences = '',
+        string $visualStyle = '',
+        string $blueprintCode = '',
+        string $websiteMode = 'service',
+        string $engine = 'servio'
+    ): array {
+        $themeProfiles = $this->themeProfiles($engine);
+        $signals = strtolower(trim($imagePreferences . ' ' . $visualStyle . ' ' . $blueprintCode . ' ' . $websiteMode));
+
+        return collect($themes)
+            ->map(function (array $theme) use ($themeProfiles, $signals, $blueprintCode, $websiteMode): array {
+                $id = (string) ($theme['id'] ?? '');
+                $profile = $themeProfiles[$id] ?? ['tags' => [], 'modes' => [], 'verticals' => [], 'weight' => 0];
+                $score = (int) ($profile['weight'] ?? 0);
+                $reasons = [];
+
+                foreach ((array) ($profile['tags'] ?? []) as $tag) {
+                    if ($tag !== '' && str_contains($signals, strtolower((string) $tag))) {
+                        $score += 4;
+                        $reasons[] = 'tag:' . $tag;
+                    }
+                }
+
+                if (in_array($websiteMode, (array) ($profile['modes'] ?? []), true)) {
+                    $score += 5;
+                    $reasons[] = 'mode:' . $websiteMode;
+                }
+
+                if ($blueprintCode !== '' && in_array($blueprintCode, (array) ($profile['verticals'] ?? []), true)) {
+                    $score += 6;
+                    $reasons[] = 'vertical:' . $blueprintCode;
+                }
+
+                return array_merge($theme, [
+                    'score' => $score,
+                    'match_reasons' => $reasons,
+                ]);
+            })
+            ->sortByDesc('score')
+            ->values()
+            ->all();
+    }
+
+    private function themeProfiles(string $engine): array
+    {
+        if ($engine === 'servio') {
+            return [
+                '1' => ['tags' => ['classic', 'local', 'simple'], 'modes' => ['service'], 'verticals' => ['home-cleaning'], 'weight' => 1],
+                '3' => ['tags' => ['clean', 'friendly', 'local'], 'modes' => ['service'], 'verticals' => ['dog-walking', 'barber-services'], 'weight' => 3],
+                '5' => ['tags' => ['playful', 'bold', 'colorful'], 'modes' => ['service'], 'verticals' => ['dog-walking'], 'weight' => 2],
+                '6' => ['tags' => ['warm', 'human', 'trustworthy'], 'modes' => ['service'], 'verticals' => ['barber-services', 'tutoring-coaching'], 'weight' => 5],
+                '7' => ['tags' => ['dark', 'editorial', 'moody'], 'modes' => ['service'], 'verticals' => ['tutoring-coaching'], 'weight' => 5],
+                '8' => ['tags' => ['friendly', 'clean', 'modern'], 'modes' => ['service'], 'verticals' => ['dog-walking', 'home-cleaning', 'barber-services'], 'weight' => 6],
+                '9' => ['tags' => ['dark', 'luxury', 'cinematic'], 'modes' => ['service'], 'verticals' => ['tutoring-coaching'], 'weight' => 6],
+                '10' => ['tags' => ['premium', 'structured', 'modern'], 'modes' => ['service'], 'verticals' => ['barber-services', 'tutoring-coaching'], 'weight' => 4],
+                '11' => ['tags' => ['warm', 'approachable', 'community'], 'modes' => ['service'], 'verticals' => ['dog-walking', 'home-cleaning'], 'weight' => 5],
+                '12' => ['tags' => ['luxury', 'high-end', 'gallery'], 'modes' => ['service'], 'verticals' => ['barber-services'], 'weight' => 4],
+                '14' => ['tags' => ['sleek', 'minimal', 'high-end'], 'modes' => ['service'], 'verticals' => ['barber-services'], 'weight' => 3],
+                '15' => ['tags' => ['full', 'content-rich', 'trust'], 'modes' => ['service'], 'verticals' => ['tutoring-coaching', 'home-cleaning'], 'weight' => 6],
+                '16' => ['tags' => ['luxury', 'dark', 'premium'], 'modes' => ['service'], 'verticals' => ['barber-services', 'tutoring-coaching'], 'weight' => 6],
+                '17' => ['tags' => ['dark', 'moody', 'music', 'artist', 'goth'], 'modes' => ['service'], 'verticals' => ['tutoring-coaching'], 'weight' => 8],
+            ];
+        }
+
+        return [
+            '4' => ['tags' => ['clean', 'catalog', 'simple'], 'modes' => ['product'], 'verticals' => ['handmade-products'], 'weight' => 2],
+            '8' => ['tags' => ['bold', 'visual', 'playful'], 'modes' => ['product'], 'verticals' => ['handmade-products'], 'weight' => 4],
+            '10' => ['tags' => ['premium', 'catalog', 'modern'], 'modes' => ['product'], 'verticals' => ['handmade-products'], 'weight' => 6],
+            '11' => ['tags' => ['grid', 'dense', 'catalog'], 'modes' => ['product'], 'verticals' => ['handmade-products'], 'weight' => 5],
+            '12' => ['tags' => ['gallery', 'visual', 'editorial'], 'modes' => ['product'], 'verticals' => ['handmade-products'], 'weight' => 4],
+            '13' => ['tags' => ['story', 'brand', 'trust'], 'modes' => ['product'], 'verticals' => ['handmade-products'], 'weight' => 5],
+            '14' => ['tags' => ['sleek', 'premium', 'conversion'], 'modes' => ['product'], 'verticals' => ['handmade-products'], 'weight' => 7],
+            '15' => ['tags' => ['content-rich', 'trust', 'brand'], 'modes' => ['product'], 'verticals' => ['handmade-products'], 'weight' => 4],
+        ];
+    }
+
+    private function imageQueries(VerticalBlueprint $blueprint, Company $company, string $icpName, array $websiteBuild = []): array
     {
         $queries = collect((array) ($blueprint->default_image_queries_json ?? []))
             ->map(fn ($item) => trim((string) $item))
             ->filter();
+        $direction = is_array($websiteBuild['image_direction'] ?? null) ? $websiteBuild['image_direction'] : [];
+        $style = trim((string) ($direction['style'] ?? ''));
+        $mood = trim((string) ($direction['mood'] ?? ''));
+        $subjects = $this->stringList((array) ($direction['subjects'] ?? []));
+        $avoid = collect($this->stringList((array) ($direction['avoid'] ?? [])))
+            ->map(fn (string $item) => strtolower($item))
+            ->all();
 
         if ($company->primary_city) {
             $queries->push(trim((string) $company->primary_city . ' local business'));
         }
 
-        if ($icpName !== '') {
+        if ($icpName !== '' && !$this->containsAvoidSignal($avoid, ['random lifestyle photos', 'generic laptops', 'fake office meetings'])) {
             $queries->push($icpName . ' lifestyle');
         }
 
-        foreach ($this->textareaList($imagePreferences) as $preference) {
+        foreach ($subjects as $subject) {
+            $query = trim(implode(' ', array_filter([
+                $company->primary_city ?: null,
+                $company->company_name ?: null,
+                $subject,
+                $style !== '' ? $style : null,
+                $mood !== '' ? $mood : null,
+            ])));
+            if ($query !== '') {
+                $queries->push($query);
+            }
+        }
+
+        foreach ($this->textareaList($this->imageDirectionText($websiteBuild)) as $preference) {
+            if (str_starts_with(strtolower($preference), 'avoid:')) {
+                continue;
+            }
             $queries->push($preference);
         }
 
@@ -1032,8 +1175,26 @@ class WebsiteAutopilotService
         return $businessModel === 'hybrid' ? 'service' : $businessModel;
     }
 
-    private function catalogItemsFromWebsiteBuild(string $raw, string $websiteMode): array
+    private function catalogItemsFromWebsiteBuild(array $websiteBuild, string $websiteMode): array
     {
+        $cards = collect((array) ($websiteBuild['offer_cards'] ?? []))
+            ->filter(fn ($item): bool => is_array($item))
+            ->map(function (array $item): array {
+                return [
+                    'title' => trim((string) ($item['title'] ?? '')),
+                    'price' => trim((string) ($item['price'] ?? '')),
+                    'description' => trim((string) ($item['description'] ?? '')),
+                ];
+            })
+            ->filter(fn (array $item) => $item['title'] !== '')
+            ->values()
+            ->all();
+
+        if ($cards !== []) {
+            return $cards;
+        }
+
+        $raw = (string) ($websiteBuild['offer_items'] ?? '');
         $items = collect(preg_split("/\r\n|\n|\r/", trim($raw)) ?: [])
             ->map(function (string $line) {
                 $parts = array_map('trim', explode('|', $line));
@@ -1058,10 +1219,13 @@ class WebsiteAutopilotService
         ]];
     }
 
-    private function pagePlan(VerticalBlueprint $blueprint, string $mustIncludePages): array
+    private function pagePlan(VerticalBlueprint $blueprint, array $websiteBuild): array
     {
         $defaultPages = $this->stringList($blueprint->default_pages_json ?? []);
-        $requestedPages = $this->textareaList($mustIncludePages);
+        $requestedPages = $this->stringList((array) ($websiteBuild['page_sections'] ?? []));
+        if ($requestedPages === []) {
+            $requestedPages = $this->textareaList((string) ($websiteBuild['must_include_pages'] ?? ''));
+        }
 
         return collect(array_merge($defaultPages, $requestedPages, ['about us', 'faq', 'contact']))
             ->map(fn (string $item) => trim($item))
@@ -1079,6 +1243,66 @@ class WebsiteAutopilotService
             ->filter()
             ->values()
             ->all();
+    }
+
+    private function websiteBuildFaqQuestions(array $websiteBuild): array
+    {
+        $items = $this->stringList((array) ($websiteBuild['faq_questions_list'] ?? []));
+        if ($items !== []) {
+            return $items;
+        }
+
+        return $this->textareaList((string) ($websiteBuild['faq_points'] ?? ''));
+    }
+
+    private function websiteBuildTrustPoints(array $websiteBuild): array
+    {
+        $items = $this->stringList((array) ($websiteBuild['trust_points_list'] ?? []));
+        if ($items !== []) {
+            return $items;
+        }
+
+        return $this->textareaList((string) ($websiteBuild['proof_points'] ?? ''));
+    }
+
+    private function imageDirectionText(array $websiteBuild): string
+    {
+        $direction = is_array($websiteBuild['image_direction'] ?? null) ? $websiteBuild['image_direction'] : [];
+        if ($direction === []) {
+            return trim((string) ($websiteBuild['image_preferences'] ?? ''));
+        }
+
+        $lines = [];
+        $style = trim((string) ($direction['style'] ?? ''));
+        $mood = trim((string) ($direction['mood'] ?? ''));
+        $subjects = $this->stringList((array) ($direction['subjects'] ?? []));
+        $avoid = $this->stringList((array) ($direction['avoid'] ?? []));
+
+        if ($style !== '') {
+            $lines[] = 'Style: ' . $style;
+        }
+        if ($mood !== '') {
+            $lines[] = 'Mood: ' . $mood;
+        }
+        if ($subjects !== []) {
+            $lines[] = 'Show: ' . implode(', ', $subjects);
+        }
+        if ($avoid !== []) {
+            $lines[] = 'Avoid: ' . implode(', ', $avoid);
+        }
+
+        return implode("\n", $lines);
+    }
+
+    private function containsAvoidSignal(array $avoid, array $signals): bool
+    {
+        foreach ($signals as $signal) {
+            if (in_array(strtolower($signal), $avoid, true)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function contactBlock(array $websiteBuild, string $city, string $deliveryScope): array
@@ -1300,6 +1524,25 @@ class WebsiteAutopilotService
         $sections = array_values(array_filter((array) ($draft['sections'] ?? []), fn ($item) => is_array($item)));
 
         return trim((string) (($sections[0]['body'] ?? '') ?: ($sections[1]['body'] ?? '')));
+    }
+
+    private function enableOnlineBooking(array $draft): bool
+    {
+        $mode = trim((string) ($draft['website_mode'] ?? 'service'));
+        return in_array($mode, ['service', 'product'], true);
+    }
+
+    private function enableServiceMenu(array $draft): bool
+    {
+        $mode = trim((string) ($draft['website_mode'] ?? 'service'));
+        $engine = trim((string) ($draft['website_engine'] ?? 'servio'));
+
+        return $engine === 'servio' || $mode === 'service';
+    }
+
+    private function enableShopMenu(array $draft): bool
+    {
+        return trim((string) ($draft['website_mode'] ?? 'service')) === 'product';
     }
 
     private function starterRecordMedia(array $draft, int $offset): array

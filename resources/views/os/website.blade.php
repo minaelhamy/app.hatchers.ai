@@ -112,6 +112,59 @@
         $supportsServices = in_array($businessModel, ['service', 'hybrid'], true);
         $defaultWebsiteTitle = old('website_title', $autopilotDraft['title'] ?? $recommendedCard['website_title']);
         $defaultThemeTemplate = old('theme_template', $autopilotDraft['theme_template'] ?? $recommendedCard['theme']);
+        $buildOfferCards = collect(old('offer_titles', []))->isNotEmpty()
+            ? collect(old('offer_titles', []))->map(function ($title, $index) {
+                return [
+                    'title' => (string) $title,
+                    'price' => (string) (old('offer_prices', [])[$index] ?? ''),
+                    'description' => (string) (old('offer_descriptions', [])[$index] ?? ''),
+                ];
+            })->all()
+            : (is_array($buildIntake['offer_cards'] ?? null) ? $buildIntake['offer_cards'] : []);
+        $buildOfferCards = array_pad(array_slice($buildOfferCards, 0, 4), 4, ['title' => '', 'price' => '', 'description' => '']);
+        $trustPointInputs = old('trust_points', is_array($buildIntake['trust_points_list'] ?? null) ? $buildIntake['trust_points_list'] : []);
+        $trustPointInputs = array_pad(array_slice($trustPointInputs, 0, 6), 6, '');
+        $faqQuestionInputs = old('faq_questions', is_array($buildIntake['faq_questions_list'] ?? null) ? $buildIntake['faq_questions_list'] : []);
+        $faqQuestionInputs = array_pad(array_slice($faqQuestionInputs, 0, 6), 6, '');
+        $pageSectionInputs = old('page_sections', is_array($buildIntake['page_sections'] ?? null) ? $buildIntake['page_sections'] : []);
+        $socialProfiles = is_array($buildIntake['social_profiles'] ?? null) ? $buildIntake['social_profiles'] : [];
+        $socialDefaults = [];
+        foreach ($socialProfiles as $profile) {
+            $network = strtolower((string) ($profile['network'] ?? ''));
+            $url = (string) ($profile['url'] ?? '');
+            $field = match ($network) {
+                'instagram' => 'instagram_url',
+                'facebook' => 'facebook_url',
+                'tiktok' => 'tiktok_url',
+                'linkedin' => 'linkedin_url',
+                'youtube' => 'youtube_url',
+                'website' => 'website_url',
+                default => null,
+            };
+            if ($field) {
+                $socialDefaults[$field] = $url;
+            }
+        }
+        $imageDirection = is_array($buildIntake['image_direction'] ?? null) ? $buildIntake['image_direction'] : [];
+        $imageSubjects = old('image_subjects', is_array($imageDirection['subjects'] ?? null) ? $imageDirection['subjects'] : []);
+        $avoidVisuals = old('avoid_visuals', is_array($imageDirection['avoid'] ?? null) ? $imageDirection['avoid'] : []);
+        $pageSectionOptions = [
+            'hero' => 'Hero',
+            'about' => 'About / Story',
+            'offers' => 'Offers',
+            'services' => 'Services',
+            'products' => 'Products',
+            'pricing' => 'Pricing',
+            'results' => 'Results',
+            'testimonials' => 'Testimonials',
+            'faq' => 'FAQ',
+            'contact' => 'Contact',
+            'gallery' => 'Gallery',
+        ];
+        $imageStyleOptions = ['Clean and minimal', 'Bold and modern', 'Dark and moody', 'Warm and human', 'Luxury and premium', 'Playful and colorful'];
+        $imageMoodOptions = ['Trustworthy', 'Energetic', 'Calm', 'Confident', 'Authentic', 'High-end'];
+        $imageSubjectOptions = ['Founder portraits', 'Team at work', 'Behind the scenes', 'Customers using the offer', 'Products close-up', 'Location or local scenes', 'Process or transformation', 'Live performance or action shots'];
+        $avoidVisualOptions = ['Generic laptops', 'Corporate handshakes', 'Charts and dashboards', 'Fake office meetings', 'Over-polished stock poses', 'Countdown / hype visuals', 'Random lifestyle photos'];
         $websiteStage = request()->query('stage', 'build');
         if (!in_array($websiteStage, ['build', 'overview', 'setup', 'publish'], true)) {
             $websiteStage = 'build';
@@ -223,7 +276,7 @@
                         @endif
                         <div class="stack-item">
                             <strong>What should this website do first?</strong><br>
-                            <textarea name="website_goal" rows="3" style="margin-top:10px;width:100%;padding:12px;border-radius:14px;border:1px solid var(--line);background:#fff;">{{ old('website_goal', $buildIntake['website_goal'] ?? '') }}</textarea>
+                            <input type="text" name="website_goal" value="{{ old('website_goal', $buildIntake['website_goal'] ?? '') }}" placeholder="Get customers, book more calls, sell products, collect leads..." style="margin-top:10px;width:100%;padding:12px;border-radius:14px;border:1px solid var(--line);background:#fff;">
                         </div>
                         @if ($businessModel === 'hybrid')
                             <div class="stack-item">
@@ -241,17 +294,35 @@
                         </div>
                         <div class="stack-item">
                             <strong>{{ $supportsProducts && !$supportsServices ? 'Products to feature first' : 'Services or products to feature first' }}</strong><br>
-                            <span class="muted">One item per line using: Name | Price | Short description</span>
-                            <textarea name="offer_items" rows="6" style="margin-top:10px;width:100%;padding:12px;border-radius:14px;border:1px solid var(--line);background:#fff;">{{ old('offer_items', $buildIntake['offer_items'] ?? '') }}</textarea>
+                            <span class="muted">Add the first offers one by one. Hatchers will normalize them before building the site.</span>
+                            @foreach ($buildOfferCards as $index => $offerCard)
+                                <div class="card" style="margin-top:10px;padding:14px;">
+                                    <strong>{{ $supportsProducts && !$supportsServices ? 'Featured product' : 'Featured offer' }} {{ $index + 1 }}</strong>
+                                    <div class="grid-2" style="margin-top:10px;">
+                                        <input type="text" name="offer_titles[]" value="{{ $offerCard['title'] ?? '' }}" placeholder="Name" style="width:100%;padding:12px;border-radius:14px;border:1px solid var(--line);background:#fff;">
+                                        <input type="text" name="offer_prices[]" value="{{ $offerCard['price'] ?? '' }}" placeholder="Price or pricing format" style="width:100%;padding:12px;border-radius:14px;border:1px solid var(--line);background:#fff;">
+                                    </div>
+                                    <textarea name="offer_descriptions[]" rows="2" placeholder="Short description or outcome" style="margin-top:10px;width:100%;padding:12px;border-radius:14px;border:1px solid var(--line);background:#fff;">{{ $offerCard['description'] ?? '' }}</textarea>
+                                </div>
+                            @endforeach
                         </div>
                         <div class="stack-item">
                             <strong>Trust points to show</strong><br>
-                            <span class="muted">Reviews, years of experience, guarantees, certifications, before/after results, local reputation.</span>
-                            <textarea name="proof_points" rows="3" style="margin-top:10px;width:100%;padding:12px;border-radius:14px;border:1px solid var(--line);background:#fff;">{{ old('proof_points', $buildIntake['proof_points'] ?? '') }}</textarea>
+                            <span class="muted">Short proof signals only. Hatchers will turn them into cleaner website sections later.</span>
+                            <div class="stack" style="margin-top:10px;">
+                                @foreach ($trustPointInputs as $trustPoint)
+                                    <input type="text" name="trust_points[]" value="{{ $trustPoint }}" placeholder="Example: 10M+ plays across platforms" style="width:100%;padding:12px;border-radius:14px;border:1px solid var(--line);background:#fff;">
+                                @endforeach
+                            </div>
                         </div>
                         <div class="stack-item">
                             <strong>FAQ questions to answer</strong><br>
-                            <textarea name="faq_points" rows="4" style="margin-top:10px;width:100%;padding:12px;border-radius:14px;border:1px solid var(--line);background:#fff;">{{ old('faq_points', $buildIntake['faq_points'] ?? '') }}</textarea>
+                            <span class="muted">Questions only. Hatchers AI will draft cleaner answers in the right website format.</span>
+                            <div class="stack" style="margin-top:10px;">
+                                @foreach ($faqQuestionInputs as $faqQuestion)
+                                    <input type="text" name="faq_questions[]" value="{{ $faqQuestion }}" placeholder="Example: What happens on the discovery call?" style="width:100%;padding:12px;border-radius:14px;border:1px solid var(--line);background:#fff;">
+                                @endforeach
+                            </div>
                         </div>
                         <div class="stack-item">
                             <strong>Contact details and logistics</strong><br>
@@ -264,13 +335,73 @@
                                 <input type="text" name="business_hours" value="{{ old('business_hours', $buildIntake['business_hours'] ?? '') }}" placeholder="Business hours" style="width:100%;padding:12px;border-radius:14px;border:1px solid var(--line);background:#fff;">
                             </div>
                             <input type="text" name="business_address" value="{{ old('business_address', $buildIntake['business_address'] ?? '') }}" placeholder="Business address" style="margin-top:10px;width:100%;padding:12px;border-radius:14px;border:1px solid var(--line);background:#fff;">
-                            <textarea name="social_links" rows="2" placeholder="Instagram, Facebook, TikTok, LinkedIn, etc." style="margin-top:10px;width:100%;padding:12px;border-radius:14px;border:1px solid var(--line);background:#fff;">{{ old('social_links', $buildIntake['social_links'] ?? '') }}</textarea>
+                            <div class="grid-2" style="margin-top:10px;">
+                                <input type="url" name="instagram_url" value="{{ old('instagram_url', $socialDefaults['instagram_url'] ?? '') }}" placeholder="Instagram URL" style="width:100%;padding:12px;border-radius:14px;border:1px solid var(--line);background:#fff;">
+                                <input type="url" name="facebook_url" value="{{ old('facebook_url', $socialDefaults['facebook_url'] ?? '') }}" placeholder="Facebook URL" style="width:100%;padding:12px;border-radius:14px;border:1px solid var(--line);background:#fff;">
+                            </div>
+                            <div class="grid-2" style="margin-top:10px;">
+                                <input type="url" name="tiktok_url" value="{{ old('tiktok_url', $socialDefaults['tiktok_url'] ?? '') }}" placeholder="TikTok URL" style="width:100%;padding:12px;border-radius:14px;border:1px solid var(--line);background:#fff;">
+                                <input type="url" name="linkedin_url" value="{{ old('linkedin_url', $socialDefaults['linkedin_url'] ?? '') }}" placeholder="LinkedIn URL" style="width:100%;padding:12px;border-radius:14px;border:1px solid var(--line);background:#fff;">
+                            </div>
+                            <div class="grid-2" style="margin-top:10px;">
+                                <input type="url" name="youtube_url" value="{{ old('youtube_url', $socialDefaults['youtube_url'] ?? '') }}" placeholder="YouTube URL" style="width:100%;padding:12px;border-radius:14px;border:1px solid var(--line);background:#fff;">
+                                <input type="url" name="website_url" value="{{ old('website_url', $socialDefaults['website_url'] ?? '') }}" placeholder="Other website URL" style="width:100%;padding:12px;border-radius:14px;border:1px solid var(--line);background:#fff;">
+                            </div>
                         </div>
                         <div class="stack-item">
-                            <strong>Pages and image direction</strong><br>
-                            <textarea name="must_include_pages" rows="2" placeholder="Any must-have pages or sections..." style="margin-top:10px;width:100%;padding:12px;border-radius:14px;border:1px solid var(--line);background:#fff;">{{ old('must_include_pages', $buildIntake['must_include_pages'] ?? '') }}</textarea>
-                            <textarea name="image_preferences" rows="2" placeholder="Image style, mood, color tone, local scenes, team photos, product photography..." style="margin-top:10px;width:100%;padding:12px;border-radius:14px;border:1px solid var(--line);background:#fff;">{{ old('image_preferences', $buildIntake['image_preferences'] ?? '') }}</textarea>
-                            <textarea name="special_requests" rows="2" placeholder="Anything special we should include or avoid?" style="margin-top:10px;width:100%;padding:12px;border-radius:14px;border:1px solid var(--line);background:#fff;">{{ old('special_requests', $buildIntake['special_requests'] ?? '') }}</textarea>
+                            <strong>Pages to include</strong><br>
+                            <div class="grid-2" style="margin-top:10px;">
+                                @foreach ($pageSectionOptions as $value => $label)
+                                    <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;border:1px solid var(--line);background:#fff;">
+                                        <input type="checkbox" name="page_sections[]" value="{{ $value }}" @checked(in_array($value, $pageSectionInputs, true))>
+                                        <span>{{ $label }}</span>
+                                    </label>
+                                @endforeach
+                            </div>
+                        </div>
+                        <div class="stack-item">
+                            <strong>Image and visual direction</strong><br>
+                            <div class="grid-2" style="margin-top:10px;">
+                                <select name="image_style" style="width:100%;padding:12px;border-radius:14px;border:1px solid var(--line);background:#fff;">
+                                    <option value="">Choose a visual style</option>
+                                    @foreach ($imageStyleOptions as $option)
+                                        <option value="{{ $option }}" @selected(old('image_style', $imageDirection['style'] ?? '') === $option)>{{ $option }}</option>
+                                    @endforeach
+                                </select>
+                                <select name="image_mood" style="width:100%;padding:12px;border-radius:14px;border:1px solid var(--line);background:#fff;">
+                                    <option value="">Choose a mood</option>
+                                    @foreach ($imageMoodOptions as $option)
+                                        <option value="{{ $option }}" @selected(old('image_mood', $imageDirection['mood'] ?? '') === $option)>{{ $option }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div style="margin-top:12px;">
+                                <strong style="font-size:0.95rem;">What should the images show?</strong>
+                                <div class="grid-2" style="margin-top:10px;">
+                                    @foreach ($imageSubjectOptions as $option)
+                                        <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;border:1px solid var(--line);background:#fff;">
+                                            <input type="checkbox" name="image_subjects[]" value="{{ $option }}" @checked(in_array($option, $imageSubjects, true))>
+                                            <span>{{ $option }}</span>
+                                        </label>
+                                    @endforeach
+                                </div>
+                            </div>
+                            <div style="margin-top:12px;">
+                                <strong style="font-size:0.95rem;">What should we avoid?</strong>
+                                <div class="grid-2" style="margin-top:10px;">
+                                    @foreach ($avoidVisualOptions as $option)
+                                        <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;border:1px solid var(--line);background:#fff;">
+                                            <input type="checkbox" name="avoid_visuals[]" value="{{ $option }}" @checked(in_array($option, $avoidVisuals, true))>
+                                            <span>{{ $option }}</span>
+                                        </label>
+                                    @endforeach
+                                </div>
+                            </div>
+                        </div>
+                        <div class="stack-item">
+                            <strong>Founder notes for AI</strong><br>
+                            <span class="muted">Use this only for story, brand nuance, or important context we should interpret before building.</span>
+                            <textarea name="special_requests" rows="4" placeholder="Example: Lead with the $300 van story, explain the revenue-share model visually, avoid guru-style marketing." style="margin-top:10px;width:100%;padding:12px;border-radius:14px;border:1px solid var(--line);background:#fff;">{{ old('special_requests', $buildIntake['special_requests'] ?? '') }}</textarea>
                         </div>
                         <button class="btn primary" type="submit">Build My Website</button>
                     </form>
@@ -305,8 +436,43 @@
                                 <span class="muted">{{ $autopilotDraft['starter_offer']['description'] ?? '' }}</span>
                             </div>
                             <div class="stack-item">
+                                <strong>Theme audit</strong><br>
+                                {{ $autopilotDraft['theme_label'] ?? ('Theme ' . ($autopilotDraft['theme_template'] ?? '1')) }}<br>
+                                <span class="muted">
+                                    @if (!empty($autopilotDraft['theme_match_reasons'] ?? []))
+                                        {{ implode(' · ', $autopilotDraft['theme_match_reasons']) }}
+                                    @else
+                                        Theme rationale pending.
+                                    @endif
+                                </span>
+                                @if (!empty($autopilotDraft['theme_candidates'] ?? []))
+                                    @foreach (($autopilotDraft['theme_candidates'] ?? []) as $candidate)
+                                        <div class="muted" style="margin-top:8px;">
+                                            {{ $candidate['label'] ?? ('Theme ' . ($candidate['id'] ?? '?')) }} · score {{ $candidate['score'] ?? 0 }}
+                                            @if (!empty($candidate['match_reasons'] ?? []))
+                                                · {{ implode(', ', $candidate['match_reasons']) }}
+                                            @endif
+                                        </div>
+                                    @endforeach
+                                @endif
+                            </div>
+                            <div class="stack-item">
                                 <strong>Image direction</strong><br>
                                 <span class="muted">{{ implode(' · ', $autopilotDraft['image_queries'] ?? []) ?: 'Image queries pending' }}</span>
+                            </div>
+                            <div class="stack-item">
+                                <strong>Landing page readiness</strong><br>
+                                @php($qualityAudit = $autopilotDraft['quality_audit'] ?? [])
+                                <div class="muted">Theme fit: {{ ucfirst($qualityAudit['theme_strength'] ?? 'pending') }}</div>
+                                <div class="muted">Offers: {{ $qualityAudit['offers_count'] ?? 0 }} · FAQ: {{ $qualityAudit['faq_count'] ?? 0 }} · Proof: {{ $qualityAudit['proof_count'] ?? 0 }} · Pages: {{ $qualityAudit['page_count'] ?? 0 }}</div>
+                                <div class="muted">Planned media slots: {{ $qualityAudit['media_slot_count'] ?? 0 }} · CTA ready: {{ !empty($qualityAudit['cta_ready']) ? 'Yes' : 'No' }}</div>
+                                @if (!empty($qualityAudit['menus'] ?? []))
+                                    <div class="muted">
+                                        Booking: {{ !empty($qualityAudit['menus']['online_booking']) ? 'On' : 'Off' }} ·
+                                        Service menu: {{ !empty($qualityAudit['menus']['service_menu']) ? 'On' : 'Off' }} ·
+                                        Shop menu: {{ !empty($qualityAudit['menus']['shop_menu']) ? 'On' : 'Off' }}
+                                    </div>
+                                @endif
                             </div>
                             @if (!empty($autopilotDraft['atlas_handoff']['asset_slots'] ?? []))
                                 <div class="stack-item">

@@ -4083,7 +4083,7 @@ class OsShellController extends Controller
         }
 
         $validated = $request->validate([
-            'website_goal' => ['required', 'string', 'max:500'],
+            'website_goal' => ['required', 'string', 'max:255'],
             'primary_website_focus' => ['nullable', Rule::in(['auto', 'product', 'service'])],
             'primary_cta' => ['nullable', 'string', 'max:255'],
             'contact_email' => ['nullable', 'email', 'max:255'],
@@ -4091,13 +4091,38 @@ class OsShellController extends Controller
             'whatsapp_number' => ['nullable', 'string', 'max:120'],
             'business_address' => ['nullable', 'string', 'max:500'],
             'business_hours' => ['nullable', 'string', 'max:500'],
+            'offer_titles' => ['nullable', 'array'],
+            'offer_titles.*' => ['nullable', 'string', 'max:180'],
+            'offer_prices' => ['nullable', 'array'],
+            'offer_prices.*' => ['nullable', 'string', 'max:120'],
+            'offer_descriptions' => ['nullable', 'array'],
+            'offer_descriptions.*' => ['nullable', 'string', 'max:500'],
+            'trust_points' => ['nullable', 'array'],
+            'trust_points.*' => ['nullable', 'string', 'max:255'],
+            'faq_questions' => ['nullable', 'array'],
+            'faq_questions.*' => ['nullable', 'string', 'max:255'],
+            'page_sections' => ['nullable', 'array'],
+            'page_sections.*' => ['nullable', 'string', 'max:120'],
+            'instagram_url' => ['nullable', 'url', 'max:255'],
+            'facebook_url' => ['nullable', 'url', 'max:255'],
+            'tiktok_url' => ['nullable', 'url', 'max:255'],
+            'linkedin_url' => ['nullable', 'url', 'max:255'],
+            'youtube_url' => ['nullable', 'url', 'max:255'],
+            'website_url' => ['nullable', 'url', 'max:255'],
+            'image_style' => ['nullable', 'string', 'max:120'],
+            'image_mood' => ['nullable', 'string', 'max:120'],
+            'image_subjects' => ['nullable', 'array'],
+            'image_subjects.*' => ['nullable', 'string', 'max:120'],
+            'avoid_visuals' => ['nullable', 'array'],
+            'avoid_visuals.*' => ['nullable', 'string', 'max:120'],
+            'special_requests' => ['nullable', 'string', 'max:1500'],
+            // Legacy compatibility while older sessions/forms may still post these.
             'social_links' => ['nullable', 'string', 'max:1200'],
             'must_include_pages' => ['nullable', 'string', 'max:1200'],
             'offer_items' => ['nullable', 'string', 'max:4000'],
             'faq_points' => ['nullable', 'string', 'max:2500'],
             'proof_points' => ['nullable', 'string', 'max:2500'],
             'image_preferences' => ['nullable', 'string', 'max:1500'],
-            'special_requests' => ['nullable', 'string', 'max:1500'],
         ]);
 
         $founder->loadMissing('company.intelligence', 'businessBrief', 'icpProfiles', 'actionPlans');
@@ -4131,6 +4156,17 @@ class OsShellController extends Controller
         );
 
         $constraints = is_array($brief->constraints_json) ? $brief->constraints_json : [];
+        $offerCards = $this->normalizeWebsiteBuildOfferCards(
+            (array) ($validated['offer_titles'] ?? []),
+            (array) ($validated['offer_prices'] ?? []),
+            (array) ($validated['offer_descriptions'] ?? [])
+        );
+        $trustPoints = $this->normalizeWebsiteBuildList((array) ($validated['trust_points'] ?? []));
+        $faqQuestions = $this->normalizeWebsiteBuildList((array) ($validated['faq_questions'] ?? []));
+        $pageSections = $this->normalizeWebsiteBuildPageSections((array) ($validated['page_sections'] ?? []));
+        $socialProfiles = $this->normalizeWebsiteBuildSocialProfiles($validated);
+        $imageDirection = $this->normalizeWebsiteBuildImageDirection($validated);
+
         $constraints['website_build'] = [
             'website_goal' => trim((string) ($validated['website_goal'] ?? '')),
             'primary_website_focus' => trim((string) ($validated['primary_website_focus'] ?? 'auto')),
@@ -4140,19 +4176,26 @@ class OsShellController extends Controller
             'whatsapp_number' => trim((string) ($validated['whatsapp_number'] ?? '')),
             'business_address' => trim((string) ($validated['business_address'] ?? '')),
             'business_hours' => trim((string) ($validated['business_hours'] ?? '')),
-            'social_links' => trim((string) ($validated['social_links'] ?? '')),
-            'must_include_pages' => trim((string) ($validated['must_include_pages'] ?? '')),
-            'offer_items' => trim((string) ($validated['offer_items'] ?? '')),
-            'faq_points' => trim((string) ($validated['faq_points'] ?? '')),
-            'proof_points' => trim((string) ($validated['proof_points'] ?? '')),
-            'image_preferences' => trim((string) ($validated['image_preferences'] ?? '')),
+            'offer_cards' => $offerCards,
+            'trust_points_list' => $trustPoints,
+            'faq_questions_list' => $faqQuestions,
+            'page_sections' => $pageSections,
+            'social_profiles' => $socialProfiles,
+            'image_direction' => $imageDirection,
+            // Legacy text summaries kept so existing draft code remains backward-compatible.
+            'social_links' => $this->websiteBuildSocialProfilesToText($socialProfiles, trim((string) ($validated['social_links'] ?? ''))),
+            'must_include_pages' => $this->websiteBuildPageSectionsToText($pageSections, trim((string) ($validated['must_include_pages'] ?? ''))),
+            'offer_items' => $this->websiteBuildOfferCardsToText($offerCards, trim((string) ($validated['offer_items'] ?? ''))),
+            'faq_points' => $this->websiteBuildListToText($faqQuestions, trim((string) ($validated['faq_points'] ?? ''))),
+            'proof_points' => $this->websiteBuildListToText($trustPoints, trim((string) ($validated['proof_points'] ?? ''))),
+            'image_preferences' => $this->websiteBuildImageDirectionToText($imageDirection, trim((string) ($validated['image_preferences'] ?? ''))),
             'special_requests' => trim((string) ($validated['special_requests'] ?? '')),
             'updated_at' => now()->toDateTimeString(),
         ];
 
         $brief->forceFill([
             'constraints_json' => $constraints,
-            'proof_points' => trim((string) ($validated['proof_points'] ?? $brief->proof_points ?? '')),
+            'proof_points' => $this->websiteBuildListToText($trustPoints, (string) ($brief->proof_points ?? '')),
         ])->save();
 
         $engineLabel = $this->websiteBuildEngineLabel($company, (string) ($validated['primary_website_focus'] ?? 'auto'));
@@ -9250,6 +9293,219 @@ class OsShellController extends Controller
         }
 
         return $businessModel === 'product' ? 'bazaar' : 'servio';
+    }
+
+    private function normalizeWebsiteBuildOfferCards(array $titles, array $prices, array $descriptions): array
+    {
+        $rows = max(count($titles), count($prices), count($descriptions));
+        $cards = [];
+
+        for ($index = 0; $index < $rows; $index++) {
+            $title = trim((string) ($titles[$index] ?? ''));
+            $price = trim((string) ($prices[$index] ?? ''));
+            $description = trim((string) ($descriptions[$index] ?? ''));
+
+            if ($title === '' && $price === '' && $description === '') {
+                continue;
+            }
+
+            if ($title === '') {
+                continue;
+            }
+
+            $cards[] = [
+                'title' => Str::limit(preg_replace('/\s+/', ' ', $title) ?: $title, 180, ''),
+                'price' => Str::limit(preg_replace('/\s+/', ' ', $price) ?: $price, 120, ''),
+                'description' => Str::limit(preg_replace('/\s+/', ' ', $description) ?: $description, 500, ''),
+            ];
+        }
+
+        return array_slice($cards, 0, 6);
+    }
+
+    private function normalizeWebsiteBuildList(array $items): array
+    {
+        return collect($items)
+            ->map(fn ($item) => trim((string) $item))
+            ->filter()
+            ->map(function (string $item): string {
+                $normalized = preg_replace('/\s+/', ' ', $item) ?: $item;
+                return Str::limit($normalized, 255, '');
+            })
+            ->unique()
+            ->values()
+            ->take(8)
+            ->all();
+    }
+
+    private function normalizeWebsiteBuildPageSections(array $items): array
+    {
+        $allowed = [
+            'hero', 'about', 'offers', 'services', 'products', 'pricing',
+            'results', 'testimonials', 'faq', 'contact', 'gallery',
+        ];
+
+        return collect($items)
+            ->map(fn ($item) => strtolower(trim((string) $item)))
+            ->filter(fn (string $item) => in_array($item, $allowed, true))
+            ->unique()
+            ->values()
+            ->take(8)
+            ->all();
+    }
+
+    private function normalizeWebsiteBuildSocialProfiles(array $validated): array
+    {
+        $map = [
+            'instagram_url' => 'Instagram',
+            'facebook_url' => 'Facebook',
+            'tiktok_url' => 'TikTok',
+            'linkedin_url' => 'LinkedIn',
+            'youtube_url' => 'YouTube',
+            'website_url' => 'Website',
+        ];
+
+        $profiles = [];
+
+        foreach ($map as $field => $network) {
+            $url = trim((string) ($validated[$field] ?? ''));
+            if ($url === '') {
+                continue;
+            }
+
+            $profiles[] = [
+                'network' => $network,
+                'url' => Str::limit($url, 255, ''),
+            ];
+        }
+
+        return $profiles;
+    }
+
+    private function normalizeWebsiteBuildImageDirection(array $validated): array
+    {
+        $subjects = collect((array) ($validated['image_subjects'] ?? []))
+            ->map(fn ($item) => trim((string) $item))
+            ->filter()
+            ->unique()
+            ->values()
+            ->take(8)
+            ->all();
+
+        $avoid = collect((array) ($validated['avoid_visuals'] ?? []))
+            ->map(fn ($item) => trim((string) $item))
+            ->filter()
+            ->unique()
+            ->values()
+            ->take(8)
+            ->all();
+
+        return array_filter([
+            'style' => trim((string) ($validated['image_style'] ?? '')),
+            'mood' => trim((string) ($validated['image_mood'] ?? '')),
+            'subjects' => $subjects,
+            'avoid' => $avoid,
+        ], function ($value): bool {
+            if (is_array($value)) {
+                return $value !== [];
+            }
+
+            return trim((string) $value) !== '';
+        });
+    }
+
+    private function websiteBuildOfferCardsToText(array $cards, string $fallback = ''): string
+    {
+        $lines = collect($cards)
+            ->filter(fn ($card): bool => is_array($card) && trim((string) ($card['title'] ?? '')) !== '')
+            ->map(function (array $card): string {
+                return implode(' | ', array_values(array_filter([
+                    trim((string) ($card['title'] ?? '')),
+                    trim((string) ($card['price'] ?? '')),
+                    trim((string) ($card['description'] ?? '')),
+                ], fn ($value): bool => $value !== '')));
+            })
+            ->filter()
+            ->values()
+            ->all();
+
+        return $lines !== [] ? implode("\n", $lines) : trim($fallback);
+    }
+
+    private function websiteBuildListToText(array $items, string $fallback = ''): string
+    {
+        $items = collect($items)
+            ->map(fn ($item) => trim((string) $item))
+            ->filter()
+            ->values()
+            ->all();
+
+        return $items !== [] ? implode("\n", $items) : trim($fallback);
+    }
+
+    private function websiteBuildPageSectionsToText(array $sections, string $fallback = ''): string
+    {
+        $labels = [
+            'hero' => 'Hero',
+            'about' => 'About',
+            'offers' => 'Offers',
+            'services' => 'Services',
+            'products' => 'Products',
+            'pricing' => 'Pricing',
+            'results' => 'Results',
+            'testimonials' => 'Testimonials',
+            'faq' => 'FAQ',
+            'contact' => 'Contact',
+            'gallery' => 'Gallery',
+        ];
+
+        $items = collect($sections)
+            ->map(fn ($item) => $labels[strtolower(trim((string) $item))] ?? trim((string) $item))
+            ->filter()
+            ->values()
+            ->all();
+
+        return $items !== [] ? implode("\n", $items) : trim($fallback);
+    }
+
+    private function websiteBuildSocialProfilesToText(array $profiles, string $fallback = ''): string
+    {
+        $lines = collect($profiles)
+            ->filter(fn ($profile): bool => is_array($profile) && trim((string) ($profile['url'] ?? '')) !== '')
+            ->map(function (array $profile): string {
+                $network = trim((string) ($profile['network'] ?? ''));
+                $url = trim((string) ($profile['url'] ?? ''));
+                return $network !== '' ? $network . ': ' . $url : $url;
+            })
+            ->filter()
+            ->values()
+            ->all();
+
+        return $lines !== [] ? implode("\n", $lines) : trim($fallback);
+    }
+
+    private function websiteBuildImageDirectionToText(array $imageDirection, string $fallback = ''): string
+    {
+        $lines = [];
+        $style = trim((string) ($imageDirection['style'] ?? ''));
+        $mood = trim((string) ($imageDirection['mood'] ?? ''));
+        $subjects = array_values(array_filter(array_map('trim', (array) ($imageDirection['subjects'] ?? []))));
+        $avoid = array_values(array_filter(array_map('trim', (array) ($imageDirection['avoid'] ?? []))));
+
+        if ($style !== '') {
+            $lines[] = 'Style: ' . $style;
+        }
+        if ($mood !== '') {
+            $lines[] = 'Mood: ' . $mood;
+        }
+        if ($subjects !== []) {
+            $lines[] = 'Show: ' . implode(', ', $subjects);
+        }
+        if ($avoid !== []) {
+            $lines[] = 'Avoid: ' . implode(', ', $avoid);
+        }
+
+        return $lines !== [] ? implode("\n", $lines) : trim($fallback);
     }
 
     private function buildFounderSearchResults(Founder $founder, array $dashboard, string $query): array
