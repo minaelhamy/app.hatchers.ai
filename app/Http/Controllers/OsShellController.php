@@ -19,6 +19,7 @@ use App\Models\FounderPodMembership;
 use App\Models\FounderPodPost;
 use App\Models\FounderPricingRecommendation;
 use App\Models\FounderPromoLink;
+use App\Models\FounderWebsiteGenerationRun;
 use App\Models\FounderPayoutAccount;
 use App\Models\FounderPayoutRequest;
 use App\Models\FounderWeeklyState;
@@ -8117,7 +8118,7 @@ class OsShellController extends Controller
         }
 
         $company = Company::query()
-            ->with('founder.moduleSnapshots')
+            ->with(['founder.moduleSnapshots', 'websiteGenerationRuns'])
             ->get()
             ->first(function (Company $company) use ($normalizedPath): bool {
                 if (!$this->companyMatchesPublicWebsitePath($company, $normalizedPath)) {
@@ -8129,7 +8130,7 @@ class OsShellController extends Controller
 
         if (!$company) {
             $company = Company::query()
-                ->with('founder.moduleSnapshots')
+                ->with(['founder.moduleSnapshots', 'websiteGenerationRuns'])
                 ->get()
                 ->first(fn (Company $company): bool => $this->companyMatchesPublicWebsitePath($company, $normalizedPath));
         }
@@ -8187,6 +8188,46 @@ class OsShellController extends Controller
             }
         }
 
+        if (!$company) {
+            $generationRun = FounderWebsiteGenerationRun::query()
+                ->with(['company.founder.moduleSnapshots', 'founder.company'])
+                ->latest('id')
+                ->get()
+                ->first(function (FounderWebsiteGenerationRun $run) use ($normalizedPath): bool {
+                    $output = is_array($run->output_json ?? null) ? $run->output_json : [];
+                    $draftPath = trim(strtolower((string) ($output['website_path'] ?? '')), '/');
+
+                    if ($draftPath !== '' && $draftPath === $normalizedPath) {
+                        return true;
+                    }
+
+                    $draftUrl = trim((string) ($output['website_url'] ?? ''));
+                    $draftUrlPath = trim(strtolower((string) parse_url($draftUrl, PHP_URL_PATH)), '/');
+                    if ($draftUrlPath !== '') {
+                        $segments = array_values(array_filter(explode('/', $draftUrlPath)));
+                        if ($draftUrlPath === $normalizedPath || in_array($normalizedPath, $segments, true)) {
+                            return true;
+                        }
+                    }
+
+                    return false;
+                });
+
+            if ($generationRun) {
+                $company = $generationRun->company ?: $generationRun->founder?->company;
+
+                if ($company) {
+                    if (blank($company->website_path)) {
+                        $company->website_path = $normalizedPath;
+                    }
+                    if (blank($company->website_url)) {
+                        $company->website_url = $this->buildCompanyWebsiteUrl($company, (string) ($company->website_engine ?? ''));
+                    }
+                    $company->save();
+                }
+            }
+        }
+
         return $company;
     }
 
@@ -8237,6 +8278,23 @@ class OsShellController extends Controller
             if ($summaryPath !== '') {
                 $summarySegments = array_values(array_filter(explode('/', $summaryPath)));
                 if (strtolower($summaryPath) === $normalizedPath || in_array($normalizedPath, $summarySegments, true)) {
+                    return true;
+                }
+            }
+        }
+
+        foreach (($company->websiteGenerationRuns ?? collect()) as $run) {
+            $output = is_array($run->output_json ?? null) ? $run->output_json : [];
+            $draftPath = trim(strtolower((string) ($output['website_path'] ?? '')), '/');
+            if ($draftPath !== '' && $draftPath === $normalizedPath) {
+                return true;
+            }
+
+            $draftUrl = trim((string) ($output['website_url'] ?? ''));
+            $draftUrlPath = trim(strtolower((string) parse_url($draftUrl, PHP_URL_PATH)), '/');
+            if ($draftUrlPath !== '') {
+                $draftSegments = array_values(array_filter(explode('/', $draftUrlPath)));
+                if ($draftUrlPath === $normalizedPath || in_array($normalizedPath, $draftSegments, true)) {
                     return true;
                 }
             }
