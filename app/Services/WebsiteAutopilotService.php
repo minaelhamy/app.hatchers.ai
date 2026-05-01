@@ -615,7 +615,7 @@ class WebsiteAutopilotService
             'website_engine' => $draft['website_engine'],
             'title' => $title,
             'description' => $description,
-            'media_assets' => $this->starterRecordMedia($draft, 0),
+            'media_assets' => $this->starterBlogMedia($draft),
         ]);
 
         if (!($result['ok'] ?? false)) {
@@ -754,6 +754,7 @@ class WebsiteAutopilotService
 
         return array_values(array_filter([
             $this->slotMedia('hero', 'hero banner', $hero),
+            $this->slotMedia('blog_primary', 'blog feature image', $hero ?? $story ?? $features),
             $this->slotMedia('landing', 'landing banner', $hero),
             $this->slotMedia('faq', 'faq image', $faq),
             $this->slotMedia('story', 'story image', $story),
@@ -765,9 +766,6 @@ class WebsiteAutopilotService
             $this->slotMedia('service_detail', 'service detail image', $features ?? $proof ?? $hero),
             $this->slotMedia('service_support', 'service support image', $action ?? $story ?? $hero),
             $this->slotMedia('testimonial_primary', 'testimonial image', $proof ?? $story ?? $hero),
-            $this->slotMedia('gallery_primary', 'gallery image one', $story ?? $hero),
-            $this->slotMedia('gallery_secondary', 'gallery image two', $features ?? $hero),
-            $this->slotMedia('gallery_tertiary', 'gallery image three', $action ?? $proof ?? $hero),
             $this->slotMedia('why_choose_item', 'why choose us image', $story ?? $features ?? $hero),
         ]));
     }
@@ -1472,13 +1470,25 @@ class WebsiteAutopilotService
         $cityTail = $city !== '' ? ' in ' . $city : '';
         $problem = trim($problemSolved) !== '' ? trim($problemSolved) : 'make the first buying decision feel simpler and more confident';
         $offer = trim($starterTitle) !== '' ? trim($starterTitle) : 'the best first offer';
+        $relatedSubject = $this->relatedBlogSubject($starterTitle, $icpName, $city);
 
         return [
-            'title' => 'How ' . $companyName . ' helps ' . $icpName . ' stop struggling and start moving faster',
-            'description' => trim(implode("\n\n", [
-                $companyName . ' was built to help ' . $icpName . $cityTail . ' solve one frustrating problem: ' . $problem . '.',
-                'Instead of overwhelming people with too many choices, the site leads with a single high-conviction next step: ' . $offer . '. That follows a Sell Like Crazy structure by making the problem clear, the promise obvious, and the call to action easy to say yes to.',
-                'The goal is simple: remove confusion, increase trust, and create an offer stack that feels valuable enough to act on now. That is the same value-first logic behind strong Grand Slam style offers: more clarity, better outcome, less friction.',
+            'title' => Str::limit($companyName . ': ' . $relatedSubject, 180, ''),
+            'description' => trim(implode("\n", [
+                '<p>' . e($companyName) . ' was built to help ' . e($icpName) . $cityTail . ' solve one frustrating problem: ' . e($problem) . '. The businesses that win attention and trust are the ones that make the next step feel clear, valuable, and easy to say yes to.</p>',
+                '<h2>Why this matters</h2>',
+                '<p>' . e($relatedSubject) . ' matters because customers are rarely just buying a service. They are buying certainty, speed, convenience, and confidence. If a business does not explain the stakes clearly, the buyer delays, comparison shops forever, or settles for a cheaper option that creates more hassle later.</p>',
+                '<h2>The common mistake people make</h2>',
+                '<p>Most people try to solve the symptom instead of the real problem. They look for the fastest option, the cheapest option, or the most familiar option. But when the experience is confusing, slow, or inconsistent, they end up paying with time, frustration, and lost trust.</p>',
+                '<h2>What a smarter first step looks like</h2>',
+                '<p>A stronger buying path starts with a focused offer like ' . e($offer) . '. That kind of offer works because it removes friction. It gives the customer a clear starting point, helps them understand the value quickly, and reduces the anxiety that usually slows down action.</p>',
+                '<h2>How direct-response thinking improves the decision</h2>',
+                '<p>Strong direct-response content does three things well. It names the problem in a way the buyer already feels. It shows a believable outcome they actually want. And it frames the offer as the bridge between where they are and where they want to go. That is why websites built around clarity, proof, and urgency convert better than websites built like brochures.</p>',
+                '<h2>What customers should look for before they commit</h2>',
+                '<ul><li>A provider that understands the real problem, not just the category.</li><li>A clear first offer with transparent pricing and obvious next steps.</li><li>Proof that the experience is dependable, not just attractive.</li><li>A reason to act now instead of putting the decision off again.</li></ul>',
+                '<h2>The practical takeaway</h2>',
+                '<p>' . e($companyName) . ' uses this exact logic to help ' . e($icpName) . ' move faster with more confidence. When the offer is clear and the message is relevant, the website becomes a selling asset, not just an online placeholder. That is how a strong first impression turns into booked revenue.</p>',
+                '<p>The takeaway is simple: better positioning leads to better offers, better offers lead to easier yeses, and easier yeses create momentum. That is the standard a high-conviction website should meet from day one.</p>',
             ])),
         ];
     }
@@ -1493,6 +1503,7 @@ class WebsiteAutopilotService
 
         return collect(array_merge($defaultPages, $requestedPages, ['about us', 'faq', 'contact']))
             ->map(fn (string $item) => trim($item))
+            ->reject(fn (string $item): bool => in_array(strtolower($item), ['gallery', 'photo gallery', 'image gallery'], true))
             ->filter()
             ->unique()
             ->take(8)
@@ -1854,6 +1865,39 @@ class WebsiteAutopilotService
                 'source_url' => trim((string) ($asset['source_url'] ?? '')),
             ])->all(),
         ]));
+    }
+
+    private function starterBlogMedia(array $draft): array
+    {
+        $media = array_values(array_filter((array) ($draft['media_assets'] ?? []), fn ($item) => is_array($item)));
+
+        if ($media === []) {
+            $resolved = $this->normalizeResolvedAssets((array) ($draft['atlas_handoff']['asset_slots'] ?? []));
+            $byKey = collect($resolved)->keyBy(fn (array $asset): string => trim((string) ($asset['slot_key'] ?? '')));
+            $blog = $byKey->get('blog_primary') ?? $byKey->get('hero') ?? $byKey->get('story') ?? ($resolved[0] ?? null);
+
+            return is_array($blog) && trim((string) ($blog['source_url'] ?? '')) !== '' ? [[
+                'target' => 'blog_primary',
+                'source_url' => trim((string) ($blog['source_url'] ?? '')),
+            ]] : [];
+        }
+
+        $byTarget = collect($media)->keyBy(fn (array $item): string => trim((string) ($item['target'] ?? '')));
+        $asset = $byTarget->get('blog_primary') ?? $byTarget->get('hero') ?? $byTarget->get('story') ?? $byTarget->get('section_one');
+
+        return is_array($asset) && trim((string) ($asset['source_url'] ?? '')) !== '' ? [[
+            'target' => 'blog_primary',
+            'source_url' => trim((string) ($asset['source_url'] ?? '')),
+        ]] : [];
+    }
+
+    private function relatedBlogSubject(string $starterTitle, string $icpName, string $city): string
+    {
+        $offer = trim($starterTitle) !== '' ? trim($starterTitle) : 'choosing the right service';
+        $audience = trim($icpName) !== '' ? trim($icpName) : 'buyers';
+        $location = trim($city) !== '' ? ' in ' . trim($city) : '';
+
+        return 'A practical guide to ' . Str::lower($offer) . ' for ' . $audience . $location;
     }
 
     private function defaultProofBullets(string $companyName, string $starterTitle, array $outcomes, string $city): array
