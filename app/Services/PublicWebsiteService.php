@@ -50,13 +50,13 @@ class PublicWebsiteService
         $osBaseUrl = rtrim((string) config('app.url'), '/');
         $engineProxyUrl = '';
 
-        if ($storefrontUrl !== '' && $this->shouldUseDirectStorefrontUrl($storefrontUrl, $engineBaseUrl) && !$this->isRecursiveOsStorefrontUrl($storefrontUrl, $osBaseUrl, $websitePath)) {
-            $engineProxyUrl = $storefrontUrl;
-        } elseif ($engineBaseUrl !== '' && $engineVendorSlug !== '') {
+        if ($engineBaseUrl !== '' && $engineVendorSlug !== '') {
             $candidateProxyUrl = $engineBaseUrl . '/' . ltrim($engineVendorSlug, '/');
             if (!$this->isRecursiveOsStorefrontUrl($candidateProxyUrl, $osBaseUrl, $websitePath)) {
                 $engineProxyUrl = $candidateProxyUrl;
             }
+        } elseif ($storefrontUrl !== '' && $this->shouldUseDirectStorefrontUrl($storefrontUrl, $engineBaseUrl) && !$this->isRecursiveOsStorefrontUrl($storefrontUrl, $osBaseUrl, $websitePath)) {
+            $engineProxyUrl = $storefrontUrl;
         } elseif ($storefrontUrl !== '' && !$this->isRecursiveOsStorefrontUrl($storefrontUrl, $osBaseUrl, $websitePath)) {
             $engineProxyUrl = $storefrontUrl;
         }
