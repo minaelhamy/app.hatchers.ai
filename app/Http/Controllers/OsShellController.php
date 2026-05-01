@@ -56,6 +56,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -8420,6 +8421,15 @@ class OsShellController extends Controller
             'founder_matches' => $founderMatches,
             'generation_matches' => $generationMatches,
         ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+        $this->appendPublicWebsiteDebugLog('failed', [
+            'context' => $context,
+            'requested_path' => $websitePath,
+            'normalized_path' => $normalizedPath,
+            'proxy_path' => $proxyPath,
+            'company_matches' => $companyMatches,
+            'founder_matches' => $founderMatches,
+            'generation_matches' => $generationMatches,
+        ]);
     }
 
     private function logPublicWebsiteResolutionSuccess(string $websitePath, Company $company, array $site, string $context): void
@@ -8450,6 +8460,30 @@ class OsShellController extends Controller
             'engine_vendor_slug' => (string) ($site['engine_vendor_slug'] ?? ''),
             'engine_proxy_url' => (string) ($site['engine_proxy_url'] ?? ''),
         ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+        $this->appendPublicWebsiteDebugLog('resolved', [
+            'context' => $context,
+            'requested_path' => $websitePath,
+            'company_id' => (int) $company->id,
+            'company_name' => (string) ($company->company_name ?? ''),
+            'website_path' => (string) ($company->website_path ?? ''),
+            'website_url' => (string) ($company->website_url ?? ''),
+            'engine_public_url' => (string) ($company->engine_public_url ?? ''),
+            'engine' => (string) ($site['engine'] ?? ''),
+            'uses_engine_storefront' => (bool) ($site['uses_engine_storefront'] ?? false),
+            'engine_vendor_slug' => (string) ($site['engine_vendor_slug'] ?? ''),
+            'engine_proxy_url' => (string) ($site['engine_proxy_url'] ?? ''),
+        ]);
+    }
+
+    private function appendPublicWebsiteDebugLog(string $stage, array $context): void
+    {
+        try {
+            File::append(
+                storage_path('logs/public-website-debug.log'),
+                '[' . now()->toDateTimeString() . '] [PublicWebsite][' . $stage . '] ' . json_encode($context, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . PHP_EOL
+            );
+        } catch (Throwable) {
+        }
     }
 
     private function proxyEngineStorefront(Company $company, string $proxyPath, Request $request, PublicWebsiteService $publicWebsiteService)
