@@ -4774,10 +4774,12 @@ class OsShellController extends Controller
     {
         $company = $this->resolvePublicWebsiteCompany($websitePath);
         if (!$company) {
+            $this->logPublicWebsiteResolutionFailure($websitePath, 'page');
             abort(404);
         }
 
         $site = $publicWebsiteService->build($company);
+        $this->logPublicWebsiteResolutionSuccess($websitePath, $company, $site, 'page');
         if (($site['uses_engine_storefront'] ?? false) && !empty($site['engine_proxy_url'])) {
             return $this->proxyEngineStorefront($company, '', request(), $publicWebsiteService);
         }
@@ -4797,6 +4799,7 @@ class OsShellController extends Controller
     {
         $company = $this->resolvePublicWebsiteRootCompany($websiteRoot);
         if (!$company) {
+            $this->logPublicWebsiteResolutionFailure($websiteRoot, 'proxy', $proxyPath);
             abort(404);
         }
 
@@ -8317,6 +8320,114 @@ class OsShellController extends Controller
         return $websiteStatus === 'live'
             || $generationStatus === 'published'
             || $launchStage === 'website_live';
+    }
+
+    private function logPublicWebsiteResolutionFailure(string $websitePath, string $context, string $proxyPath = ''): void
+    {
+        $normalizedPath = trim(strtolower($websitePath), '/');
+
+        $companyMatches = Company::query()
+            ->with(['founder', 'websiteGenerationRuns'])
+            ->get()
+            ->filter(fn (Company $company): bool => $this->companyMatchesPublicWebsitePath($company, $normalizedPath))
+            ->take(5)
+            ->map(fn (Company $company): array => [
+                'company_id' => (int) $company->id,
+                'company_name' => (string) ($company->company_name ?? ''),
+                'website_path' => (string) ($company->website_path ?? ''),
+                'website_url' => (string) ($company->website_url ?? ''),
+                'engine_public_url' => (string) ($company->engine_public_url ?? ''),
+                'website_status' => (string) ($company->website_status ?? ''),
+                'generation_status' => (string) ($company->website_generation_status ?? ''),
+                'founder_username' => (string) ($company->founder?->username ?? ''),
+                'founder_full_name' => (string) ($company->founder?->full_name ?? ''),
+            ])
+            ->values()
+            ->all();
+
+        $founderMatches = Founder::query()
+            ->with('company')
+            ->get()
+            ->filter(function (Founder $founder) use ($normalizedPath): bool {
+                $username = trim(strtolower((string) ($founder->username ?? '')), '/');
+                $fullNameSlug = trim(strtolower((string) str($founder->full_name ?: '')->slug('-')->value()), '/');
+
+                return ($username !== '' && $username === $normalizedPath)
+                    || ($fullNameSlug !== '' && $fullNameSlug === $normalizedPath);
+            })
+            ->take(5)
+            ->map(fn (Founder $founder): array => [
+                'founder_id' => (int) $founder->id,
+                'username' => (string) ($founder->username ?? ''),
+                'full_name' => (string) ($founder->full_name ?? ''),
+                'company_id' => (int) ($founder->company?->id ?? 0),
+                'company_website_path' => (string) ($founder->company?->website_path ?? ''),
+            ])
+            ->values()
+            ->all();
+
+        $generationMatches = FounderWebsiteGenerationRun::query()
+            ->with(['company', 'founder'])
+            ->latest('id')
+            ->get()
+            ->filter(function (FounderWebsiteGenerationRun $run) use ($normalizedPath): bool {
+                $output = is_array($run->output_json ?? null) ? $run->output_json : [];
+                $draftPath = trim(strtolower((string) ($output['website_path'] ?? '')), '/');
+                $draftUrlPath = trim(strtolower((string) parse_url((string) ($output['website_url'] ?? ''), PHP_URL_PATH)), '/');
+
+                if ($draftPath !== '' && $draftPath === $normalizedPath) {
+                    return true;
+                }
+
+                if ($draftUrlPath !== '') {
+                    $segments = array_values(array_filter(explode('/', $draftUrlPath)));
+
+                    return $draftUrlPath === $normalizedPath || in_array($normalizedPath, $segments, true);
+                }
+
+                return false;
+            })
+            ->take(5)
+            ->map(function (FounderWebsiteGenerationRun $run): array {
+                $output = is_array($run->output_json ?? null) ? $run->output_json : [];
+
+                return [
+                    'run_id' => (int) $run->id,
+                    'founder_id' => (int) ($run->founder_id ?? 0),
+                    'company_id' => (int) ($run->company_id ?? 0),
+                    'website_path' => (string) ($output['website_path'] ?? ''),
+                    'website_url' => (string) ($output['website_url'] ?? ''),
+                ];
+            })
+            ->values()
+            ->all();
+
+        Log::warning('Public website resolution failed', [
+            'context' => $context,
+            'requested_path' => $websitePath,
+            'normalized_path' => $normalizedPath,
+            'proxy_path' => $proxyPath,
+            'company_matches' => $companyMatches,
+            'founder_matches' => $founderMatches,
+            'generation_matches' => $generationMatches,
+        ]);
+    }
+
+    private function logPublicWebsiteResolutionSuccess(string $websitePath, Company $company, array $site, string $context): void
+    {
+        Log::info('Public website resolved', [
+            'context' => $context,
+            'requested_path' => $websitePath,
+            'company_id' => (int) $company->id,
+            'company_name' => (string) ($company->company_name ?? ''),
+            'website_path' => (string) ($company->website_path ?? ''),
+            'website_url' => (string) ($company->website_url ?? ''),
+            'engine_public_url' => (string) ($company->engine_public_url ?? ''),
+            'engine' => (string) ($site['engine'] ?? ''),
+            'uses_engine_storefront' => (bool) ($site['uses_engine_storefront'] ?? false),
+            'engine_vendor_slug' => (string) ($site['engine_vendor_slug'] ?? ''),
+            'engine_proxy_url' => (string) ($site['engine_proxy_url'] ?? ''),
+        ]);
     }
 
     private function proxyEngineStorefront(Company $company, string $proxyPath, Request $request, PublicWebsiteService $publicWebsiteService)
