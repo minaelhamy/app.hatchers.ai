@@ -105,7 +105,15 @@
         $autopilot = $website['autopilot'] ?? [];
         $autopilotDraft = $autopilot['draft'] ?? null;
         $launchSystem = $autopilot['launch_system'] ?? null;
-        $recommendedCard = collect($engines)->firstWhere('key', $recommendedEngine) ?: $engines[0];
+        $recommendedCard = collect($engines)->firstWhere('key', $recommendedEngine)
+            ?: ($engines[0] ?? [
+                'key' => $recommendedEngine ?: 'servio',
+                'label' => strtoupper($recommendedEngine ?: 'servio'),
+                'role' => 'Website engine',
+                'theme' => '1',
+                'website_title' => $companyName,
+                'website_mode' => $businessModel === 'product' ? 'product' : 'service',
+            ]);
         $initialThemeOptions = $themeOptions[$recommendedEngine] ?? [];
         $dnsTargets = $website['dns_targets'];
         $supportsProducts = in_array($businessModel, ['product', 'hybrid'], true);

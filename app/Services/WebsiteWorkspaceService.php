@@ -296,9 +296,63 @@ class WebsiteWorkspaceService
         return trim($domain, '/');
     }
 
-    private function websiteBuildPayload(array $constraints): array
+    private function websiteBuildPayload($constraints): array
     {
+        $constraints = is_array($constraints) ? $constraints : [];
         $payload = is_array($constraints['website_build'] ?? null) ? $constraints['website_build'] : [];
+
+        $socialProfiles = is_array($payload['social_profiles'] ?? null) ? $payload['social_profiles'] : [];
+        $socialLinks = collect($socialProfiles)
+            ->filter(fn ($item) => is_array($item) && trim((string) ($item['url'] ?? '')) !== '')
+            ->map(function (array $item): string {
+                $network = trim((string) ($item['network'] ?? ''));
+                $url = trim((string) ($item['url'] ?? ''));
+
+                return $network !== '' ? $network . ': ' . $url : $url;
+            })
+            ->values()
+            ->implode("\n");
+
+        $offerCards = is_array($payload['offer_cards'] ?? null) ? $payload['offer_cards'] : [];
+        $legacyOfferItems = collect($offerCards)
+            ->filter(fn ($item) => is_array($item))
+            ->map(function (array $item): string {
+                $title = trim((string) ($item['title'] ?? ''));
+                $price = trim((string) ($item['price'] ?? ''));
+                $description = trim((string) ($item['description'] ?? ''));
+
+                return implode(' | ', array_values(array_filter([$title, $price, $description], fn ($value) => $value !== '')));
+            })
+            ->filter()
+            ->values()
+            ->implode("\n");
+
+        $faqPoints = collect((array) ($payload['faq_questions_list'] ?? []))
+            ->map(fn ($item) => trim((string) $item))
+            ->filter()
+            ->values()
+            ->implode("\n");
+
+        $proofPoints = collect((array) ($payload['trust_points_list'] ?? []))
+            ->map(fn ($item) => trim((string) $item))
+            ->filter()
+            ->values()
+            ->implode("\n");
+
+        $mustIncludePages = collect((array) ($payload['page_sections'] ?? []))
+            ->map(fn ($item) => trim((string) $item))
+            ->filter()
+            ->values()
+            ->implode("\n");
+
+        $imageDirection = is_array($payload['image_direction'] ?? null) ? $payload['image_direction'] : [];
+        $imagePreferences = implode("\n", array_values(array_filter([
+            !empty($imageDirection['style']) ? 'Style: ' . trim((string) $imageDirection['style']) : null,
+            !empty($imageDirection['mood']) ? 'Mood: ' . trim((string) $imageDirection['mood']) : null,
+            !empty($imageDirection['subjects']) && is_array($imageDirection['subjects']) ? 'Subjects: ' . implode(', ', array_filter(array_map('strval', $imageDirection['subjects']))) : null,
+            !empty($imageDirection['avoid']) && is_array($imageDirection['avoid']) ? 'Avoid: ' . implode(', ', array_filter(array_map('strval', $imageDirection['avoid']))) : null,
+            !empty($imageDirection['notes']) ? 'Notes: ' . trim((string) $imageDirection['notes']) : null,
+        ])));
 
         return [
             'website_goal' => trim((string) ($payload['website_goal'] ?? '')),
@@ -309,13 +363,19 @@ class WebsiteWorkspaceService
             'whatsapp_number' => trim((string) ($payload['whatsapp_number'] ?? '')),
             'business_address' => trim((string) ($payload['business_address'] ?? '')),
             'business_hours' => trim((string) ($payload['business_hours'] ?? '')),
-            'social_links' => trim((string) ($payload['social_links'] ?? '')),
-            'must_include_pages' => trim((string) ($payload['must_include_pages'] ?? '')),
-            'offer_items' => trim((string) ($payload['offer_items'] ?? '')),
-            'faq_points' => trim((string) ($payload['faq_points'] ?? '')),
-            'proof_points' => trim((string) ($payload['proof_points'] ?? '')),
-            'image_preferences' => trim((string) ($payload['image_preferences'] ?? '')),
+            'social_links' => trim((string) ($payload['social_links'] ?? $socialLinks)),
+            'must_include_pages' => trim((string) ($payload['must_include_pages'] ?? $mustIncludePages)),
+            'offer_items' => trim((string) ($payload['offer_items'] ?? $legacyOfferItems)),
+            'faq_points' => trim((string) ($payload['faq_points'] ?? $faqPoints)),
+            'proof_points' => trim((string) ($payload['proof_points'] ?? $proofPoints)),
+            'image_preferences' => trim((string) ($payload['image_preferences'] ?? $imagePreferences)),
             'special_requests' => trim((string) ($payload['special_requests'] ?? '')),
+            'offer_cards' => $offerCards,
+            'trust_points_list' => array_values(array_filter(array_map('strval', (array) ($payload['trust_points_list'] ?? [])), fn ($value) => trim($value) !== '')),
+            'faq_questions_list' => array_values(array_filter(array_map('strval', (array) ($payload['faq_questions_list'] ?? [])), fn ($value) => trim($value) !== '')),
+            'page_sections' => array_values(array_filter(array_map('strval', (array) ($payload['page_sections'] ?? [])), fn ($value) => trim($value) !== '')),
+            'social_profiles' => $socialProfiles,
+            'image_direction' => $imageDirection,
         ];
     }
 
