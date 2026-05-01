@@ -470,41 +470,43 @@
                             </div>
                             <div class="stack-item">
                                 <strong>Landing page readiness</strong><br>
-                                @php($qualityAudit = $autopilotDraft['quality_audit'] ?? [])
+                                @php
+                                    $qualityAudit = is_array($autopilotDraft['quality_audit'] ?? null) ? $autopilotDraft['quality_audit'] : [];
+                                @endphp
                                 <div class="muted">Theme fit: {{ ucfirst($qualityAudit['theme_strength'] ?? 'pending') }}</div>
                                 <div class="muted">Offers: {{ $qualityAudit['offers_count'] ?? 0 }} · FAQ: {{ $qualityAudit['faq_count'] ?? 0 }} · Proof: {{ $qualityAudit['proof_count'] ?? 0 }} · Pages: {{ $qualityAudit['page_count'] ?? 0 }}</div>
                                 <div class="muted">Planned media slots: {{ $qualityAudit['media_slot_count'] ?? 0 }} · CTA ready: {{ !empty($qualityAudit['cta_ready']) ? 'Yes' : 'No' }}</div>
-                                @if (!empty($qualityAudit['menus'] ?? []))
+                                <?php if (!empty($qualityAudit['menus'] ?? [])): ?>
                                     <div class="muted">
                                         Booking: {{ !empty($qualityAudit['menus']['online_booking']) ? 'On' : 'Off' }} ·
                                         Service menu: {{ !empty($qualityAudit['menus']['service_menu']) ? 'On' : 'Off' }} ·
                                         Shop menu: {{ !empty($qualityAudit['menus']['shop_menu']) ? 'On' : 'Off' }}
                                     </div>
-                                @endif
+                                <?php endif; ?>
                             </div>
-                            @if (!empty($autopilotDraft['atlas_handoff']['asset_slots'] ?? []))
+                            <?php if (!empty($autopilotDraft['atlas_handoff']['asset_slots'] ?? [])): ?>
                                 <div class="stack-item">
                                     <strong>Creative asset plan</strong><br>
                                     <span class="muted">Hatchers prepared the image brief and asset slots for this website draft.</span>
-                                    @foreach (($autopilotDraft['atlas_handoff']['asset_slots'] ?? []) as $slot)
+                                    <?php foreach (($autopilotDraft['atlas_handoff']['asset_slots'] ?? []) as $slot): ?>
                                         <div class="muted" style="margin-top:8px;">
                                             {{ $slot['slot_label'] ?? 'Slot' }} · {{ $slot['query'] ?? '' }} · {{ ucfirst(str_replace('_', ' ', $slot['status'] ?? 'requested')) }}
                                         </div>
-                                        @if (!empty($slot['preview_url']))
+                                        <?php if (!empty($slot['preview_url'])): ?>
                                             <div style="margin-top:8px;">
                                                 <img src="{{ $slot['preview_url'] }}" alt="{{ $slot['alt_text'] ?? ($slot['slot_label'] ?? 'Website asset') }}" style="width:100%;max-width:220px;border-radius:14px;border:1px solid var(--line);display:block;">
                                             </div>
-                                        @endif
-                                    @endforeach
+                                        <?php endif; ?>
+                                    <?php endforeach; ?>
                                 </div>
-                            @endif
+                            <?php endif; ?>
                             <div class="stack-item">
                                 <strong>Launch checklist</strong><br>
-                                @foreach (($autopilotDraft['launch_checklist'] ?? []) as $check)
+                                <?php foreach (($autopilotDraft['launch_checklist'] ?? []) as $check): ?>
                                     <div class="muted">{{ $check }}</div>
-                                @endforeach
+                                <?php endforeach; ?>
                             </div>
-                            @if (!empty($autopilotDraft['funnel_blocks'] ?? []))
+                            <?php if (!empty($autopilotDraft['funnel_blocks'] ?? [])): ?>
                                 <div class="stack-item">
                                     <strong>Direct-response sections</strong><br>
                                     @php
@@ -517,7 +519,7 @@
                                         </div>
                                     <?php endforeach; ?>
                                 </div>
-                            @endif
+                            <?php endif; ?>
                             <div class="stack-item">
                                 <strong>Website plan status</strong><br>
                                 <span class="muted">
