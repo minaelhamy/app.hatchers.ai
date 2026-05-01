@@ -62,6 +62,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
 use Symfony\Component\HttpFoundation\Cookie;
@@ -8715,6 +8716,25 @@ class OsShellController extends Controller
         $upstream = $client->send($method, $targetUrl, $options);
         $status = $upstream->status();
         $contentType = strtolower((string) $upstream->header('Content-Type', 'text/html; charset=UTF-8'));
+
+        if ($status === 404 && $proxyPath === '') {
+            Log::warning('Storefront proxy returned 404 for website root; falling back to local public website view.', [
+                'company_id' => (int) $company->id,
+                'website_root' => $websiteRoot,
+                'target_url' => $targetUrl,
+                'engine' => (string) ($site['engine'] ?? ''),
+            ]);
+
+            return view('os.public-website', [
+                'pageTitle' => (string) ($company->company_name ?: 'Business Website'),
+                'site' => $site,
+                'sourceContext' => [
+                    'src' => trim((string) $request->query('src', '')),
+                    'promo' => trim((string) $request->query('promo', '')),
+                    'offer' => trim((string) $request->query('offer', '')),
+                ],
+            ]);
+        }
 
         if ($status >= 300 && $status < 400 && filled($upstream->header('Location'))) {
             $location = $this->rewriteStorefrontUrlToOsPath((string) $upstream->header('Location'), $engineProxyUrl, $websiteRoot);
