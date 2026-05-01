@@ -144,7 +144,7 @@ class FounderDashboardService
                 'due' => $isCompleted ? 'Completed' : ($index === 0 ? 'Priority now' : ($index === 1 ? 'Next up' : 'Queued this week')),
                 'title' => $action->title,
                 'description' => $this->actionSummary($action),
-                'cta' => $isCompleted ? '' : ($index === 0 ? 'Build with AI' : 'Write with AI'),
+                'cta' => '',
                 'completed' => $isCompleted,
                 'mentor_name' => $mentorLinked ? $mentorName : '',
                 'mentor_context' => $mentorLinked
@@ -537,15 +537,18 @@ class FounderDashboardService
     private function actionSummary(FounderActionPlan $actionPlan): string
     {
         $meta = is_array($actionPlan->metadata_json) ? $actionPlan->metadata_json : [];
-
-        return trim((string) ($meta['summary'] ?? $actionPlan->description ?? ''));
+        return $this->normalizeActionText((string) ($meta['summary'] ?? $actionPlan->description ?? ''));
     }
 
     private function actionArticle(FounderActionPlan $actionPlan): string
     {
         $meta = is_array($actionPlan->metadata_json) ? $actionPlan->metadata_json : [];
+        return $this->normalizeActionText((string) ($meta['article_body'] ?? $actionPlan->description ?? ''));
+    }
 
-        return trim((string) ($meta['article_body'] ?? $actionPlan->description ?? ''));
+    private function normalizeActionText(string $value): string
+    {
+        return trim(html_entity_decode($value, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
     }
 
     private function lessonBadge(?FounderActionPlan $lesson, bool $isCompleted): string

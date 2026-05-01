@@ -27,11 +27,11 @@
         .task-card-top { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:8px; }
         .task-card-actions { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
         .task-label { font-size:0.83rem; color:var(--rose); text-transform:uppercase; letter-spacing:0.05em; }
-        .task-cta { border:0; border-radius:10px; padding:10px 16px; background:linear-gradient(90deg,#8e1c74,#ff2c35); color:white; font-weight:600; cursor:pointer; }
         .task-status { border:1px solid rgba(220,207,191,0.9); border-radius:10px; padding:10px 14px; background:#fffdf8; color:var(--ink); font-weight:600; cursor:pointer; }
         .task-title { font-size:1.08rem; font-weight:600; }
         .task-subtle { color: var(--muted); font-size:0.98rem; margin-top:4px; }
         .task-card.completed .task-title { text-decoration: line-through; opacity:0.75; }
+        .task-card.completed .task-label, .task-card.completed .task-subtle { opacity:0.72; }
         .task-banner { border-radius:14px; padding:14px 16px; margin-bottom:16px; font-size:0.96rem; }
         .task-banner.success { background:rgba(78, 188, 118, 0.12); border:1px solid rgba(78, 188, 118, 0.24); color:#21643a; }
         .task-banner.error { background:rgba(199, 63, 63, 0.08); border:1px solid rgba(199, 63, 63, 0.2); color:#8c2d2d; }
@@ -101,20 +101,17 @@
                         data-drawer-due="{{ e($task['detail_due']) }}"
                         data-drawer-owner="{{ e($task['detail_owner']) }}"
                         data-drawer-description="{{ e($task['detail_description']) }}"
-                        data-drawer-badge="{{ e($task['cta'] ?: 'Completed') }}"
+                        data-drawer-badge="{{ e($task['completed'] ? 'Completed' : 'Open') }}"
                         data-drawer-comments='@json($task["comments"])'>
                         <div class="task-card-top">
                             <div class="task-label">{{ strtoupper($task['label']) }} · {{ strtoupper($task['due']) }}</div>
                             <div class="task-card-actions">
                                 @if ($task['id'])
-                                    <form method="POST" action="{{ route('founder.tasks.status', $task['id']) }}" onclick="event.stopPropagation();" style="margin:0;">
+                                    <form method="POST" action="{{ route('founder.tasks.status', $task['id']) }}" onclick="event.stopPropagation();" style="margin:0;" data-task-status-form>
                                         @csrf
                                         <input type="hidden" name="status" value="{{ $task['completed'] ? 'pending' : 'completed' }}">
-                                        <button class="task-status" type="submit">{{ $task['status_label'] }}</button>
+                                        <button class="task-status" type="submit" data-task-status-button>{{ $task['status_label'] }}</button>
                                     </form>
-                                @endif
-                                @if (!$task['completed'] && $task['cta'] !== '')
-                                    <button class="task-cta" type="button">{{ $task['cta'] }}</button>
                                 @endif
                             </div>
                         </div>
@@ -132,7 +129,7 @@
             <div class="tasks-rightbar-inner">
                 <h3>Task Guidance</h3>
                 <div class="mini-note">Prioritize the tasks that move your website, offer, and customer pipeline forward this week.</div>
-                <div class="mini-note" style="margin-top:10px;">Use the AI actions to speed up writing, planning, and founder execution.</div>
+                <div class="mini-note" style="margin-top:10px;">Stay focused on the task itself here. Complete it, reopen it, and review the guidance without leaving this workspace.</div>
                 @if (!empty($workspace['mentor_session']['subtitle']))
                     <div class="mini-note" style="margin-top:10px;">Mentor context: {{ $workspace['mentor_session']['subtitle'] }}. Tasks with mentor linkage are aligned to that rhythm.</div>
                 @endif
@@ -183,6 +180,7 @@
         (() => {
             const drawer = document.querySelector('[data-task-drawer]');
             if (!drawer) return;
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
             const title = drawer.querySelector('[data-drawer-title]');
             const due = drawer.querySelector('[data-drawer-due]');
             const owner = drawer.querySelector('[data-drawer-owner]');
@@ -192,9 +190,76 @@
             const statusForm = drawer.querySelector('[data-drawer-status-form]');
             const statusInput = drawer.querySelector('[data-drawer-status-input]');
             const statusLabel = drawer.querySelector('[data-drawer-status-label]');
+            let activeTaskCard = null;
+
+            const applyTaskState = (trigger, completed) => {
+                if (!trigger) return;
+                const nextStatus = completed ? 'pending' : 'completed';
+                const nextLabel = completed ? 'Reopen task' : 'Complete task';
+                const dueLabel = completed ? 'COMPLETED' : 'OPEN';
+
+                trigger.classList.toggle('completed', completed);
+                trigger.setAttribute('data-status-value', nextStatus);
+                trigger.setAttribute('data-status-label', nextLabel);
+                trigger.setAttribute('data-drawer-badge', completed ? 'Completed' : 'Open');
+
+                const cardLabel = trigger.querySelector('.task-label');
+                if (cardLabel) {
+                    const labelParts = (cardLabel.textContent || '').split('·');
+                    const leftLabel = (labelParts[0] || 'TASK').trim();
+                    cardLabel.textContent = `${leftLabel} · ${dueLabel}`;
+                }
+
+                const cardForm = trigger.querySelector('[data-task-status-form]');
+                if (cardForm) {
+                    const hiddenInput = cardForm.querySelector('input[name="status"]');
+                    const submitButton = cardForm.querySelector('[data-task-status-button]');
+                    if (hiddenInput) hiddenInput.value = nextStatus;
+                    if (submitButton) submitButton.textContent = nextLabel;
+                }
+
+                if (activeTaskCard === trigger) {
+                    badge.textContent = completed ? 'Completed' : 'Open';
+                    statusInput.value = nextStatus;
+                    statusLabel.textContent = nextLabel;
+                }
+            };
+
+            const submitTaskStatus = async (form, trigger) => {
+                const action = form.getAttribute('action');
+                if (!action) return;
+
+                const formData = new FormData(form);
+
+                try {
+                    const response = await fetch(action, {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRF-TOKEN': csrfToken,
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'Accept': 'application/json',
+                        },
+                        body: formData,
+                        credentials: 'same-origin',
+                    });
+
+                    const payload = await response.json();
+
+                    if (!response.ok || !payload.ok) {
+                        throw new Error(payload.message || 'Task update failed.');
+                    }
+
+                    applyTaskState(trigger, !!payload.completed);
+                } catch (error) {
+                    console.error(error);
+                    window.alert('We could not update this task in place yet. Please try again.');
+                }
+            };
+
             document.querySelectorAll('[data-open-task]').forEach((trigger) => {
                 trigger.addEventListener('click', (event) => {
                     event.preventDefault();
+                    activeTaskCard = trigger;
                     title.textContent = trigger.getAttribute('data-drawer-title') || 'Task';
                     due.textContent = trigger.getAttribute('data-drawer-due') || '';
                     owner.textContent = trigger.getAttribute('data-drawer-owner') || '';
@@ -226,7 +291,26 @@
                     drawer.classList.add('open');
                 });
             });
-            drawer.querySelector('[data-close-task]')?.addEventListener('click', () => drawer.classList.remove('open'));
+
+            document.querySelectorAll('[data-task-status-form]').forEach((form) => {
+                form.addEventListener('submit', async (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    const trigger = form.closest('[data-open-task]');
+                    await submitTaskStatus(form, trigger);
+                });
+            });
+
+            statusForm?.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                const trigger = activeTaskCard;
+                await submitTaskStatus(statusForm, trigger);
+            });
+
+            drawer.querySelector('[data-close-task]')?.addEventListener('click', () => {
+                drawer.classList.remove('open');
+                activeTaskCard = null;
+            });
         })();
     </script>
 @endsection

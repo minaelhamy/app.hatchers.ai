@@ -1702,7 +1702,7 @@ class OsShellController extends Controller
         FounderActionPlan $actionPlan,
         OsAssistantActionService $actionService,
         AtlasIntelligenceService $atlas
-    ): RedirectResponse {
+    ): RedirectResponse|JsonResponse {
         /** @var \App\Models\Founder $user */
         $user = Auth::user();
         if (!$user->isFounder()) {
@@ -1732,7 +1732,7 @@ class OsShellController extends Controller
         FounderActionPlan $actionPlan,
         OsAssistantActionService $actionService,
         AtlasIntelligenceService $atlas
-    ): RedirectResponse {
+    ): RedirectResponse|JsonResponse {
         /** @var \App\Models\Founder $user */
         $user = Auth::user();
         if (!$user->isFounder()) {
@@ -7004,7 +7004,7 @@ class OsShellController extends Controller
         OsAssistantActionService $actionService,
         AtlasIntelligenceService $atlas,
         string $actorRole = 'founder'
-    ): RedirectResponse {
+    ): RedirectResponse|JsonResponse {
         $normalizedStatus = $status === 'completed' ? 'completed' : 'pending';
         $lmsStatus = $normalizedStatus === 'completed' ? 'completed' : 'open';
         $isLesson = $context === 'lesson';
@@ -7035,16 +7035,46 @@ class OsShellController extends Controller
             ? ($isLesson ? 'Lesson completed from Hatchers Ai Business OS.' : 'Task completed from Hatchers Ai Business OS.')
             : ($isLesson ? 'Lesson reopened inside Hatchers Ai Business OS.' : 'Task reopened inside Hatchers Ai Business OS.');
 
+        $responsePayload = [
+            'ok' => true,
+            'status' => $normalizedStatus,
+            'completed' => $normalizedStatus === 'completed',
+            'message' => $success,
+            'task' => [
+                'id' => $actionPlan->id,
+                'title' => $actionPlan->title,
+                'status_label' => $normalizedStatus === 'completed'
+                    ? ($isLesson ? 'Reopen lesson' : 'Reopen task')
+                    : ($isLesson ? 'Complete lesson' : 'Complete task'),
+            ],
+        ];
+
         if (!($bridgeResult['success'] ?? false)) {
+            if ($this->expectsJsonTaskResponse(request())) {
+                $responsePayload['warning'] = ($bridgeResult['reply'] ?? 'LMS sync is still pending.') . ' The OS state was updated and will keep moving forward.';
+                return response()->json($responsePayload);
+            }
+
             return redirect()
                 ->route($route)
                 ->with('success', $success)
                 ->with('error', ($bridgeResult['reply'] ?? 'LMS sync is still pending.') . ' The OS state was updated and will keep moving forward.');
         }
 
+        if ($this->expectsJsonTaskResponse(request())) {
+            return response()->json($responsePayload);
+        }
+
         return redirect()
             ->route($route)
             ->with('success', $success);
+    }
+
+    private function expectsJsonTaskResponse(Request $request): bool
+    {
+        return $request->expectsJson()
+            || $request->wantsJson()
+            || strtolower((string) $request->header('X-Requested-With')) === 'xmlhttprequest';
     }
 
     private function ensureAdminPermission(Founder $user, string $permission): void

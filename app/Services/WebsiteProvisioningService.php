@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Founder;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class WebsiteProvisioningService
@@ -270,6 +271,13 @@ class WebsiteProvisioningService
                 'data' => $data,
             ];
         } catch (\Throwable $exception) {
+            Log::error('Website engine bridge request failed.', [
+                'engine' => $engine,
+                'base_url' => $baseUrl,
+                'message' => $exception->getMessage(),
+                'exception_class' => get_class($exception),
+            ]);
+
             return [
                 'ok' => false,
                 'error' => 'The website engine could not be reached right now.',
