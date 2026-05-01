@@ -454,7 +454,10 @@ class WebsiteAutopilotService
     private function syncStarterOffer(Founder $founder, array $draft): array
     {
         $starterOffer = is_array($draft['starter_offer'] ?? null) ? $draft['starter_offer'] : [];
-        $title = trim((string) ($starterOffer['title'] ?? ''));
+        $title = $this->normalizeStarterTitle(
+            (string) ($starterOffer['title'] ?? ''),
+            (string) ($starterOffer['mode'] ?? 'service')
+        );
         if ($title === '') {
             return ['ok' => false, 'message' => 'No starter offer title was generated.'];
         }
@@ -501,14 +504,22 @@ class WebsiteAutopilotService
         ]);
 
         foreach (array_slice((array) ($draft['catalog_items'] ?? []), 1, 3) as $index => $item) {
-            if (!is_array($item) || trim((string) ($item['title'] ?? '')) === '') {
+            if (!is_array($item)) {
+                continue;
+            }
+
+            $catalogTitle = $this->normalizeStarterTitle(
+                (string) ($item['title'] ?? ''),
+                (string) ($starterOffer['mode'] ?? 'service')
+            );
+            if ($catalogTitle === '') {
                 continue;
             }
 
             $this->websiteProvisioningService->createStarterRecord($founder, [
                 'website_engine' => $draft['website_engine'],
                 'starter_mode' => $starterOffer['mode'] ?? 'service',
-                'starter_title' => (string) $item['title'],
+                'starter_title' => $catalogTitle,
                 'starter_description' => (string) ($item['description'] ?? ''),
                 'starter_price' => trim((string) ($item['price'] ?? '')) !== ''
                     ? (string) $item['price']
@@ -518,6 +529,17 @@ class WebsiteAutopilotService
         }
 
         return ['ok' => true, 'message' => 'Starter offer created from the website autopilot draft.'];
+    }
+
+    private function normalizeStarterTitle(string $rawTitle, string $mode = 'service'): string
+    {
+        $title = trim((string) Str::of($rawTitle)->replaceMatches('/\s+/', ' '));
+        if ($title === '') {
+            $fallback = strtolower(trim($mode)) === 'product' ? 'Starter Product' : 'Starter Service';
+            return $fallback;
+        }
+
+        return Str::limit($title, 180, '');
     }
 
     private function updateCompanyIntelligence(Company $company, array $draft): void

@@ -34,9 +34,9 @@
         ['key' => 'inbox', 'label' => 'Inbox', 'icon' => 'IN', 'accent' => 'sky', 'href' => route('founder.inbox')],
         ['key' => 'search', 'label' => 'Search', 'icon' => 'Q', 'accent' => 'amber', 'href' => route('founder.search')],
         ['key' => 'ai-tools', 'label' => 'AI Studio', 'icon' => 'AI', 'accent' => 'rose', 'href' => route('founder.ai-tools')],
-        ['key' => 'automations', 'label' => 'Automations', 'icon' => 'BOT', 'accent' => 'plum', 'href' => route('founder.coming-soon', ['feature' => 'automations'])],
-        ['key' => 'affiliate-network', 'label' => 'Affiliate Network', 'icon' => 'AF', 'accent' => 'rose', 'href' => route('founder.coming-soon', ['feature' => 'affiliate-network'])],
-        ['key' => 'offer-engineering', 'label' => 'Offer Engineering', 'icon' => 'OF', 'accent' => 'amber', 'href' => route('founder.coming-soon', ['feature' => 'offer-engineering'])],
+        ['key' => 'automations', 'label' => 'Automations (Coming Soon)', 'icon' => 'BOT', 'accent' => 'plum', 'href' => 'javascript:void(0)', 'disabled' => true],
+        ['key' => 'affiliate-network', 'label' => 'Affiliate Network (Coming Soon)', 'icon' => 'AF', 'accent' => 'rose', 'href' => 'javascript:void(0)', 'disabled' => true],
+        ['key' => 'offer-engineering', 'label' => 'Offer Engineering (Coming Soon)', 'icon' => 'OF', 'accent' => 'amber', 'href' => 'javascript:void(0)', 'disabled' => true],
         ['key' => 'analytics', 'label' => 'Analytics', 'icon' => 'AN', 'accent' => 'mint', 'href' => route('founder.analytics')],
         ['key' => 'media-library', 'label' => 'Media Library', 'icon' => 'ML', 'accent' => 'copper', 'href' => route('founder.media-library')],
         ['key' => 'learning-plan', 'label' => 'Learning Plan', 'icon' => 'LP', 'accent' => 'gold', 'href' => route('founder.learning-plan')],
@@ -71,8 +71,12 @@
                 draggable="true"
                 data-launcher-key="{{ $item['key'] }}"
                 data-launcher-label="{{ $item['label'] }}"
-                data-launcher-route="{{ $item['href'] }}"
+                @if (empty($item['disabled']))
+                    data-launcher-route="{{ $item['href'] }}"
+                @endif
                 data-launcher-icon="{{ $item['icon'] }}"
+                data-launcher-disabled="{{ !empty($item['disabled']) ? '1' : '0' }}"
+                aria-disabled="{{ !empty($item['disabled']) ? 'true' : 'false' }}"
             >
                 <span class="os-launcher-app-surface tone-{{ $item['accent'] }}">
                     <span class="{{ $sidebarIconClass }} os-launcher-app-glyph">{{ $item['icon'] }}</span>

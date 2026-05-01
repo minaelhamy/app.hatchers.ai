@@ -61,7 +61,7 @@
             <section class="atlas-frame-header">
                 <div>
                     <h1>{{ $workspaceLabel }}</h1>
-                    <p>Stay inside Hatchers OS while using the real Atlas workspace underneath. This keeps campaigns, chats, and media work in one operating surface.</p>
+                    <p>Stay inside Hatchers AI OS while using the real Atlas workspace underneath. This keeps campaigns, chats, and media work in one operating surface.</p>
                 </div>
                 <div class="atlas-frame-actions">
                     <a class="atlas-frame-button" href="{{ route('founder.ai-tools') }}">Back to AI Studio</a>

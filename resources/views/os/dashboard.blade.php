@@ -414,6 +414,11 @@
             transition: transform 0.18s ease;
         }
 
+        .os-desktop-icon.is-disabled {
+            cursor: default;
+            opacity: 0.78;
+        }
+
         .os-desktop-icon.dragging {
             opacity: 0.45;
             transform: scale(0.97);
@@ -471,6 +476,18 @@
 
         .os-desktop-icon:hover {
             transform: translateY(-1px);
+        }
+
+        .os-desktop-icon.is-disabled:hover,
+        .os-desktop-icon.is-disabled:hover .os-desktop-icon-tile {
+            transform: none;
+        }
+
+        .os-desktop-icon.is-disabled .os-desktop-icon-tile {
+            box-shadow:
+                0 10px 20px rgba(61, 46, 28, 0.08),
+                inset 0 1px 0 rgba(255, 255, 255, 0.12);
+            filter: saturate(0.9);
         }
 
         .os-desktop-icon-label {
@@ -720,6 +737,7 @@
                 const iconKey = icon.dataset.launcherKey || '';
                 const needsHeartbeat = icon.dataset.launcherHeartbeat === '1';
                 const needsDailyHeartbeat = icon.dataset.launcherDailyHeartbeat === '1';
+                const isDisabled = icon.dataset.launcherDisabled === '1';
 
                 if (needsHeartbeat && openedState[iconKey] !== todayKey) {
                     icon.classList.add('is-heartbeating');
@@ -729,7 +747,13 @@
                     icon.classList.add('is-heartbeating');
                 }
 
-                icon.addEventListener('click', () => {
+                icon.addEventListener('click', (event) => {
+                    if (isDisabled) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        return;
+                    }
+
                     markOpened(iconKey);
                     icon.classList.remove('is-heartbeating');
 
@@ -938,27 +962,30 @@
             ],
             [
                 'key' => 'automations',
-                'label' => 'Automations',
-                'route' => route('founder.coming-soon', ['feature' => 'automations']),
+                'label' => 'Automations (Coming Soon)',
+                'route' => 'javascript:void(0)',
                 'class' => 'os-icon-automation',
                 'icon' => 'gear',
                 'external' => false,
+                'disabled' => true,
             ],
             [
                 'key' => 'affiliate-network',
-                'label' => 'Affiliate Network',
-                'route' => route('founder.coming-soon', ['feature' => 'affiliate-network']),
+                'label' => 'Affiliate Network (Coming Soon)',
+                'route' => 'javascript:void(0)',
                 'class' => 'os-icon-growth',
                 'icon' => 'target',
                 'external' => false,
+                'disabled' => true,
             ],
             [
                 'key' => 'offer-engineering',
-                'label' => 'Offer Engineering',
-                'route' => route('founder.coming-soon', ['feature' => 'offer-engineering']),
+                'label' => 'Offer Engineering (Coming Soon)',
+                'route' => 'javascript:void(0)',
                 'class' => 'os-icon-brand',
                 'icon' => 'spark',
                 'external' => false,
+                'disabled' => true,
             ],
             [
                 'key' => 'analytics',
@@ -1068,17 +1095,21 @@
             <div class="os-desktop-icons" data-os-launcher data-storage-key="hatchers-os-desktop-order-{{ $dashboard['founder']->id ?? 'guest' }}">
                 @foreach ($desktopApps as $app)
                     <a
-                        class="os-desktop-icon"
+                        class="os-desktop-icon {{ !empty($app['disabled']) ? 'is-disabled' : '' }}"
                         href="{{ $app['route'] }}"
                         draggable="true"
                         data-launcher-key="{{ $app['key'] }}"
                         data-launcher-label="{{ $app['label'] }}"
-                        data-launcher-route="{{ $app['route'] }}"
+                        @if (empty($app['disabled']))
+                            data-launcher-route="{{ $app['route'] }}"
+                        @endif
                         data-launcher-class="{{ $app['class'] }}"
                         data-launcher-icon="{{ $app['icon'] }}"
                         data-launcher-external="{{ !empty($app['external']) ? '1' : '0' }}"
                         data-launcher-heartbeat="{{ !empty($app['heartbeat']) ? '1' : '0' }}"
                         data-launcher-daily-heartbeat="{{ !empty($app['daily_heartbeat']) ? '1' : '0' }}"
+                        data-launcher-disabled="{{ !empty($app['disabled']) ? '1' : '0' }}"
+                        aria-disabled="{{ !empty($app['disabled']) ? 'true' : 'false' }}"
                     >
                         <span class="os-desktop-icon-tile {{ $app['class'] }}">
                             @switch($app['icon'])

@@ -400,7 +400,7 @@
                 <section class="intelligence-hero">
                     <div class="intelligence-kicker">Company Intelligence</div>
                     <h1>Build the business core once, then let the whole OS use it.</h1>
-                    <p class="intelligence-copy">This is the first task for every founder. Complete it before using the rest of Hatchers OS, then come back and refine it anytime as your business becomes clearer and stronger.</p>
+                    <p class="intelligence-copy">This is the first task for every founder. Complete it before using the rest of Hatchers AI OS, then come back and refine it anytime as your business becomes clearer and stronger.</p>
                     <div class="intelligence-progress">
                         <div class="intelligence-progress-top">
                             <span>{{ $wizard['completed_steps'] ?? 0 }} of {{ $wizard['total_steps'] ?? 4 }} steps complete</span>

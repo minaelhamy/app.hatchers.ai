@@ -500,7 +500,7 @@
             <section class="grid-2" style="margin-top: 22px;">
                 <div class="card">
                     <h2>Add Your First Offer</h2>
-                    <p class="muted" style="margin-bottom: 14px;">This lets founders create the first product or service directly from Hatchers OS without jumping into engine dashboards first.</p>
+                    <p class="muted" style="margin-bottom: 14px;">This lets founders create the first product or service directly from Hatchers AI OS without jumping into engine dashboards first.</p>
                     <form method="POST" action="/website/starter" class="stack">
                         @csrf
                         @if($osEmbedMode)

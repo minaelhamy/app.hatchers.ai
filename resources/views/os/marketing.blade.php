@@ -117,7 +117,7 @@
                 @if ($errors->any())
                     <div class="marketing-banner error">
                         <strong>Please fix the highlighted fields.</strong>
-                        <div class="marketing-note" style="margin-top:6px;">We kept your draft in place so you can finish creating the campaign from Hatchers OS.</div>
+                        <div class="marketing-note" style="margin-top:6px;">We kept your draft in place so you can finish creating the campaign from Hatchers AI OS.</div>
                     </div>
                 @endif
 
@@ -183,7 +183,7 @@
                         <div class="marketing-card">
                             <div class="marketing-card-meta">Plan Content</div>
                             <div class="marketing-card-title">Create a content request in the OS</div>
-                            <div class="marketing-card-copy">Plan the next post, email, blog, or landing page brief here. Hatchers OS keeps the queue visible and ready for generation.</div>
+                            <div class="marketing-card-copy">Plan the next post, email, blog, or landing page brief here. Hatchers AI OS keeps the queue visible and ready for generation.</div>
                             <form class="marketing-inline-form" method="POST" action="{{ route('founder.marketing.content-request.create') }}">
                                 @csrf
                                 <div class="marketing-field">
@@ -335,7 +335,7 @@
                                 @empty
                                     <div class="marketing-pipeline-item">
                                         <div class="marketing-card-title">No content requests yet</div>
-                                        <div class="marketing-note">Start planning your next pieces here so Hatchers OS becomes the place where campaigns and content both begin.</div>
+                                        <div class="marketing-note">Start planning your next pieces here so Hatchers AI OS becomes the place where campaigns and content both begin.</div>
                                     </div>
                                 @endforelse
                             </div>

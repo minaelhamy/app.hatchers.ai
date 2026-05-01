@@ -126,7 +126,7 @@
                             <div class="tool-card-row">
                                 <div>
                                     <div class="tool-card-title">AI Agents</div>
-                                    <div class="tool-card-copy">See real Atlas conversation threads, reopen any thread, and continue agent work inside Hatchers OS.</div>
+                                    <div class="tool-card-copy">See real Atlas conversation threads, reopen any thread, and continue agent work inside Hatchers AI OS.</div>
                                 </div>
                                 <div class="tool-card-icon">◇</div>
                             </div>
