@@ -45,8 +45,8 @@ class PublicWebsiteService
         if ($storefrontUrl === '') {
             $storefrontUrl = trim((string) ($company->engine_public_url ?? ''));
         }
-        $engineVendorSlug = $this->resolveEngineVendorSlug($storefrontUrl, $payload, $founder?->username, $websitePath);
         $engineBaseUrl = rtrim((string) config('modules.' . $engine . '.base_url', ''), '/');
+        $engineVendorSlug = $this->resolveEngineVendorSlug($storefrontUrl, $engineBaseUrl, $payload, $founder?->username, $websitePath);
         $osBaseUrl = rtrim((string) config('app.url'), '/');
         $engineProxyUrl = '';
 
@@ -128,13 +128,26 @@ class PublicWebsiteService
             ->all();
     }
 
-    private function resolveEngineVendorSlug(string $storefrontUrl, array $payload, ?string $founderUsername, string $websitePath = ''): string
+    private function resolveEngineVendorSlug(string $storefrontUrl, string $engineBaseUrl, array $payload, ?string $founderUsername, string $websitePath = ''): string
     {
         $path = trim((string) parse_url($storefrontUrl, PHP_URL_PATH), '/');
         if ($path !== '') {
             $segments = array_values(array_filter(explode('/', $path)));
             if (!empty($segments)) {
                 return trim((string) $segments[0]);
+            }
+        }
+
+        $storefrontHost = strtolower((string) parse_url($storefrontUrl, PHP_URL_HOST));
+        $engineHost = strtolower((string) parse_url($engineBaseUrl, PHP_URL_HOST));
+        if ($storefrontHost !== '' && $engineHost !== '' && $storefrontHost !== $engineHost) {
+            $suffix = '.' . $engineHost;
+            if (str_ends_with($storefrontHost, $suffix)) {
+                $subdomain = substr($storefrontHost, 0, -strlen($suffix));
+                $subdomain = trim((string) $subdomain);
+                if ($subdomain !== '') {
+                    return $subdomain;
+                }
             }
         }
 
@@ -165,7 +178,7 @@ class PublicWebsiteService
             return true;
         }
 
-        if ($storefrontHost !== $engineHost) {
+        if ($storefrontHost !== $engineHost && !str_ends_with($storefrontHost, '.' . $engineHost)) {
             return true;
         }
 
