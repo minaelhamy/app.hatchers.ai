@@ -2,15 +2,15 @@
 
 return [
     'os' => [
-        'shared_secret' => env('WEBSITE_PLATFORM_SHARED_SECRET', ''),
+        'shared_secret' => env('WEBSITE_PLATFORM_SHARED_SECRET', env('HATCHERS_SHARED_SECRET', '')),
     ],
     'atlas' => [
         'base_url' => env('ATLAS_BASE_URL', 'https://atlas.hatchers.ai'),
-        'shared_secret' => env('WEBSITE_PLATFORM_SHARED_SECRET', ''),
+        'shared_secret' => env('WEBSITE_PLATFORM_SHARED_SECRET', env('HATCHERS_SHARED_SECRET', '')),
     ],
     'lms' => [
         'base_url' => env('LMS_BASE_URL', 'https://lms.hatchers.ai'),
-        'shared_secret' => env('WEBSITE_PLATFORM_SHARED_SECRET', ''),
+        'shared_secret' => env('WEBSITE_PLATFORM_SHARED_SECRET', env('HATCHERS_SHARED_SECRET', '')),
     ],
     'bazaar' => [
         'base_url' => env('BAZAAR_BASE_URL', 'https://bazaar.hatchers.ai'),
