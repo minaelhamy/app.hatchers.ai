@@ -248,7 +248,8 @@ class WebsiteProvisioningService
         }
 
         try {
-            $response = Http::timeout(15)
+            $response = Http::connectTimeout(10)
+                ->timeout(90)
                 ->withHeaders([
                     'X-Hatchers-Signature' => hash_hmac('sha256', $json, $sharedSecret),
                     'Content-Type' => 'application/json',
