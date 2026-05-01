@@ -201,6 +201,30 @@ class WebsiteProvisioningService
         ]);
     }
 
+    public function createBlogRecord(Founder $founder, array $input): array
+    {
+        $engine = $this->normalizeEngine((string) ($input['website_engine'] ?? ''));
+        $title = trim((string) ($input['title'] ?? ''));
+        $description = trim((string) ($input['description'] ?? ''));
+
+        if ($engine === '' || $title === '') {
+            return [
+                'ok' => false,
+                'error' => 'Blog content needs a valid engine and title.',
+            ];
+        }
+
+        return $this->postToEngine($engine, [
+            'category' => 'blog',
+            'operation' => 'create',
+            'username' => $founder->username,
+            'email' => $founder->email,
+            'title' => $title,
+            'description' => $description,
+            'media_assets' => array_values(array_filter((array) ($input['media_assets'] ?? []), fn ($item) => is_array($item))),
+        ]);
+    }
+
     public function connectCustomDomain(Founder $founder, array $input): array
     {
         $engine = $this->normalizeEngine((string) ($input['website_engine'] ?? ''));

@@ -26,7 +26,7 @@ class FounderNotificationService
         return $this->create($founder, [
             'kind' => 'website_building',
             'title' => 'Building your website now.',
-            'meta' => 'Hatchers is preparing your first ' . strtoupper($engineLabel) . ' website draft.',
+            'meta' => 'Hatchers is creating your first ' . strtoupper($engineLabel) . ' website with services, pricing, offer copy, a launch blog, and media in the background.',
             'app_key' => 'build-website',
             'data_json' => [
                 'engine' => strtolower($engineLabel),
@@ -40,7 +40,7 @@ class FounderNotificationService
         return $this->create($founder, [
             'kind' => 'website_ready',
             'title' => 'Your website is ready.',
-            'meta' => trim('Live at ' . preg_replace('#^https?://#', '', $websiteUrl) . ' · Edit it in ' . $this->engineLabelFromAppKey($engineAppKey) . '.'),
+            'meta' => trim('Live at ' . preg_replace('#^https?://#', '', $websiteUrl) . ' · You can edit everything in ' . $this->engineLabelFromAppKey($engineAppKey) . '.'),
             'app_key' => $engineAppKey,
             'link_url' => $websiteUrl,
             'data_json' => [

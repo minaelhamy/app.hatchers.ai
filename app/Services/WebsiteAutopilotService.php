@@ -10,6 +10,7 @@ use App\Models\FounderBusinessBrief;
 use App\Models\FounderIcpProfile;
 use App\Models\FounderWebsiteGenerationRun;
 use App\Models\VerticalBlueprint;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
 
@@ -124,12 +125,15 @@ class WebsiteAutopilotService
             $this->syncDraftToAtlas($founder, $draft);
             $engineSync = $this->syncDraftToWebsiteEngine($founder, $draft);
             $starterSync = $this->syncStarterOffer($founder, $draft);
+            $blogSync = $this->syncStarterBlog($founder, $draft);
             $engineSyncOk = (bool) ($engineSync['ok'] ?? false);
             $starterSyncOk = (bool) ($starterSync['ok'] ?? false);
-            $generationOk = $engineSyncOk && $starterSyncOk;
+            $blogSyncOk = (bool) ($blogSync['ok'] ?? false);
+            $generationOk = $engineSyncOk && $starterSyncOk && $blogSyncOk;
             $failureMessage = trim(implode(' ', array_filter([
                 !$engineSyncOk ? (string) ($engineSync['message'] ?? 'The website engine could not be updated.') : null,
                 !$starterSyncOk ? (string) ($starterSync['message'] ?? 'The starter offers could not be created.') : null,
+                !$blogSyncOk ? (string) ($blogSync['message'] ?? 'The launch blog could not be created.') : null,
             ])));
 
             $run->forceFill([
@@ -137,6 +141,7 @@ class WebsiteAutopilotService
                 'output_json' => array_merge($draft, [
                     'engine_sync' => $engineSync,
                     'starter_sync' => $starterSync,
+                    'blog_sync' => $blogSync,
                 ]),
                 'generated_at' => now(),
             ])->save();
@@ -257,7 +262,14 @@ class WebsiteAutopilotService
         $outcomes = $this->stringList($icp?->desired_outcomes_json ?? []);
         $objections = $this->stringList($icp?->objections_json ?? []);
         $channels = $this->stringList($blueprint->default_channels_json ?? []);
-        $catalogItems = $this->catalogItemsFromWebsiteBuild($websiteBuild, $websiteMode);
+        $catalogItems = $this->catalogItemsFromWebsiteBuild(
+            $websiteBuild,
+            $websiteMode,
+            $company->intelligence,
+            (string) $blueprint->code,
+            $companyName,
+            $coreOffer
+        );
         $pages = $this->pagePlan($blueprint, $websiteBuild);
         $tasks = $this->stringList($blueprint->default_tasks_json ?? []);
         $imageQueries = $this->imageQueries($blueprint, $company, $icpName, $websiteBuild);
@@ -277,7 +289,6 @@ class WebsiteAutopilotService
         $websiteGoal = trim((string) ($websiteBuild['website_goal'] ?? ''));
         $faqPoints = $this->websiteBuildFaqQuestions($websiteBuild);
         $proofPoints = $this->websiteBuildTrustPoints($websiteBuild);
-
         $headline = $this->heroHeadline($blueprint, $companyName, $problemSolved, $city);
         $subhead = $this->heroSubhead($companyName, $coreOffer, $icpName, $city);
         $briefLine = $problemSolved !== ''
@@ -296,6 +307,8 @@ class WebsiteAutopilotService
             $starterPrice = '49';
         }
         $contactBlock = $this->contactBlock($websiteBuild, $city, (string) $brief->delivery_scope);
+
+        $starterBlog = $this->starterBlogDraft($companyName, $problemSolved, $starterTitle, $icpName, $city);
 
         return [
             'website_engine' => $engine,
@@ -357,6 +370,7 @@ class WebsiteAutopilotService
                 'price' => $starterPrice,
             ],
             'catalog_items' => $catalogItems,
+            'starter_blog' => $starterBlog,
             'pricing' => $pricing,
             'sell_like_crazy' => [
                 'core_promise' => $headline,
@@ -430,6 +444,7 @@ class WebsiteAutopilotService
                 'offers_count' => count($catalogItems),
                 'faq_count' => count($faqPoints),
                 'proof_count' => count($proofPoints),
+                'blog_count' => $starterBlog['title'] !== '' ? 1 : 0,
                 'page_count' => count($pages),
                 'media_slot_count' => 6,
                 'cta_ready' => $primaryCta !== '',
@@ -575,6 +590,50 @@ class WebsiteAutopilotService
         }
 
         return ['ok' => true, 'message' => 'Starter offer created from the website autopilot draft.'];
+    }
+
+    private function syncStarterBlog(Founder $founder, array $draft): array
+    {
+        $blog = is_array($draft['starter_blog'] ?? null) ? $draft['starter_blog'] : [];
+        $title = trim((string) ($blog['title'] ?? ''));
+        $description = trim((string) ($blog['description'] ?? ''));
+
+        if ($title === '' || $description === '') {
+            return ['ok' => true, 'message' => 'No starter blog needed for this website build.'];
+        }
+
+        $existing = $founder->actionPlans()
+            ->where('platform', (string) $draft['website_engine'])
+            ->where('title', $title)
+            ->exists();
+
+        if ($existing) {
+            return ['ok' => true, 'message' => 'Starter blog already exists.'];
+        }
+
+        $result = $this->websiteProvisioningService->createBlogRecord($founder, [
+            'website_engine' => $draft['website_engine'],
+            'title' => $title,
+            'description' => $description,
+            'media_assets' => $this->starterRecordMedia($draft, 0),
+        ]);
+
+        if (!($result['ok'] ?? false)) {
+            return ['ok' => false, 'message' => (string) ($result['error'] ?? 'Starter blog could not be created.')];
+        }
+
+        FounderActionPlan::create([
+            'founder_id' => $founder->id,
+            'title' => $title,
+            'description' => $description,
+            'platform' => (string) $draft['website_engine'],
+            'priority' => 70,
+            'status' => 'created',
+            'cta_label' => 'Edit In Servio',
+            'cta_url' => route('workspace.launch', ['module' => 'servio']),
+        ]);
+
+        return ['ok' => true, 'message' => 'Starter blog created from the website autopilot draft.'];
     }
 
     private function normalizeStarterTitle(string $rawTitle, string $mode = 'service'): string
@@ -1175,7 +1234,14 @@ class WebsiteAutopilotService
         return $businessModel === 'hybrid' ? 'service' : $businessModel;
     }
 
-    private function catalogItemsFromWebsiteBuild(array $websiteBuild, string $websiteMode): array
+    private function catalogItemsFromWebsiteBuild(
+        array $websiteBuild,
+        string $websiteMode,
+        ?CompanyIntelligence $intelligence = null,
+        string $blueprintCode = '',
+        string $companyName = '',
+        string $coreOffer = ''
+    ): array
     {
         $cards = collect((array) ($websiteBuild['offer_cards'] ?? []))
             ->filter(fn ($item): bool => is_array($item))
@@ -1212,11 +1278,191 @@ class WebsiteAutopilotService
             return $items;
         }
 
-        return [[
-            'title' => $websiteMode === 'product' ? 'Featured product' : 'Signature service',
-            'price' => '',
-            'description' => '',
-        ]];
+        $freeformItems = $this->catalogItemsFromFounderNotes($websiteBuild);
+        if ($freeformItems !== []) {
+            return $freeformItems;
+        }
+
+        return $this->generatedCatalogItems($websiteBuild, $websiteMode, $intelligence, $blueprintCode, $companyName, $coreOffer);
+    }
+
+    private function catalogItemsFromFounderNotes(array $websiteBuild): array
+    {
+        $notes = trim(implode("\n", array_filter([
+            (string) ($websiteBuild['services_pricing_notes'] ?? ''),
+            (string) ($websiteBuild['special_requests'] ?? ''),
+        ])));
+
+        if ($notes === '') {
+            return [];
+        }
+
+        return collect(preg_split("/\r\n|\n|\r/", $notes) ?: [])
+            ->map(function (string $line): ?array {
+                $normalized = trim(preg_replace('/^[\-\*\d\.\)\s]+/', '', $line) ?? '');
+                if ($normalized === '') {
+                    return null;
+                }
+
+                $parts = array_map('trim', preg_split('/\s+\|\s+/', $normalized) ?: []);
+                if (count($parts) >= 2) {
+                    return [
+                        'title' => (string) ($parts[0] ?? ''),
+                        'price' => (string) ($parts[1] ?? ''),
+                        'description' => (string) ($parts[2] ?? ''),
+                    ];
+                }
+
+                if (preg_match('/^(?<title>[^$]+?)\s+\$?(?<price>\d[\d,]*(?:\.\d{1,2})?(?:\/[A-Za-z]+)?)\s*[-:]\s*(?<description>.+)$/', $normalized, $matches)) {
+                    return [
+                        'title' => trim((string) ($matches['title'] ?? '')),
+                        'price' => trim((string) ($matches['price'] ?? '')),
+                        'description' => trim((string) ($matches['description'] ?? '')),
+                    ];
+                }
+
+                return null;
+            })
+            ->filter(fn ($item) => is_array($item) && trim((string) ($item['title'] ?? '')) !== '')
+            ->take(4)
+            ->values()
+            ->all();
+    }
+
+    private function generatedCatalogItems(
+        array $websiteBuild,
+        string $websiteMode,
+        ?CompanyIntelligence $intelligence = null,
+        string $blueprintCode = '',
+        string $companyName = '',
+        string $coreOffer = ''
+    ): array
+    {
+        $goal = trim((string) ($websiteBuild['website_goal'] ?? ''));
+        $focusLine = trim((string) ($websiteBuild['founder_story_notes'] ?? ''));
+        $pricingNotes = trim((string) ($intelligence?->pricing_notes ?? ''));
+        $marketNotes = trim((string) ($intelligence?->local_market_notes ?? ''));
+        $intelligenceOffer = trim((string) ($intelligence?->core_offer ?? ''));
+        $seed = strtolower(trim(implode(' ', array_filter([
+            $goal,
+            $focusLine,
+            (string) ($websiteBuild['services_pricing_notes'] ?? ''),
+            (string) ($websiteBuild['special_requests'] ?? ''),
+            $pricingNotes,
+            $marketNotes,
+            $intelligenceOffer,
+            $coreOffer,
+            $blueprintCode,
+            $companyName,
+        ]))));
+
+        $profiles = [
+            'dog' => [
+                ['title' => 'Quick Relief Walk', 'price' => '$25', 'description' => 'A dependable 30-minute walk for busy weekdays and restless dogs.'],
+                ['title' => 'Daily DogWalker Plan', 'price' => '$129/week', 'description' => 'Recurring weekday walks with updates and a simple schedule for busy owners.'],
+                ['title' => 'Puppy Energy Reset', 'price' => '$39', 'description' => 'A higher-attention session for puppies or high-energy dogs that need structure and movement.'],
+            ],
+            'music' => [
+                ['title' => 'Artist Growth Audit', 'price' => '$149', 'description' => 'A focused strategy session to diagnose what is blocking growth, audience building, and monetization.'],
+                ['title' => 'Signature Coaching Sprint', 'price' => '$497', 'description' => 'A high-accountability package with clear actions, positioning, and revenue priorities.'],
+                ['title' => 'Momentum Membership', 'price' => '$997/mo', 'description' => 'Ongoing guidance, feedback, and execution support for artists building predictable momentum.'],
+            ],
+            'clean' => [
+                ['title' => 'Fresh Start Clean', 'price' => '$129', 'description' => 'A thorough reset for busy homes that need a dependable first clean.'],
+                ['title' => 'Weekly Home Flow', 'price' => '$89/visit', 'description' => 'Recurring cleaning that keeps the home consistently guest-ready and stress-free.'],
+                ['title' => 'Deep Clean Upgrade', 'price' => '$249', 'description' => 'A premium clean for neglected areas, special events, or seasonal resets.'],
+            ],
+            'barber' => [
+                ['title' => 'Sharp Cut Session', 'price' => '$35', 'description' => 'A clean, confidence-building haircut with fast booking and a smooth in-chair experience.'],
+                ['title' => 'Cut + Beard Reset', 'price' => '$55', 'description' => 'A more complete grooming package for clients who want the full polished look.'],
+                ['title' => 'VIP Grooming Plan', 'price' => '$99/mo', 'description' => 'A membership-style plan for regular maintenance, priority booking, and a premium experience.'],
+            ],
+            'default_service' => [
+                ['title' => 'Starter Service', 'price' => '$49', 'description' => 'An easy first step that reduces friction and gets the customer moving fast.'],
+                ['title' => 'Core Offer', 'price' => '$149', 'description' => 'The main conversion-focused package built to solve the biggest customer problem.'],
+                ['title' => 'Premium Upgrade', 'price' => '$299', 'description' => 'A higher-value option for buyers who want speed, depth, or extra support.'],
+            ],
+            'default_product' => [
+                ['title' => 'Featured Product', 'price' => '$39', 'description' => 'The hero item positioned as the easiest first purchase.'],
+                ['title' => 'Best-Seller Bundle', 'price' => '$79', 'description' => 'A stronger average-order-value offer combining the most relevant items.'],
+                ['title' => 'Premium Collection', 'price' => '$129', 'description' => 'A higher-end option for customers who want the full experience.'],
+            ],
+        ];
+
+        $selected = match (true) {
+            str_contains($seed, 'dog') => $profiles['dog'],
+            str_contains($seed, 'artist'), str_contains($seed, 'music'), str_contains($seed, 'musician') => $profiles['music'],
+            str_contains($seed, 'clean') => $profiles['clean'],
+            str_contains($seed, 'barber'), str_contains($seed, 'cut') => $profiles['barber'],
+            str_contains($seed, 'dog-walking') => $profiles['dog'],
+            str_contains($seed, 'tutoring-coaching') => $profiles['music'],
+            str_contains($seed, 'home-cleaning') => $profiles['clean'],
+            str_contains($seed, 'barber-services') => $profiles['barber'],
+            $websiteMode === 'product' => $profiles['default_product'],
+            default => $profiles['default_service'],
+        };
+
+        $starterPrice = $this->extractPriceHint($pricingNotes)
+            ?: $this->extractPriceHint($marketNotes)
+            ?: trim((string) ($selected[0]['price'] ?? ''));
+        $corePrice = $this->extractPriceHintFromBand($pricingNotes, 2)
+            ?: trim((string) ($selected[1]['price'] ?? ''));
+        $premiumPrice = $this->extractPriceHintFromBand($pricingNotes, 3)
+            ?: trim((string) ($selected[2]['price'] ?? ''));
+
+        $offerLabel = trim($intelligenceOffer !== '' ? $intelligenceOffer : $coreOffer);
+        if ($offerLabel !== '') {
+            $headlineOffer = Str::headline(Str::of($offerLabel)->replace(['service', 'services', 'offer', 'offers', 'package', 'packages'], ' ')->trim()->value());
+            if ($headlineOffer !== '') {
+                $selected[0]['title'] = $headlineOffer . ' Starter';
+                $selected[1]['title'] = $headlineOffer . ' Core';
+                $selected[2]['title'] = $headlineOffer . ' Premium';
+            }
+        }
+
+        $selected[0]['price'] = $starterPrice !== '' ? $starterPrice : $selected[0]['price'];
+        $selected[1]['price'] = $corePrice !== '' ? $corePrice : $selected[1]['price'];
+        $selected[2]['price'] = $premiumPrice !== '' ? $premiumPrice : $selected[2]['price'];
+
+        return $selected;
+    }
+
+    private function extractPriceHint(string $raw): string
+    {
+        if (preg_match('/\$?\s?(\d[\d,]*(?:\.\d{1,2})?(?:\/[A-Za-z]+)?)/', $raw, $matches)) {
+            return '$' . ltrim((string) ($matches[1] ?? ''), '$');
+        }
+
+        return '';
+    }
+
+    private function extractPriceHintFromBand(string $raw, int $band): string
+    {
+        preg_match_all('/\$?\s?(\d[\d,]*(?:\.\d{1,2})?(?:\/[A-Za-z]+)?)/', $raw, $matches);
+        $prices = array_values(array_filter(array_map('strval', (array) ($matches[1] ?? []))));
+        $index = max(0, $band - 1);
+
+        if (!isset($prices[$index])) {
+            return '';
+        }
+
+        return '$' . ltrim($prices[$index], '$');
+    }
+
+    private function starterBlogDraft(string $companyName, string $problemSolved, string $starterTitle, string $icpName, string $city): array
+    {
+        $cityTail = $city !== '' ? ' in ' . $city : '';
+        $problem = trim($problemSolved) !== '' ? trim($problemSolved) : 'make the first buying decision feel simpler and more confident';
+        $offer = trim($starterTitle) !== '' ? trim($starterTitle) : 'the best first offer';
+
+        return [
+            'title' => 'How ' . $companyName . ' helps ' . $icpName . ' stop struggling and start moving faster',
+            'description' => trim(implode("\n\n", [
+                $companyName . ' was built to help ' . $icpName . $cityTail . ' solve one frustrating problem: ' . $problem . '.',
+                'Instead of overwhelming people with too many choices, the site leads with a single high-conviction next step: ' . $offer . '. That follows a Sell Like Crazy structure by making the problem clear, the promise obvious, and the call to action easy to say yes to.',
+                'The goal is simple: remove confusion, increase trust, and create an offer stack that feels valuable enough to act on now. That is the same value-first logic behind strong Grand Slam style offers: more clarity, better outcome, less friction.',
+            ])),
+        ];
     }
 
     private function pagePlan(VerticalBlueprint $blueprint, array $websiteBuild): array

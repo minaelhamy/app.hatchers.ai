@@ -4085,9 +4085,11 @@ class OsShellController extends Controller
         }
 
         $validated = $request->validate([
-            'website_goal' => ['required', 'string', 'max:255'],
+            'website_goal' => ['nullable', 'string', 'max:255'],
             'primary_website_focus' => ['nullable', Rule::in(['auto', 'product', 'service'])],
             'primary_cta' => ['nullable', 'string', 'max:255'],
+            'founder_story_notes' => ['nullable', 'string', 'max:2500'],
+            'services_pricing_notes' => ['nullable', 'string', 'max:3000'],
             'contact_email' => ['nullable', 'email', 'max:255'],
             'contact_phone' => ['nullable', 'string', 'max:120'],
             'whatsapp_number' => ['nullable', 'string', 'max:120'],
@@ -4127,16 +4129,29 @@ class OsShellController extends Controller
             'image_preferences' => ['nullable', 'string', 'max:1500'],
         ]);
 
-        $founder->loadMissing('company.intelligence', 'businessBrief', 'icpProfiles', 'actionPlans');
-        $company = $founder->company;
-        if (!$company) {
-            return redirect()->route('founder.settings', array_filter([
-                'step' => 'basics',
-                'os_embed' => $request->boolean('os_embed') ? 1 : null,
-            ]))->with('error', 'Complete the company basics before building the website.');
-        }
+        try {
+
+            $founder->loadMissing('company.intelligence', 'businessBrief', 'icpProfiles', 'actionPlans');
+            $company = $founder->company;
+            if (!$company) {
+                return redirect()->route('founder.settings', array_filter([
+                    'step' => 'basics',
+                    'os_embed' => $request->boolean('os_embed') ? 1 : null,
+                ]))->with('error', 'Complete the company basics before building the website.');
+            }
 
         $this->syncFounderBusinessContextModels($founder, $company);
+        $existingBrief = $founder->businessBrief ?: $company->businessBrief;
+        $autoWebsiteGoal = trim((string) ($validated['website_goal'] ?? ''));
+        if ($autoWebsiteGoal === '') {
+            $autoWebsiteGoal = trim((string) ($company->intelligence?->primary_growth_goal ?? ''));
+        }
+        if ($autoWebsiteGoal === '') {
+            $autoWebsiteGoal = 'Get more customers and create the clearest first offer.';
+        }
+        $founderStoryNotes = trim((string) ($validated['founder_story_notes'] ?? ''));
+        $servicesPricingNotes = trim((string) ($validated['services_pricing_notes'] ?? ''));
+        $specialRequests = trim((string) ($validated['special_requests'] ?? ''));
 
         $brief = FounderBusinessBrief::updateOrCreate(
             ['founder_id' => $founder->id, 'company_id' => $company->id],
@@ -4148,11 +4163,13 @@ class OsShellController extends Controller
                 'core_offer' => (string) ($company->intelligence?->core_offer ?? ''),
                 'business_type_detail' => (string) ($company->verticalBlueprint?->name ?? ''),
                 'location_city' => (string) ($company->primary_city ?? ''),
-                'location_country' => (string) ($brief->location_country ?? ''),
+                'location_country' => (string) ($existingBrief?->location_country ?? ''),
                 'service_radius' => (string) ($company->service_radius ?? ''),
-                'delivery_scope' => (string) ($brief->delivery_scope ?? $company->service_radius ?? ''),
-                'proof_points' => (string) ($brief->proof_points ?? ''),
-                'founder_story' => (string) ($brief->founder_story ?? $company->company_brief ?? ''),
+                'delivery_scope' => (string) ($existingBrief?->delivery_scope ?? $company->service_radius ?? ''),
+                'proof_points' => (string) ($existingBrief?->proof_points ?? ''),
+                'founder_story' => $founderStoryNotes !== ''
+                    ? $founderStoryNotes
+                    : (string) ($existingBrief?->founder_story ?? $company->company_brief ?? ''),
                 'status' => 'captured',
             ]
         );
@@ -4170,9 +4187,11 @@ class OsShellController extends Controller
         $imageDirection = $this->normalizeWebsiteBuildImageDirection($validated);
 
         $constraints['website_build'] = [
-            'website_goal' => trim((string) ($validated['website_goal'] ?? '')),
+            'website_goal' => $autoWebsiteGoal,
             'primary_website_focus' => trim((string) ($validated['primary_website_focus'] ?? 'auto')),
             'primary_cta' => trim((string) ($validated['primary_cta'] ?? '')),
+            'founder_story_notes' => $founderStoryNotes,
+            'services_pricing_notes' => $servicesPricingNotes,
             'contact_email' => trim((string) ($validated['contact_email'] ?? '')),
             'contact_phone' => trim((string) ($validated['contact_phone'] ?? '')),
             'whatsapp_number' => trim((string) ($validated['whatsapp_number'] ?? '')),
@@ -4191,12 +4210,15 @@ class OsShellController extends Controller
             'faq_points' => $this->websiteBuildListToText($faqQuestions, trim((string) ($validated['faq_points'] ?? ''))),
             'proof_points' => $this->websiteBuildListToText($trustPoints, trim((string) ($validated['proof_points'] ?? ''))),
             'image_preferences' => $this->websiteBuildImageDirectionToText($imageDirection, trim((string) ($validated['image_preferences'] ?? ''))),
-            'special_requests' => trim((string) ($validated['special_requests'] ?? '')),
+            'special_requests' => $specialRequests,
             'updated_at' => now()->toDateTimeString(),
         ];
 
         $brief->forceFill([
             'constraints_json' => $constraints,
+            'business_summary' => $servicesPricingNotes !== ''
+                ? trim((string) ($brief->business_summary ?: $company->company_brief) . "\n\nService and pricing notes:\n" . $servicesPricingNotes)
+                : (string) ($brief->business_summary ?? $company->company_brief ?? ''),
             'proof_points' => $this->websiteBuildListToText($trustPoints, (string) ($brief->proof_points ?? '')),
         ])->save();
 
@@ -4219,6 +4241,8 @@ class OsShellController extends Controller
 
                 /** @var WebsiteAutopilotService $websiteAutopilotService */
                 $websiteAutopilotService = app(WebsiteAutopilotService::class);
+                /** @var WebsiteProvisioningService $websiteProvisioningService */
+                $websiteProvisioningService = app(WebsiteProvisioningService::class);
                 /** @var FounderNotificationService $founderNotificationService */
                 $founderNotificationService = app(FounderNotificationService::class);
 
@@ -4257,6 +4281,35 @@ class OsShellController extends Controller
                     return;
                 }
 
+                $publishResult = $websiteProvisioningService->publishWebsite(
+                    $freshFounder,
+                    (string) ($freshCompany?->website_engine ?? 'servio')
+                );
+
+                if (!($publishResult['ok'] ?? false) && ($publishResult['bridge_status'] ?? null) !== 'pending') {
+                    if ($freshCompany) {
+                        $freshCompany->forceFill([
+                            'website_generation_status' => 'queued',
+                            'website_status' => 'not_started',
+                        ])->save();
+                    }
+
+                    $founderNotificationService->websiteBuildFailed(
+                        $freshFounder,
+                        (string) ($publishResult['error'] ?? 'We built the website draft, but could not publish it yet.')
+                    );
+
+                    return;
+                }
+
+                if ($freshCompany) {
+                    $freshCompany->forceFill([
+                        'website_status' => 'live',
+                        'website_generation_status' => 'published',
+                        'launch_stage' => 'website_live',
+                    ])->save();
+                }
+
                 $websiteUrl = (string) ($freshCompany?->website_url ?: ('https://app.hatchers.ai/' . ltrim((string) ($freshCompany?->website_path ?? ''), '/')));
                 $engineAppKey = strtolower((string) ($freshCompany?->website_engine ?? 'servio')) === 'bazaar' ? 'bazaar-engine' : 'servio-engine';
                 $founderNotificationService->websiteReady($freshFounder, $engineAppKey, $websiteUrl);
@@ -4283,12 +4336,24 @@ class OsShellController extends Controller
             }
         });
 
-        return redirect()
-            ->route('website', array_filter([
-                'stage' => 'build',
-                'os_embed' => $request->boolean('os_embed') ? 1 : null,
-            ]))
-            ->with('success', 'We are working on your website now. You can close this window and we will notify you when it is ready.');
+            return redirect()
+                ->route('website', array_filter([
+                    'stage' => 'build',
+                    'os_embed' => $request->boolean('os_embed') ? 1 : null,
+                ]))
+                ->with('success', 'We are building and publishing your website now. We will notify you as soon as it is live and ready to edit in Servio.');
+        } catch (Throwable $e) {
+            Log::error('Website build request submission failed before generation started.', [
+                'founder_id' => $founder->id,
+                'company_id' => $founder->company_id,
+                'message' => $e->getMessage(),
+            ]);
+
+            return redirect()
+                ->back()
+                ->withInput()
+                ->with('error', 'We could not start the website build just yet. Your notes are safe, and we already tightened this flow so it fails gracefully while we finish the last fixes.');
+        }
     }
 
     public function founderApplyLaunchSystem(Request $request, WebsiteAutopilotService $websiteAutopilotService): RedirectResponse
