@@ -8067,17 +8067,22 @@ class OsShellController extends Controller
         }
 
         $company = Company::query()
-            ->where('website_status', 'live')
             ->with('founder')
             ->get()
             ->first(function (Company $company) use ($normalizedPath): bool {
-                $path = trim(strtolower((string) ($company->website_path ?? '')), '/');
-                if ($path === '') {
-                    $path = strtolower((string) str($company->company_name ?: 'your-business')->slug('-'));
+                if (!$this->companyMatchesPublicWebsitePath($company, $normalizedPath)) {
+                    return false;
                 }
 
-                return $path === $normalizedPath;
+                return $this->companyIsPublicWebsiteLive($company);
             });
+
+        if (!$company) {
+            $company = Company::query()
+                ->with('founder')
+                ->get()
+                ->first(fn (Company $company): bool => $this->companyMatchesPublicWebsitePath($company, $normalizedPath));
+        }
 
         if ($company && blank($company->website_path)) {
             $company->website_path = $normalizedPath;
@@ -8091,6 +8096,36 @@ class OsShellController extends Controller
     private function resolvePublicWebsiteRootCompany(string $websiteRoot): ?Company
     {
         return $this->resolvePublicWebsiteCompany($websiteRoot);
+    }
+
+    private function companyMatchesPublicWebsitePath(Company $company, string $normalizedPath): bool
+    {
+        $path = trim(strtolower((string) ($company->website_path ?? '')), '/');
+        if ($path === '') {
+            $path = strtolower((string) str($company->company_name ?: 'your-business')->slug('-'));
+        }
+
+        if ($path === $normalizedPath) {
+            return true;
+        }
+
+        $websiteUrlPath = trim((string) parse_url((string) ($company->website_url ?? ''), PHP_URL_PATH), '/');
+        if ($websiteUrlPath !== '' && strtolower($websiteUrlPath) === $normalizedPath) {
+            return true;
+        }
+
+        return false;
+    }
+
+    private function companyIsPublicWebsiteLive(Company $company): bool
+    {
+        $websiteStatus = strtolower(trim((string) ($company->website_status ?? '')));
+        $generationStatus = strtolower(trim((string) ($company->website_generation_status ?? '')));
+        $launchStage = strtolower(trim((string) ($company->launch_stage ?? '')));
+
+        return $websiteStatus === 'live'
+            || $generationStatus === 'published'
+            || $launchStage === 'website_live';
     }
 
     private function proxyEngineStorefront(Company $company, string $proxyPath, Request $request, PublicWebsiteService $publicWebsiteService)
