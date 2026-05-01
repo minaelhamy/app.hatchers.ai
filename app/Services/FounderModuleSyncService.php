@@ -92,7 +92,11 @@ class FounderModuleSyncService
             return ['ok' => false, 'error' => 'Unsupported sync module.'];
         }
 
+        $founder->loadMissing('company.intelligence', 'company.businessBrief', 'company.icpProfiles', 'company.verticalBlueprint');
         $company = $founder->company;
+        $intelligence = $company?->intelligence;
+        $businessBrief = $company?->businessBrief;
+        $icpProfile = $company?->icpProfiles()->latest()->first();
         $payload = [
             'name' => $founder->full_name,
             'email' => $founder->email,
@@ -103,6 +107,49 @@ class FounderModuleSyncService
             'business_model' => $company?->business_model,
             'industry' => $company?->industry,
             'stage' => $company?->stage,
+            'primary_city' => $company?->primary_city,
+            'service_radius' => $company?->service_radius,
+            'website_path' => $company?->website_path,
+            'vertical_blueprint' => $company?->verticalBlueprint?->code,
+            'company_intelligence' => [
+                'target_audience' => $intelligence?->target_audience,
+                'primary_icp_name' => $intelligence?->primary_icp_name,
+                'ideal_customer_profile' => $intelligence?->ideal_customer_profile,
+                'problem_solved' => $intelligence?->problem_solved,
+                'brand_voice' => $intelligence?->brand_voice,
+                'differentiators' => $intelligence?->differentiators,
+                'core_offer' => $intelligence?->core_offer,
+                'primary_growth_goal' => $intelligence?->primary_growth_goal,
+                'known_blockers' => $intelligence?->known_blockers,
+                'objections' => $intelligence?->objections,
+                'buying_triggers' => $intelligence?->buying_triggers,
+                'local_market_notes' => $intelligence?->local_market_notes,
+                'visual_style' => $intelligence?->visual_style,
+            ],
+            'business_brief' => [
+                'business_name' => $businessBrief?->business_name,
+                'business_summary' => $businessBrief?->business_summary,
+                'problem_solved' => $businessBrief?->problem_solved,
+                'core_offer' => $businessBrief?->core_offer,
+                'business_type_detail' => $businessBrief?->business_type_detail,
+                'location_city' => $businessBrief?->location_city,
+                'location_country' => $businessBrief?->location_country,
+                'service_radius' => $businessBrief?->service_radius,
+                'delivery_scope' => $businessBrief?->delivery_scope,
+                'proof_points' => $businessBrief?->proof_points,
+                'founder_story' => $businessBrief?->founder_story,
+            ],
+            'icp_profile' => [
+                'primary_icp_name' => $icpProfile?->primary_icp_name,
+                'pain_points' => $icpProfile?->pain_points_json,
+                'desired_outcomes' => $icpProfile?->desired_outcomes_json,
+                'buying_triggers' => $icpProfile?->buying_triggers_json,
+                'objections' => $icpProfile?->objections_json,
+                'price_sensitivity' => $icpProfile?->price_sensitivity,
+                'primary_channels' => $icpProfile?->primary_channels_json,
+                'local_area_focus' => $icpProfile?->local_area_focus_json,
+                'language_style' => $icpProfile?->language_style,
+            ],
             'status' => $founder->status,
         ];
 

@@ -93,8 +93,14 @@ class OsShellController extends Controller
             'submitted' => session('submitted'),
             'selectedPlan' => $selectedPlan,
             'verticalBlueprintOptions' => array_values($this->verticalBlueprintDefinitions()),
+            'businessModelOptions' => $this->founderBusinessModelOptions(),
+            'stageOptions' => $this->founderStageOptions(),
             'industryOptions' => $this->founderIndustryOptions(),
+            'targetAudienceOptions' => $this->founderTargetAudienceOptions(),
+            'brandVoiceOptions' => $this->founderBrandVoiceOptions(),
             'coreOfferOptions' => $this->founderCoreOfferOptions(),
+            'growthGoalOptions' => $this->founderPrimaryGrowthGoalOptions(),
+            'knownBlockerOptions' => $this->founderKnownBlockerOptions(),
         ]);
     }
 
@@ -3177,11 +3183,21 @@ class OsShellController extends Controller
             'pageTitle' => 'Company Intelligence',
             'dashboard' => $founderDashboardService->build($user),
             'intelligence' => $user->company?->intelligence,
+            'latestIcpProfile' => $user->company?->icpProfiles()->latest()->first(),
+            'businessModelOptions' => $this->founderBusinessModelOptions(),
+            'stageOptions' => $this->founderStageOptions(),
+            'verticalBlueprintOptions' => array_values($this->verticalBlueprintDefinitions()),
+            'industryOptions' => $this->founderIndustryOptions(),
+            'targetAudienceOptions' => $this->founderTargetAudienceOptions(),
+            'brandVoiceOptions' => $this->founderBrandVoiceOptions(),
+            'coreOfferOptions' => $this->founderCoreOfferOptions(),
+            'growthGoalOptions' => $this->founderPrimaryGrowthGoalOptions(),
+            'knownBlockerOptions' => $this->founderKnownBlockerOptions(),
             'wizard' => $wizard,
         ]);
     }
 
-    public function founderUpdateSettings(Request $request): RedirectResponse
+    public function founderUpdateSettings(Request $request, FounderModuleSyncService $founderModuleSyncService): RedirectResponse
     {
         /** @var \App\Models\Founder $user */
         $user = Auth::user();
@@ -3197,26 +3213,32 @@ class OsShellController extends Controller
                 'phone' => ['nullable', 'string', 'max:50'],
                 'company_name' => ['required', 'string', 'max:255'],
                 'company_brief' => ['required', 'string', 'max:2000'],
-                'business_model' => ['required', Rule::in(['product', 'service', 'hybrid'])],
+                'business_model' => ['required', Rule::in(array_keys($this->founderBusinessModelOptions()))],
+                'vertical_blueprint' => ['required', Rule::in(array_keys($this->verticalBlueprintDefinitions()))],
+                'industry' => ['required', Rule::in($this->founderIndustryOptions())],
+                'stage' => ['required', Rule::in(array_keys($this->founderStageOptions()))],
+                'primary_city' => ['required', 'string', 'max:191'],
+                'service_radius' => ['required', 'string', 'max:191'],
                 'company_logo' => ['nullable', 'image', 'max:4096'],
             ],
             'audience' => [
-                'target_audience' => ['required', 'string', 'max:255'],
+                'target_audience' => ['required', Rule::in($this->founderTargetAudienceOptions())],
                 'primary_icp_name' => ['required', 'string', 'max:255'],
                 'ideal_customer_profile' => ['required', 'string', 'max:1000'],
                 'problem_solved' => ['required', 'string', 'max:1000'],
+                'pain_points' => ['required', 'string', 'max:1200'],
             ],
             'offer' => [
-                'core_offer' => ['required', 'string', 'max:255'],
+                'core_offer' => ['required', Rule::in($this->founderCoreOfferOptions())],
                 'differentiators' => ['required', 'string', 'max:1000'],
                 'objections' => ['required', 'string', 'max:1200'],
-                'buying_triggers' => ['required', 'string', 'max:1200'],
+                'desired_outcomes' => ['required', 'string', 'max:1200'],
             ],
             'brand' => [
-                'brand_voice' => ['required', 'string', 'max:255'],
+                'brand_voice' => ['required', Rule::in($this->founderBrandVoiceOptions())],
                 'visual_style' => ['required', 'string', 'max:500'],
-                'primary_growth_goal' => ['required', 'string', 'max:255'],
-                'known_blockers' => ['required', 'string', 'max:500'],
+                'primary_growth_goal' => ['required', Rule::in($this->founderPrimaryGrowthGoalOptions())],
+                'known_blockers' => ['required', Rule::in($this->founderKnownBlockerOptions())],
                 'local_market_notes' => ['nullable', 'string', 'max:1200'],
             ],
         ];
@@ -3249,12 +3271,17 @@ class OsShellController extends Controller
                 'founder_id' => $user->id,
                 'company_name' => (string) $validated['company_name'],
                 'business_model' => (string) $validated['business_model'],
-                'stage' => 'idea',
+                'vertical_blueprint_id' => $this->upsertVerticalBlueprint((string) $validated['vertical_blueprint'])->id,
+                'industry' => (string) $validated['industry'],
+                'stage' => (string) $validated['stage'],
+                'primary_city' => (string) $validated['primary_city'],
+                'service_radius' => (string) $validated['service_radius'],
                 'website_status' => 'not_started',
             ]);
         }
 
         if ($step === 'basics') {
+            $blueprint = $this->upsertVerticalBlueprint((string) $validated['vertical_blueprint']);
             $logoPath = (string) ($company->company_logo_path ?? '');
             if ($request->hasFile('company_logo')) {
                 if ($logoPath !== '' && Storage::disk('public')->exists($logoPath)) {
@@ -3267,6 +3294,11 @@ class OsShellController extends Controller
                 'company_name' => (string) $validated['company_name'],
                 'company_brief' => (string) ($validated['company_brief'] ?? ''),
                 'business_model' => (string) $validated['business_model'],
+                'vertical_blueprint_id' => $blueprint->id,
+                'industry' => (string) $validated['industry'],
+                'stage' => (string) $validated['stage'],
+                'primary_city' => (string) $validated['primary_city'],
+                'service_radius' => (string) $validated['service_radius'],
                 'company_logo_path' => $logoPath !== '' ? $logoPath : null,
             ])->save();
         }
@@ -3293,6 +3325,9 @@ class OsShellController extends Controller
                 $intelligencePayload[$field] = (string) ($validated[$field] ?? '');
             }
         }
+        if (array_key_exists('desired_outcomes', $validated)) {
+            $intelligencePayload['buying_triggers'] = (string) $validated['desired_outcomes'];
+        }
 
         CompanyIntelligence::updateOrCreate(
             ['company_id' => $company->id],
@@ -3301,7 +3336,51 @@ class OsShellController extends Controller
             ])
         );
 
+        $icpProfile = $company->icpProfiles()->latest()->first();
+        $icpPayload = [
+            'primary_icp_name' => (string) ($validated['primary_icp_name'] ?? $currentIntelligence?->primary_icp_name ?? $icpProfile?->primary_icp_name ?? ''),
+            'pain_points_json' => $step === 'audience'
+                ? $this->commaSeparatedValues((string) $validated['pain_points'])
+                : (is_array($icpProfile?->pain_points_json) ? $icpProfile->pain_points_json : []),
+            'desired_outcomes_json' => $step === 'offer'
+                ? $this->commaSeparatedValues((string) $validated['desired_outcomes'])
+                : (is_array($icpProfile?->desired_outcomes_json) ? $icpProfile->desired_outcomes_json : []),
+            'buying_triggers_json' => $step === 'offer'
+                ? $this->commaSeparatedValues((string) $validated['desired_outcomes'])
+                : (is_array($icpProfile?->buying_triggers_json) ? $icpProfile->buying_triggers_json : []),
+            'objections_json' => $step === 'offer'
+                ? $this->commaSeparatedValues((string) $validated['objections'])
+                : (is_array($icpProfile?->objections_json) ? $icpProfile->objections_json : []),
+            'price_sensitivity' => (string) ($icpProfile?->price_sensitivity ?? 'unknown'),
+            'primary_channels_json' => is_array($icpProfile?->primary_channels_json) && !empty($icpProfile->primary_channels_json)
+                ? $icpProfile->primary_channels_json
+                : ($company->verticalBlueprint?->default_channels_json ?? []),
+            'local_area_focus_json' => array_values(array_filter([(string) ($company->primary_city ?? '')])),
+            'language_style' => (string) ($validated['brand_voice'] ?? $currentIntelligence?->brand_voice ?? $icpProfile?->language_style ?? ''),
+        ];
+
+        FounderIcpProfile::updateOrCreate(
+            ['founder_id' => $user->id, 'company_id' => $company->id],
+            $icpPayload
+        );
+
+        if ($step === 'brand' && array_key_exists('primary_growth_goal', $validated)) {
+            $company->forceFill([
+                'primary_goal' => (string) $validated['primary_growth_goal'],
+            ])->save();
+        }
+
         $this->syncFounderBusinessContextModels($user, $company);
+
+        $syncResult = $founderModuleSyncService->syncFounder($user->fresh(['company.intelligence', 'company.businessBrief', 'company.icpProfiles']), 'all');
+        if (empty($syncResult['ok'])) {
+            Log::warning('Founder settings saved but downstream founder sync had issues.', [
+                'founder_id' => $user->id,
+                'company_id' => $company->id,
+                'message' => $syncResult['message'] ?? 'Founder sync failed.',
+                'results' => $syncResult['results'] ?? [],
+            ]);
+        }
 
         $user->unsetRelation('company');
         $user->load('company.intelligence');
@@ -3327,6 +3406,9 @@ class OsShellController extends Controller
     {
         $company = $founder->company;
         $intelligence = $company?->intelligence;
+        $latestIcpProfile = $company?->icpProfiles()->latest()->first();
+        $painPoints = implode(', ', is_array($latestIcpProfile?->pain_points_json) ? $latestIcpProfile->pain_points_json : []);
+        $desiredOutcomes = implode(', ', is_array($latestIcpProfile?->desired_outcomes_json) ? $latestIcpProfile->desired_outcomes_json : []);
 
         $steps = [
             'basics' => [
@@ -3340,8 +3422,13 @@ class OsShellController extends Controller
                     'company_name' => trim((string) ($company?->company_name ?? '')),
                     'company_brief' => trim((string) ($company?->company_brief ?? '')),
                     'business_model' => trim((string) ($company?->business_model ?? '')),
+                    'vertical_blueprint' => trim((string) ($company?->verticalBlueprint?->code ?? '')),
+                    'industry' => trim((string) ($company?->industry ?? '')),
+                    'stage' => trim((string) ($company?->stage ?? '')),
+                    'primary_city' => trim((string) ($company?->primary_city ?? '')),
+                    'service_radius' => trim((string) ($company?->service_radius ?? '')),
                 ],
-                'required' => ['full_name', 'company_name', 'company_brief', 'business_model'],
+                'required' => ['full_name', 'company_name', 'company_brief', 'business_model', 'vertical_blueprint', 'industry', 'stage', 'primary_city', 'service_radius'],
             ],
             'audience' => [
                 'key' => 'audience',
@@ -3353,8 +3440,9 @@ class OsShellController extends Controller
                     'primary_icp_name' => trim((string) ($intelligence?->primary_icp_name ?? '')),
                     'ideal_customer_profile' => trim((string) ($intelligence?->ideal_customer_profile ?? '')),
                     'problem_solved' => trim((string) ($intelligence?->problem_solved ?? '')),
+                    'pain_points' => trim($painPoints),
                 ],
-                'required' => ['target_audience', 'primary_icp_name', 'ideal_customer_profile', 'problem_solved'],
+                'required' => ['target_audience', 'primary_icp_name', 'ideal_customer_profile', 'problem_solved', 'pain_points'],
             ],
             'offer' => [
                 'key' => 'offer',
@@ -3365,9 +3453,9 @@ class OsShellController extends Controller
                     'core_offer' => trim((string) ($intelligence?->core_offer ?? '')),
                     'differentiators' => trim((string) ($intelligence?->differentiators ?? '')),
                     'objections' => trim((string) ($intelligence?->objections ?? '')),
-                    'buying_triggers' => trim((string) ($intelligence?->buying_triggers ?? '')),
+                    'desired_outcomes' => trim($desiredOutcomes !== '' ? $desiredOutcomes : (string) ($intelligence?->buying_triggers ?? '')),
                 ],
-                'required' => ['core_offer', 'differentiators', 'objections', 'buying_triggers'],
+                'required' => ['core_offer', 'differentiators', 'objections', 'desired_outcomes'],
             ],
             'brand' => [
                 'key' => 'brand',
@@ -3463,6 +3551,14 @@ class OsShellController extends Controller
 
         $intelligence = $company->intelligence;
         $blueprint = $company->verticalBlueprint;
+        $latestIcpProfile = $company->icpProfiles()->latest()->first();
+        $painPoints = is_array($latestIcpProfile?->pain_points_json) ? $latestIcpProfile->pain_points_json : $this->newlineSeparatedValues((string) ($intelligence?->problem_solved ?? ''));
+        $desiredOutcomes = is_array($latestIcpProfile?->desired_outcomes_json) && !empty($latestIcpProfile->desired_outcomes_json)
+            ? $latestIcpProfile->desired_outcomes_json
+            : $this->newlineSeparatedValues((string) ($intelligence?->buying_triggers ?? ''));
+        $objections = is_array($latestIcpProfile?->objections_json) && !empty($latestIcpProfile->objections_json)
+            ? $latestIcpProfile->objections_json
+            : $this->newlineSeparatedValues((string) ($intelligence?->objections ?? ''));
 
         FounderBusinessBrief::updateOrCreate(
             ['founder_id' => $founder->id, 'company_id' => $company->id],
@@ -3474,7 +3570,7 @@ class OsShellController extends Controller
                 'core_offer' => (string) ($intelligence?->core_offer ?? ''),
                 'business_type_detail' => (string) ($blueprint?->name ?? ucfirst((string) ($company->business_model ?? 'Business'))),
                 'location_city' => (string) ($company->primary_city ?? ''),
-                'location_country' => (string) ($company->businessBrief?->location_country ?? ''),
+                'location_country' => (string) ($company->businessBrief?->location_country ?? $founder->country ?? ''),
                 'service_radius' => (string) ($company->service_radius ?? ''),
                 'delivery_scope' => (string) ($company->businessBrief?->delivery_scope ?? $company->service_radius ?? ''),
                 'proof_points' => (string) ($intelligence?->differentiators ?? ''),
@@ -3488,14 +3584,14 @@ class OsShellController extends Controller
             ['founder_id' => $founder->id, 'company_id' => $company->id],
             [
                 'primary_icp_name' => (string) ($intelligence?->primary_icp_name ?? ''),
-                'pain_points_json' => is_array($company->icpProfiles()->latest()->first()?->pain_points_json)
-                    ? $company->icpProfiles()->latest()->first()->pain_points_json
-                    : [],
-                'desired_outcomes_json' => $this->newlineSeparatedValues((string) ($intelligence?->buying_triggers ?? '')),
-                'buying_triggers_json' => $this->newlineSeparatedValues((string) ($intelligence?->buying_triggers ?? '')),
-                'objections_json' => $this->newlineSeparatedValues((string) ($intelligence?->objections ?? '')),
-                'price_sensitivity' => 'unknown',
-                'primary_channels_json' => $blueprint?->default_channels_json ?? [],
+                'pain_points_json' => $painPoints,
+                'desired_outcomes_json' => $desiredOutcomes,
+                'buying_triggers_json' => $desiredOutcomes,
+                'objections_json' => $objections,
+                'price_sensitivity' => (string) ($latestIcpProfile?->price_sensitivity ?? 'unknown'),
+                'primary_channels_json' => is_array($latestIcpProfile?->primary_channels_json) && !empty($latestIcpProfile->primary_channels_json)
+                    ? $latestIcpProfile->primary_channels_json
+                    : ($blueprint?->default_channels_json ?? []),
                 'local_area_focus_json' => array_values(array_filter([(string) ($company->primary_city ?? '')])),
                 'language_style' => (string) ($intelligence?->brand_voice ?? ''),
             ]
@@ -6296,23 +6392,23 @@ class OsShellController extends Controller
             'password' => ['required', 'string', 'min:8', 'confirmed'],
             'company_name' => ['required', 'string', 'max:255'],
             'vertical_blueprint' => ['required', Rule::in(array_keys($this->verticalBlueprintDefinitions()))],
-            'business_model' => ['required', 'in:product,service,hybrid'],
+            'business_model' => ['required', Rule::in(array_keys($this->founderBusinessModelOptions()))],
             'primary_city' => ['required', 'string', 'max:191'],
             'service_radius' => ['required', 'string', 'max:191'],
             'industry' => ['required', Rule::in($this->founderIndustryOptions())],
-            'stage' => ['required', 'in:idea,launching,operating,scaling'],
-            'target_audience' => ['required', 'string', 'max:255'],
+            'stage' => ['required', Rule::in(array_keys($this->founderStageOptions()))],
+            'target_audience' => ['required', Rule::in($this->founderTargetAudienceOptions())],
             'primary_icp_name' => ['required', 'string', 'max:255'],
             'ideal_customer_profile' => ['required', 'string', 'max:1000'],
             'pain_points' => ['required', 'string', 'max:1200'],
             'desired_outcomes' => ['required', 'string', 'max:1200'],
             'objections' => ['required', 'string', 'max:1200'],
-            'brand_voice' => ['required', 'string', 'max:255'],
+            'brand_voice' => ['required', Rule::in($this->founderBrandVoiceOptions())],
             'differentiators' => ['required', 'string', 'max:1000'],
             'problem_solved' => ['required', 'string', 'max:1000'],
             'core_offer' => ['required', Rule::in($this->founderCoreOfferOptions())],
-            'primary_growth_goal' => ['required', 'string', 'max:255'],
-            'known_blockers' => ['required', 'string', 'max:255'],
+            'primary_growth_goal' => ['required', Rule::in($this->founderPrimaryGrowthGoalOptions())],
+            'known_blockers' => ['required', Rule::in($this->founderKnownBlockerOptions())],
             'company_brief' => ['required', 'string', 'max:2000'],
         ], [
             'plan_code.required' => 'Please choose a founder plan before signing up.',
@@ -8407,6 +8503,69 @@ class OsShellController extends Controller
             'Creative and media',
             'Technology and software',
             'Real estate and property',
+        ];
+    }
+
+    private function founderBusinessModelOptions(): array
+    {
+        return [
+            'product' => 'Product Business',
+            'service' => 'Service Business',
+            'hybrid' => 'Hybrid Business',
+        ];
+    }
+
+    private function founderStageOptions(): array
+    {
+        return [
+            'idea' => 'Idea Stage',
+            'launching' => 'Launching',
+            'operating' => 'Operating',
+            'scaling' => 'Scaling',
+        ];
+    }
+
+    private function founderTargetAudienceOptions(): array
+    {
+        return [
+            'Consumers / B2C',
+            'Small businesses / SMB',
+            'Corporate / Enterprise',
+            'Creators / Personal brands',
+            'Local community / Neighborhood market',
+        ];
+    }
+
+    private function founderBrandVoiceOptions(): array
+    {
+        return [
+            'Warm and supportive',
+            'Premium and polished',
+            'Bold and energetic',
+            'Professional and credible',
+            'Friendly and simple',
+        ];
+    }
+
+    private function founderPrimaryGrowthGoalOptions(): array
+    {
+        return [
+            'Launch my first website',
+            'Get my first customers',
+            'Increase recurring sales',
+            'Build a stronger brand presence',
+            'Systemize and scale operations',
+        ];
+    }
+
+    private function founderKnownBlockerOptions(): array
+    {
+        return [
+            'No clear offer yet',
+            'No website or weak funnel',
+            'Low traffic or visibility',
+            'Low conversions or sales',
+            'Limited time or team capacity',
         ];
     }
 

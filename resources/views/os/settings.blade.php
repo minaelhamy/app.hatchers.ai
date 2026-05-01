@@ -369,6 +369,7 @@
         $company = $dashboard['company'];
         $subscription = $dashboard['subscription'];
         $intelligence = $intelligence ?? $company?->intelligence;
+        $latestIcpProfile = $latestIcpProfile ?? $company?->icpProfiles()->latest()->first();
         $wizard = $wizard ?? [];
         $steps = collect($wizard['steps'] ?? []);
         $currentStep = $wizard['current_step'] ?? null;
@@ -498,11 +499,48 @@
                                     <div class="wizard-field">
                                         <label for="business-model">Business model</label>
                                         <select id="business-model" name="business_model" required>
-                                            @foreach (['product' => 'Product business', 'service' => 'Service business', 'hybrid' => 'Hybrid business'] as $value => $label)
+                                            @foreach ($businessModelOptions as $value => $label)
                                                 <option value="{{ $value }}" @selected(old('business_model', $company?->business_model) === $value)>{{ $label }}</option>
                                             @endforeach
                                         </select>
                                         @error('business_model')<div class="field-error">{{ $message }}</div>@enderror
+                                    </div>
+                                    <div class="wizard-field">
+                                        <label for="vertical-blueprint">Business blueprint</label>
+                                        <select id="vertical-blueprint" name="vertical_blueprint" required>
+                                            @foreach ($verticalBlueprintOptions as $verticalBlueprint)
+                                                <option value="{{ $verticalBlueprint['code'] }}" @selected(old('vertical_blueprint', $company?->verticalBlueprint?->code) === $verticalBlueprint['code'])>{{ $verticalBlueprint['name'] }} · {{ ucfirst($verticalBlueprint['business_model']) }}</option>
+                                            @endforeach
+                                        </select>
+                                        @error('vertical_blueprint')<div class="field-error">{{ $message }}</div>@enderror
+                                    </div>
+                                    <div class="wizard-field">
+                                        <label for="industry">Industry</label>
+                                        <select id="industry" name="industry" required>
+                                            @foreach ($industryOptions as $option)
+                                                <option value="{{ $option }}" @selected(old('industry', $company?->industry) === $option)>{{ $option }}</option>
+                                            @endforeach
+                                        </select>
+                                        @error('industry')<div class="field-error">{{ $message }}</div>@enderror
+                                    </div>
+                                    <div class="wizard-field">
+                                        <label for="stage">Stage</label>
+                                        <select id="stage" name="stage" required>
+                                            @foreach ($stageOptions as $value => $label)
+                                                <option value="{{ $value }}" @selected(old('stage', $company?->stage) === $value)>{{ $label }}</option>
+                                            @endforeach
+                                        </select>
+                                        @error('stage')<div class="field-error">{{ $message }}</div>@enderror
+                                    </div>
+                                    <div class="wizard-field">
+                                        <label for="primary-city">Primary city / market</label>
+                                        <input id="primary-city" name="primary_city" type="text" value="{{ old('primary_city', $company?->primary_city) }}" required>
+                                        @error('primary_city')<div class="field-error">{{ $message }}</div>@enderror
+                                    </div>
+                                    <div class="wizard-field">
+                                        <label for="service-radius">Service radius / delivery scope</label>
+                                        <input id="service-radius" name="service_radius" type="text" value="{{ old('service_radius', $company?->service_radius) }}" required>
+                                        @error('service_radius')<div class="field-error">{{ $message }}</div>@enderror
                                     </div>
                                     <div class="wizard-field full">
                                         <label for="company-brief">What does the business do?</label>
@@ -526,7 +564,11 @@
                                 <div class="wizard-grid">
                                     <div class="wizard-field full">
                                         <label for="target-audience">Target audience</label>
-                                        <input id="target-audience" name="target_audience" type="text" value="{{ old('target_audience', $intelligence?->target_audience) }}" required>
+                                        <select id="target-audience" name="target_audience" required>
+                                            @foreach ($targetAudienceOptions as $option)
+                                                <option value="{{ $option }}" @selected(old('target_audience', $intelligence?->target_audience) === $option)>{{ $option }}</option>
+                                            @endforeach
+                                        </select>
                                         @error('target_audience')<div class="field-error">{{ $message }}</div>@enderror
                                     </div>
                                     <div class="wizard-field full">
@@ -546,12 +588,22 @@
                                         <textarea id="problem-solved" name="problem_solved" required>{{ old('problem_solved', $intelligence?->problem_solved) }}</textarea>
                                         @error('problem_solved')<div class="field-error">{{ $message }}</div>@enderror
                                     </div>
+                                    <div class="wizard-field full">
+                                        <label for="pain-points">Top pain points</label>
+                                        <div class="wizard-field-note">Keep the same comma-separated list from founder signup so your ICP stays consistent everywhere.</div>
+                                        <textarea id="pain-points" name="pain_points" required>{{ old('pain_points', implode(', ', is_array($latestIcpProfile?->pain_points_json) ? $latestIcpProfile->pain_points_json : [])) }}</textarea>
+                                        @error('pain_points')<div class="field-error">{{ $message }}</div>@enderror
+                                    </div>
                                 </div>
                             @elseif ($currentStepKey === 'offer')
                                 <div class="wizard-grid">
                                     <div class="wizard-field full">
                                         <label for="core-offer">Core offer</label>
-                                        <input id="core-offer" name="core_offer" type="text" value="{{ old('core_offer', $intelligence?->core_offer) }}" required>
+                                        <select id="core-offer" name="core_offer" required>
+                                            @foreach ($coreOfferOptions as $option)
+                                                <option value="{{ $option }}" @selected(old('core_offer', $intelligence?->core_offer) === $option)>{{ $option }}</option>
+                                            @endforeach
+                                        </select>
                                         @error('core_offer')<div class="field-error">{{ $message }}</div>@enderror
                                     </div>
                                     <div class="wizard-field full">
@@ -560,21 +612,25 @@
                                         @error('differentiators')<div class="field-error">{{ $message }}</div>@enderror
                                     </div>
                                     <div class="wizard-field full">
+                                        <label for="desired-outcomes">Desired outcomes</label>
+                                        <textarea id="desired-outcomes" name="desired_outcomes" required>{{ old('desired_outcomes', implode(', ', is_array($latestIcpProfile?->desired_outcomes_json) ? $latestIcpProfile->desired_outcomes_json : [])) }}</textarea>
+                                        @error('desired_outcomes')<div class="field-error">{{ $message }}</div>@enderror
+                                    </div>
+                                    <div class="wizard-field full">
                                         <label for="objections">Common objections</label>
                                         <textarea id="objections" name="objections" required>{{ old('objections', $intelligence?->objections) }}</textarea>
                                         @error('objections')<div class="field-error">{{ $message }}</div>@enderror
-                                    </div>
-                                    <div class="wizard-field full">
-                                        <label for="buying-triggers">Buying triggers</label>
-                                        <textarea id="buying-triggers" name="buying_triggers" required>{{ old('buying_triggers', $intelligence?->buying_triggers) }}</textarea>
-                                        @error('buying_triggers')<div class="field-error">{{ $message }}</div>@enderror
                                     </div>
                                 </div>
                             @elseif ($currentStepKey === 'brand')
                                 <div class="wizard-grid">
                                     <div class="wizard-field">
                                         <label for="brand-voice">Brand voice</label>
-                                        <input id="brand-voice" name="brand_voice" type="text" value="{{ old('brand_voice', $intelligence?->brand_voice) }}" required>
+                                        <select id="brand-voice" name="brand_voice" required>
+                                            @foreach ($brandVoiceOptions as $option)
+                                                <option value="{{ $option }}" @selected(old('brand_voice', $intelligence?->brand_voice) === $option)>{{ $option }}</option>
+                                            @endforeach
+                                        </select>
                                         @error('brand_voice')<div class="field-error">{{ $message }}</div>@enderror
                                     </div>
                                     <div class="wizard-field">
@@ -584,12 +640,20 @@
                                     </div>
                                     <div class="wizard-field full">
                                         <label for="primary-growth-goal">Primary growth goal</label>
-                                        <input id="primary-growth-goal" name="primary_growth_goal" type="text" value="{{ old('primary_growth_goal', $intelligence?->primary_growth_goal) }}" required>
+                                        <select id="primary-growth-goal" name="primary_growth_goal" required>
+                                            @foreach ($growthGoalOptions as $option)
+                                                <option value="{{ $option }}" @selected(old('primary_growth_goal', $intelligence?->primary_growth_goal) === $option)>{{ $option }}</option>
+                                            @endforeach
+                                        </select>
                                         @error('primary_growth_goal')<div class="field-error">{{ $message }}</div>@enderror
                                     </div>
                                     <div class="wizard-field full">
                                         <label for="known-blockers">Known blockers</label>
-                                        <textarea id="known-blockers" name="known_blockers" required>{{ old('known_blockers', $intelligence?->known_blockers) }}</textarea>
+                                        <select id="known-blockers" name="known_blockers" required>
+                                            @foreach ($knownBlockerOptions as $option)
+                                                <option value="{{ $option }}" @selected(old('known_blockers', $intelligence?->known_blockers) === $option)>{{ $option }}</option>
+                                            @endforeach
+                                        </select>
                                         @error('known_blockers')<div class="field-error">{{ $message }}</div>@enderror
                                     </div>
                                     <div class="wizard-field full">
