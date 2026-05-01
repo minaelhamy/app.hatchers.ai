@@ -8256,7 +8256,7 @@ class OsShellController extends Controller
         }
 
         $company = Company::query()
-            ->with(['founder.moduleSnapshots', 'websiteGenerationRuns'])
+            ->with(['founder.moduleSnapshots', 'founder.businessBrief', 'businessBrief', 'websiteGenerationRuns'])
             ->get()
             ->first(function (Company $company) use ($normalizedPath): bool {
                 if (!$this->companyMatchesPublicWebsitePath($company, $normalizedPath)) {
@@ -8268,7 +8268,7 @@ class OsShellController extends Controller
 
         if (!$company) {
             $company = Company::query()
-                ->with(['founder.moduleSnapshots', 'websiteGenerationRuns'])
+                ->with(['founder.moduleSnapshots', 'founder.businessBrief', 'businessBrief', 'websiteGenerationRuns'])
                 ->get()
                 ->first(fn (Company $company): bool => $this->companyMatchesPublicWebsitePath($company, $normalizedPath));
         }
@@ -8405,6 +8405,16 @@ class OsShellController extends Controller
 
         $founderFullNameSlug = trim(strtolower((string) str($company->founder?->full_name ?: '')->slug('-')->value()), '/');
         if ($founderFullNameSlug !== '' && $founderFullNameSlug === $normalizedPath) {
+            return true;
+        }
+
+        $companyBriefNameSlug = trim(strtolower((string) str($company->businessBrief?->business_name ?: '')->slug('-')->value()), '/');
+        if ($companyBriefNameSlug !== '' && $companyBriefNameSlug === $normalizedPath) {
+            return true;
+        }
+
+        $founderBriefNameSlug = trim(strtolower((string) str($company->founder?->businessBrief?->business_name ?: '')->slug('-')->value()), '/');
+        if ($founderBriefNameSlug !== '' && $founderBriefNameSlug === $normalizedPath) {
             return true;
         }
 
