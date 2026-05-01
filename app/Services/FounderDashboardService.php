@@ -548,7 +548,20 @@ class FounderDashboardService
 
     private function normalizeActionText(string $value): string
     {
-        return trim(html_entity_decode($value, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        $normalized = trim($value);
+
+        for ($i = 0; $i < 3; $i++) {
+            $decoded = html_entity_decode($normalized, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            if ($decoded === $normalized) {
+                break;
+            }
+
+            $normalized = $decoded;
+        }
+
+        $normalized = preg_replace('/^Source:\s.*(?:\R\R|\R)?/u', '', $normalized) ?? $normalized;
+
+        return trim($normalized);
     }
 
     private function lessonBadge(?FounderActionPlan $lesson, bool $isCompleted): string

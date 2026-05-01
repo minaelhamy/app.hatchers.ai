@@ -364,6 +364,6 @@ class FounderAiMentorProgramService
 
     private function buildArticleBody(string $book, string $theme, string $lesson, string $application): string
     {
-        return "Source: {$book}\n\nTheme: {$theme}\n\nCore lesson:\n{$lesson}\n\nToday's application:\n{$application}\n\nFounder note:\nUse Atlas if you want help turning this lesson into sharper copy, a clearer offer, outreach, or practical execution inside Hatchers OS.";
+        return "Theme: {$theme}\n\nCore lesson:\n{$lesson}\n\nToday's application:\n{$application}\n\nFounder note:\nUse Atlas if you want help turning this lesson into sharper copy, a clearer offer, outreach, or practical execution inside Hatchers OS.";
     }
 }
