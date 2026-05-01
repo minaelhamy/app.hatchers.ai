@@ -8140,6 +8140,48 @@ class OsShellController extends Controller
             $company->save();
         }
 
+        if (!$company) {
+            $founder = Founder::query()
+                ->with(['company', 'moduleSnapshots'])
+                ->where('role', 'founder')
+                ->get()
+                ->first(function (Founder $founder) use ($normalizedPath): bool {
+                    $username = trim(strtolower((string) ($founder->username ?? '')), '/');
+                    if ($username !== '' && $username === $normalizedPath) {
+                        return true;
+                    }
+
+                    foreach (($founder->moduleSnapshots ?? collect()) as $snapshot) {
+                        $payload = is_array($snapshot->payload_json ?? null) ? $snapshot->payload_json : [];
+                        $snapshotSlug = trim(strtolower((string) ($payload['slug'] ?? $payload['vendor_slug'] ?? '')), '/');
+                        if ($snapshotSlug !== '' && $snapshotSlug === $normalizedPath) {
+                            return true;
+                        }
+
+                        $snapshotUrl = trim((string) ($payload['summary']['website_url'] ?? ''));
+                        $snapshotPath = trim(strtolower((string) parse_url($snapshotUrl, PHP_URL_PATH)), '/');
+                        if ($snapshotPath !== '') {
+                            $segments = array_values(array_filter(explode('/', $snapshotPath)));
+                            if ($snapshotPath === $normalizedPath || in_array($normalizedPath, $segments, true)) {
+                                return true;
+                            }
+                        }
+                    }
+
+                    return false;
+                });
+
+            if ($founder?->company) {
+                $company = $founder->company;
+
+                if (blank($company->website_path)) {
+                    $company->website_path = $normalizedPath;
+                    $company->website_url = $this->buildCompanyWebsiteUrl($company, (string) ($company->website_engine ?? ''));
+                    $company->save();
+                }
+            }
+        }
+
         return $company;
     }
 
