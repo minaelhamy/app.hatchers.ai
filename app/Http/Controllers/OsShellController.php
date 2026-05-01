@@ -8062,7 +8062,7 @@ class OsShellController extends Controller
         $body = $upstream->body();
         if (str_contains($contentType, 'text/html')) {
             $body = $this->rewriteStorefrontHtmlForOs($body, $engineProxyUrl, $websiteRoot);
-        } elseif (str_contains($contentType, 'javascript') || str_contains($contentType, 'json') || str_contains($contentType, 'css')) {
+        } elseif (str_contains($contentType, 'javascript') || str_contains($contentType, 'json')) {
             $body = $this->rewriteStorefrontTextForOs($body, $engineProxyUrl, $websiteRoot);
         }
 
