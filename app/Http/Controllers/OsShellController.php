@@ -8411,6 +8411,15 @@ class OsShellController extends Controller
             'founder_matches' => $founderMatches,
             'generation_matches' => $generationMatches,
         ]);
+        error_log('[PublicWebsite][failed] ' . json_encode([
+            'context' => $context,
+            'requested_path' => $websitePath,
+            'normalized_path' => $normalizedPath,
+            'proxy_path' => $proxyPath,
+            'company_matches' => $companyMatches,
+            'founder_matches' => $founderMatches,
+            'generation_matches' => $generationMatches,
+        ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
     }
 
     private function logPublicWebsiteResolutionSuccess(string $websitePath, Company $company, array $site, string $context): void
@@ -8428,6 +8437,19 @@ class OsShellController extends Controller
             'engine_vendor_slug' => (string) ($site['engine_vendor_slug'] ?? ''),
             'engine_proxy_url' => (string) ($site['engine_proxy_url'] ?? ''),
         ]);
+        error_log('[PublicWebsite][resolved] ' . json_encode([
+            'context' => $context,
+            'requested_path' => $websitePath,
+            'company_id' => (int) $company->id,
+            'company_name' => (string) ($company->company_name ?? ''),
+            'website_path' => (string) ($company->website_path ?? ''),
+            'website_url' => (string) ($company->website_url ?? ''),
+            'engine_public_url' => (string) ($company->engine_public_url ?? ''),
+            'engine' => (string) ($site['engine'] ?? ''),
+            'uses_engine_storefront' => (bool) ($site['uses_engine_storefront'] ?? false),
+            'engine_vendor_slug' => (string) ($site['engine_vendor_slug'] ?? ''),
+            'engine_proxy_url' => (string) ($site['engine_proxy_url'] ?? ''),
+        ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
     }
 
     private function proxyEngineStorefront(Company $company, string $proxyPath, Request $request, PublicWebsiteService $publicWebsiteService)
