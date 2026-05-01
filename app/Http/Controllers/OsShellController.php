@@ -4918,6 +4918,10 @@ class OsShellController extends Controller
             }
         }
 
+        $site['uses_engine_storefront'] = false;
+        $site['source_storefront_url'] = '';
+        $site['engine_proxy_url'] = '';
+
         return view('os.public-website', [
             'pageTitle' => (string) ($company->company_name ?: 'Business Website'),
             'site' => $site,
