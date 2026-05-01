@@ -21,16 +21,21 @@ class FounderNotificationService
         ]);
     }
 
-    public function websiteBuildStarted(Founder $founder, string $engineLabel): FounderNotification
+    public function websiteBuildStarted(Founder $founder, string $engineLabel, bool $isImprovementPass = false): FounderNotification
     {
+        $title = $isImprovementPass ? 'Improving your website now.' : 'Building your website now.';
+        $meta = $isImprovementPass
+            ? 'Hatchers is reviewing your inputs, re-scoring the template, and improving the live website with better services, pricing, offer copy, blog content, and media.'
+            : 'Hatchers is creating your first ' . strtoupper($engineLabel) . ' website with services, pricing, offer copy, a launch blog, and media in the background.';
+
         return $this->create($founder, [
             'kind' => 'website_building',
-            'title' => 'Building your website now.',
-            'meta' => 'Hatchers is creating your first ' . strtoupper($engineLabel) . ' website with services, pricing, offer copy, a launch blog, and media in the background.',
+            'title' => $title,
+            'meta' => $meta,
             'app_key' => 'build-website',
             'data_json' => [
                 'engine' => strtolower($engineLabel),
-                'status' => 'building',
+                'status' => $isImprovementPass ? 'improving' : 'building',
             ],
         ]);
     }

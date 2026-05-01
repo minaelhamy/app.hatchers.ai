@@ -1152,10 +1152,10 @@ class WebsiteAutopilotService
     private function heroHeadline(VerticalBlueprint $blueprint, string $companyName, string $problemSolved, string $city): string
     {
         $cityPrefix = $city !== '' ? $city . ' ' : '';
-        $problemSolved = trim($problemSolved);
+        $problemSolved = $this->normalizeProblemStatement($problemSolved, $companyName, $city);
 
         if ($problemSolved !== '') {
-            return $cityPrefix . $companyName . ' helps you ' . Str::of($problemSolved)->lower()->trim(" .")->value() . '.';
+            return $cityPrefix . $companyName . ' helps ' . Str::of($problemSolved)->lower()->trim(" .")->value() . '.';
         }
 
         return match ((string) $blueprint->code) {
@@ -1174,6 +1174,24 @@ class WebsiteAutopilotService
         $offerLine = $coreOffer !== '' ? $coreOffer : 'a clear first offer';
 
         return $companyName . ' now launches with ' . $offerLine . ' designed for ' . $icpName . $locationTail . ', using a direct-response structure inspired by Sell Like Crazy.';
+    }
+
+    private function normalizeProblemStatement(string $problemSolved, string $companyName, string $city): string
+    {
+        $statement = trim($problemSolved);
+        if ($statement === '') {
+            return '';
+        }
+
+        $statement = preg_replace('/^(we\s+help|help\s+people\s+|help\s+clients\s+|help\s+you\s+)/i', '', $statement) ?? $statement;
+        $statement = preg_replace('/^' . preg_quote($companyName, '/') . '\s+helps\s+/i', '', $statement) ?? $statement;
+        if ($city !== '') {
+            $statement = preg_replace('/^' . preg_quote($city, '/') . '\s+/i', '', $statement) ?? $statement;
+        }
+
+        return trim((string) Str::of($statement)
+            ->replaceMatches('/\s+/', ' ')
+            ->trim(" ."));
     }
 
     private function draftPricing(VerticalBlueprint $blueprint, string $websiteMode, string $companyName, array $catalogItems = []): array

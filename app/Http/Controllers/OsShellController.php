@@ -4223,12 +4223,15 @@ class OsShellController extends Controller
         ])->save();
 
         $engineLabel = $this->websiteBuildEngineLabel($company, (string) ($validated['primary_website_focus'] ?? 'auto'));
+        $isImprovementPass = $company->websiteGenerationRuns()->exists()
+            || in_array((string) ($company->website_status ?? ''), ['live', 'in_progress'], true)
+            || in_array((string) ($company->website_generation_status ?? ''), ['published', 'ready_for_review', 'in_progress'], true);
         $company->forceFill([
             'website_generation_status' => 'in_progress',
             'website_status' => 'in_progress',
         ])->save();
 
-        $founderNotificationService->websiteBuildStarted($founder, $engineLabel);
+        $founderNotificationService->websiteBuildStarted($founder, $engineLabel, $isImprovementPass);
         $founderId = (int) $founder->id;
 
         app()->terminating(function () use ($founderId) {
@@ -4341,7 +4344,9 @@ class OsShellController extends Controller
                     'stage' => 'build',
                     'os_embed' => $request->boolean('os_embed') ? 1 : null,
                 ]))
-                ->with('success', 'We are building and publishing your website now. We will notify you as soon as it is live and ready to edit in Servio.');
+                ->with('success', $isImprovementPass
+                    ? 'We are reviewing your latest inputs and improving the live website now. We will notify you as soon as the refreshed version is ready.'
+                    : 'We are building and publishing your website now. We will notify you as soon as it is live and ready to edit in Servio.');
         } catch (Throwable $e) {
             Log::error('Website build request submission failed before generation started.', [
                 'founder_id' => $founder->id,
