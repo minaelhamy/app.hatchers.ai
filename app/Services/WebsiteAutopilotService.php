@@ -1666,9 +1666,12 @@ class WebsiteAutopilotService
             ['asset_slots' => $assetSlots]
         );
 
+        $mediaAssets = $this->websiteMediaAssets($founder, $draft);
+        $mediaAssets = $this->ensurePublishableMediaAssets($mediaAssets, $draft);
+
         return [
             'asset_slots' => $assetSlots,
-            'media_assets' => $this->websiteMediaAssets($founder, $draft),
+            'media_assets' => $mediaAssets,
         ];
     }
 
@@ -1729,6 +1732,101 @@ class WebsiteAutopilotService
             'label' => $label,
             'source_url' => trim((string) ($asset['source_url'] ?? '')),
             'preview_url' => trim((string) ($asset['preview_url'] ?? '')),
+            'alt_text' => trim((string) ($asset['alt_text'] ?? $label)),
+            'credit_name' => trim((string) ($asset['credit_name'] ?? '')),
+            'credit_url' => trim((string) ($asset['credit_url'] ?? '')),
+            'provider' => trim((string) ($asset['provider'] ?? 'pexels')),
+        ];
+    }
+
+    private function ensurePublishableMediaAssets(array $mediaAssets, array $draft): array
+    {
+        $assets = array_values(array_filter($mediaAssets, fn ($item) => is_array($item)));
+        if ($assets === []) {
+            return [];
+        }
+
+        $byTarget = collect($assets)->keyBy(fn (array $item): string => trim((string) ($item['target'] ?? '')));
+        $seedAssets = collect($assets)
+            ->filter(fn (array $item): bool => trim((string) ($item['source_url'] ?? '')) !== '')
+            ->values()
+            ->all();
+
+        $hero = $byTarget->get('hero') ?? ($seedAssets[0] ?? null);
+        $story = $byTarget->get('story') ?? ($seedAssets[1] ?? $hero);
+        $features = $byTarget->get('section_one') ?? $byTarget->get('category') ?? ($seedAssets[2] ?? $hero);
+        $proof = $byTarget->get('section_two') ?? ($seedAssets[3] ?? $features ?? $hero);
+        $action = $byTarget->get('section_three') ?? ($seedAssets[4] ?? $proof ?? $hero);
+        $blog = $byTarget->get('blog_primary') ?? $story ?? $hero;
+
+        $requiredTargets = [
+            'hero' => ['label' => 'hero banner', 'asset' => $hero],
+            'blog_primary' => ['label' => 'blog feature image', 'asset' => $blog],
+            'category' => ['label' => 'category image', 'asset' => $features ?? $hero],
+            'service_primary' => ['label' => 'service primary image', 'asset' => $hero ?? $features],
+            'service_detail' => ['label' => 'service detail image', 'asset' => $features ?? $proof ?? $hero],
+            'service_support' => ['label' => 'service support image', 'asset' => $action ?? $story ?? $hero],
+            'section_one' => ['label' => 'section one banner', 'asset' => $features ?? $hero],
+            'section_two' => ['label' => 'section two banner', 'asset' => $proof ?? $hero],
+            'section_three' => ['label' => 'section three banner', 'asset' => $action ?? $hero],
+        ];
+
+        foreach ($requiredTargets as $target => $meta) {
+            if (!$byTarget->has($target) && is_array($meta['asset'])) {
+                $assets[] = $this->syntheticMediaVariant($meta['asset'], $target, (string) $meta['label']);
+            }
+        }
+
+        $assets = array_values(array_filter($assets, fn ($item) => is_array($item) && trim((string) ($item['source_url'] ?? '')) !== ''));
+        $distinctSources = collect($assets)->pluck('source_url')->map(fn ($url) => trim((string) $url))->filter()->unique()->values();
+
+        if ($distinctSources->count() < 3) {
+            $serviceSeeds = array_values(array_filter([
+                $byTarget->get('service_primary') ?? $hero,
+                $byTarget->get('service_detail') ?? $features ?? $hero,
+                $byTarget->get('service_support') ?? $action ?? $story ?? $hero,
+            ], fn ($item) => is_array($item)));
+
+            foreach (['service_primary', 'service_detail', 'service_support'] as $index => $target) {
+                $existing = collect($assets)->first(fn (array $item): bool => trim((string) ($item['target'] ?? '')) === $target);
+                $baseAsset = $serviceSeeds[$index] ?? ($serviceSeeds[0] ?? $hero);
+                if (!is_array($baseAsset)) {
+                    continue;
+                }
+
+                $variant = $this->syntheticMediaVariant($baseAsset, $target, str_replace('_', ' ', $target));
+                if ($existing) {
+                    $assets = array_map(function (array $item) use ($target, $variant): array {
+                        return trim((string) ($item['target'] ?? '')) === $target ? $variant : $item;
+                    }, $assets);
+                } else {
+                    $assets[] = $variant;
+                }
+            }
+        }
+
+        return array_values(array_reduce($assets, function (array $carry, array $asset): array {
+            $target = trim((string) ($asset['target'] ?? ''));
+            if ($target === '') {
+                return $carry;
+            }
+
+            $carry[$target] = $asset;
+            return $carry;
+        }, []));
+    }
+
+    private function syntheticMediaVariant(array $asset, string $target, string $label): array
+    {
+        $sourceUrl = trim((string) ($asset['source_url'] ?? ''));
+        $previewUrl = trim((string) ($asset['preview_url'] ?? $sourceUrl));
+        $variantSuffix = '#hatchers-' . $target;
+
+        return [
+            'target' => $target,
+            'label' => $label,
+            'source_url' => $sourceUrl !== '' ? $sourceUrl . $variantSuffix : '',
+            'preview_url' => $previewUrl !== '' ? $previewUrl . $variantSuffix : '',
             'alt_text' => trim((string) ($asset['alt_text'] ?? $label)),
             'credit_name' => trim((string) ($asset['credit_name'] ?? '')),
             'credit_url' => trim((string) ($asset['credit_url'] ?? '')),
