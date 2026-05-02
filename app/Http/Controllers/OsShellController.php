@@ -8664,7 +8664,7 @@ class OsShellController extends Controller
         if ($engineProxyUrl === '' || $websiteRoot === '') {
             return view('os.public-website', [
                 'pageTitle' => (string) ($company->company_name ?: 'Business Website'),
-                'site' => $site,
+                'site' => $this->disableEngineStorefrontFallback($site),
                 'sourceContext' => [
                     'src' => trim((string) $request->query('src', '')),
                     'promo' => trim((string) $request->query('promo', '')),
@@ -8682,7 +8682,7 @@ class OsShellController extends Controller
 
             return view('os.public-website', [
                 'pageTitle' => (string) ($company->company_name ?: 'Business Website'),
-                'site' => $site,
+                'site' => $this->disableEngineStorefrontFallback($site),
                 'sourceContext' => [
                     'src' => trim((string) $request->query('src', '')),
                     'promo' => trim((string) $request->query('promo', '')),
@@ -8751,7 +8751,7 @@ class OsShellController extends Controller
 
             return view('os.public-website', [
                 'pageTitle' => (string) ($company->company_name ?: 'Business Website'),
-                'site' => $site,
+                'site' => $this->disableEngineStorefrontFallback($site),
                 'sourceContext' => [
                     'src' => trim((string) $request->query('src', '')),
                     'promo' => trim((string) $request->query('promo', '')),
@@ -8792,6 +8792,15 @@ class OsShellController extends Controller
         }
 
         return $response;
+    }
+
+    private function disableEngineStorefrontFallback(array $site): array
+    {
+        $site['uses_engine_storefront'] = false;
+        $site['source_storefront_url'] = '';
+        $site['engine_proxy_url'] = '';
+
+        return $site;
     }
 
     private function rewriteStorefrontHtmlForOs(string $html, string $engineProxyUrl, string $websiteRoot): string
