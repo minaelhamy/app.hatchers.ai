@@ -818,7 +818,7 @@
                 $appKey = match ($kind) {
                     'mentor', 'lms' => 'learning-plan',
                     'task' => 'tasks',
-                    'atlas' => 'atlas-engine',
+                    'atlas' => 'atlas-brand-studio',
                     'bazaar' => 'bazaar-engine',
                     'servio' => 'servio-engine',
                     'website', 'website_building', 'website_ready' => 'build-website',
@@ -838,14 +838,6 @@
             ];
         })->values()->all();
         $desktopApps = [
-            [
-                'key' => 'atlas-engine',
-                'label' => 'Atlas',
-                'route' => (string) ($launchCards->get('atlas')['url'] ?? route('workspace.launch', ['module' => 'atlas'])),
-                'class' => 'os-icon-ai',
-                'icon' => 'globe',
-                'external' => !empty($launchCards->get('atlas')['url']),
-            ],
             [
                 'key' => 'lms-engine',
                 'label' => 'LMS',
