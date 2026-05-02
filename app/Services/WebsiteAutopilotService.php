@@ -1614,20 +1614,25 @@ class WebsiteAutopilotService
         $story = $byKey->get('story') ?? ($resolved[3] ?? $features ?? $hero);
         $faq = $byKey->get('faq') ?? ($resolved[4] ?? $proof ?? $hero);
         $action = $byKey->get('action') ?? ($resolved[5] ?? $proof ?? $hero);
+        $blogPrimary = $byKey->get('blog_primary') ?? ($story ?? $features ?? $hero);
+        $category = $byKey->get('category') ?? ($features ?? $hero);
+        $servicePrimary = $byKey->get('service_primary') ?? ($hero ?? $features);
+        $serviceDetail = $byKey->get('service_detail') ?? ($features ?? $proof ?? $hero);
+        $serviceSupport = $byKey->get('service_support') ?? ($action ?? $story ?? $hero);
 
         return array_values(array_filter([
             $this->slotMedia('hero', 'hero banner', $hero),
-            $this->slotMedia('blog_primary', 'blog feature image', $story ?? $features ?? $hero),
+            $this->slotMedia('blog_primary', 'blog feature image', $blogPrimary),
             $this->slotMedia('landing', 'landing banner', $hero),
             $this->slotMedia('faq', 'faq image', $faq),
             $this->slotMedia('story', 'story image', $story),
             $this->slotMedia('section_one', 'section one banner', $features),
             $this->slotMedia('section_two', 'section two banner', $proof),
             $this->slotMedia('section_three', 'section three banner', $action),
-            $this->slotMedia('category', 'category image', $features ?? $hero),
-            $this->slotMedia('service_primary', 'service primary image', $hero ?? $features),
-            $this->slotMedia('service_detail', 'service detail image', $features ?? $proof ?? $hero),
-            $this->slotMedia('service_support', 'service support image', $action ?? $story ?? $hero),
+            $this->slotMedia('category', 'category image', $category),
+            $this->slotMedia('service_primary', 'service primary image', $servicePrimary),
+            $this->slotMedia('service_detail', 'service detail image', $serviceDetail),
+            $this->slotMedia('service_support', 'service support image', $serviceSupport),
             $this->slotMedia('testimonial_primary', 'testimonial image', $proof ?? $story ?? $hero),
             $this->slotMedia('why_choose_item', 'why choose us image', $story ?? $features ?? $hero),
         ]));
@@ -1909,6 +1914,8 @@ class WebsiteAutopilotService
         $thirdQuery = $imageQueries[2] ?? ($baseQuery . ' team');
         $fourthQuery = $imageQueries[3] ?? ($baseQuery . ' consultation');
         $fifthQuery = $imageQueries[4] ?? ($baseQuery . ' detail');
+        $serviceQuery = $imageQueries[5] ?? ($baseQuery . ' service');
+        $blogQuery = $imageQueries[6] ?? ($baseQuery . ' blog');
 
         return [
             [
@@ -2000,6 +2007,72 @@ class WebsiteAutopilotService
                 ])),
                 'alt_text' => $companyName . ' action section image',
                 'visual_brief' => 'Use an image that reinforces momentum, action, booking, checkout, or contact.',
+                'status' => 'requested',
+            ],
+            [
+                'slot_key' => 'blog_primary',
+                'slot_label' => 'Blog Feature Image',
+                'provider' => 'pexels',
+                'query' => $wellnessContext ? trim($cityHint . 'yoga blog wellness lifestyle studio') : trim($blogQuery . ' editorial lifestyle'),
+                'fallback_queries' => array_values(array_filter([
+                    $wellnessContext ? trim('yoga mat mindfulness studio') : trim($blogQuery),
+                    $wellnessContext ? trim($companyName . ' yoga lifestyle') : trim($companyName . ' article image'),
+                    $wellnessContext ? trim($icpName . ' wellness routine') : trim($icpName . ' lifestyle'),
+                ])),
+                'alt_text' => $companyName . ' blog feature image',
+                'visual_brief' => 'Use an editorial image that fits long-form content and feels relevant to the business, not generic stock.',
+                'status' => 'requested',
+            ],
+            [
+                'slot_key' => 'category',
+                'slot_label' => 'Category Image',
+                'provider' => 'pexels',
+                'query' => $wellnessContext ? trim($cityHint . 'yoga studio class overview') : trim($serviceQuery . ' category overview'),
+                'fallback_queries' => array_values(array_filter([
+                    $wellnessContext ? trim('group yoga class studio') : trim($serviceQuery),
+                    $wellnessContext ? trim($companyName . ' class overview') : trim($companyName . ' service category'),
+                ])),
+                'alt_text' => $companyName . ' category image',
+                'visual_brief' => 'Use an overview image that clearly represents the main category or service family.',
+                'status' => 'requested',
+            ],
+            [
+                'slot_key' => 'service_primary',
+                'slot_label' => 'Service Primary Image',
+                'provider' => 'pexels',
+                'query' => $wellnessContext ? trim($cityHint . 'beginner yoga class indoor studio') : trim($serviceQuery . ' primary offering'),
+                'fallback_queries' => array_values(array_filter([
+                    $wellnessContext ? trim('yoga class instructor student') : trim($serviceQuery),
+                    $wellnessContext ? trim($companyName . ' signature class') : trim($companyName . ' flagship service'),
+                ])),
+                'alt_text' => $companyName . ' primary service image',
+                'visual_brief' => 'Use a concrete image of the main service being delivered.',
+                'status' => 'requested',
+            ],
+            [
+                'slot_key' => 'service_detail',
+                'slot_label' => 'Service Detail Image',
+                'provider' => 'pexels',
+                'query' => $wellnessContext ? trim($cityHint . 'yoga stretch pose studio detail') : trim($serviceQuery . ' detail closeup'),
+                'fallback_queries' => array_values(array_filter([
+                    $wellnessContext ? trim('wellness movement detail') : trim($fifthQuery),
+                    $wellnessContext ? trim($companyName . ' session detail') : trim($companyName . ' process detail'),
+                ])),
+                'alt_text' => $companyName . ' service detail image',
+                'visual_brief' => 'Use a second image that adds variety and shows a different angle or detail of the service.',
+                'status' => 'requested',
+            ],
+            [
+                'slot_key' => 'service_support',
+                'slot_label' => 'Service Support Image',
+                'provider' => 'pexels',
+                'query' => $wellnessContext ? trim($cityHint . 'yoga relaxation breathing class') : trim($serviceQuery . ' support experience'),
+                'fallback_queries' => array_values(array_filter([
+                    $wellnessContext ? trim('calm wellness studio experience') : trim($fourthQuery),
+                    $wellnessContext ? trim($companyName . ' client experience') : trim($companyName . ' support service'),
+                ])),
+                'alt_text' => $companyName . ' supporting service image',
+                'visual_brief' => 'Use a third distinct image that supports trust, experience, or the customer journey.',
                 'status' => 'requested',
             ],
         ];
