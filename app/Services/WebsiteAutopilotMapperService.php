@@ -88,7 +88,7 @@ class WebsiteAutopilotMapperService
 
         $featuredImage = trim((string) ($blog['blog_featured_image'] ?? ''));
         if ($featuredImage === '') {
-            $featuredImage = trim((string) ($mediaAssets[0]['source_url'] ?? ''));
+            $featuredImage = $this->preferredBlogFeaturedImage($mediaAssets);
         }
 
         return [
@@ -100,6 +100,24 @@ class WebsiteAutopilotMapperService
                 'source_url' => $featuredImage,
             ]] : [],
         ];
+    }
+
+    private function preferredBlogFeaturedImage(array $mediaAssets): string
+    {
+        $preferredTargets = ['blog_primary', 'story', 'section_one', 'section_two', 'hero'];
+
+        foreach ($preferredTargets as $target) {
+            foreach ($mediaAssets as $asset) {
+                if (
+                    trim((string) ($asset['target'] ?? '')) === $target
+                    && trim((string) ($asset['source_url'] ?? '')) !== ''
+                ) {
+                    return trim((string) ($asset['source_url'] ?? ''));
+                }
+            }
+        }
+
+        return trim((string) ($mediaAssets[0]['source_url'] ?? ''));
     }
 
     private function recordMediaFromNormalizedAssets(array $mediaAssets, int $offset = 0): array

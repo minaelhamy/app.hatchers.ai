@@ -1029,16 +1029,46 @@ class WebsiteAutopilotService
             $changes[] = 'hero.hero_subhead.cleaned';
         }
 
+        $wellnessContext = $this->looksLikeYogaWellnessContext(
+            (string) ($company?->company_name ?? ''),
+            (string) ($company?->company_brief ?? ''),
+            (string) ($normalized['market']['niche'] ?? ''),
+            (string) ($draft['starter_offer']['title'] ?? '')
+        );
+        $city = trim((string) ($company?->primary_city ?? ''));
+        if ($heroHeadline === '' || Str::length($heroHeadline) > 90 || str_contains(Str::lower($heroHeadline), Str::lower((string) ($company?->company_name ?? '')) . ' helps many')) {
+            $draft['hero']['headline'] = $this->conciseHeroHeadline((string) ($company?->company_name ?? ''), $city, $wellnessContext);
+            $normalized['hero']['hero_headline'] = (string) $draft['hero']['headline'];
+            $changes[] = 'hero.hero_headline.shortened';
+        }
+
+        if (
+            $heroSubhead === ''
+            || Str::length($heroSubhead) > 165
+            || str_contains(Str::lower($heroSubhead), 'sell like crazy')
+        ) {
+            $draft['hero']['subhead'] = $this->conciseHeroSubhead((string) ($company?->company_name ?? ''), $city, $wellnessContext);
+            $normalized['hero']['hero_subhead'] = (string) $draft['hero']['subhead'];
+            $changes[] = 'hero.hero_subhead.shortened';
+        }
+
         return array_values(array_unique($changes));
     }
 
     private function normalizeCatalogItems(array $items): array
     {
-        return array_values(array_map(function (array $item): array {
-            $item['title'] = $this->normalizeMarketingLabel((string) ($item['title'] ?? ''));
-            $item['description'] = $this->normalizeMarketingLabel((string) ($item['description'] ?? ''));
-            return $item;
-        }, $items));
+        return collect($items)
+            ->map(function (array $item): array {
+                $item['title'] = $this->normalizeMarketingLabel((string) ($item['title'] ?? ''));
+                $item['description'] = $this->normalizeMarketingLabel((string) ($item['description'] ?? ''));
+                $item['price'] = trim((string) ($item['price'] ?? ''));
+                return $item;
+            })
+            ->filter(fn (array $item): bool => trim((string) ($item['title'] ?? '')) !== '')
+            ->unique(fn (array $item): string => Str::lower((string) ($item['title'] ?? '')))
+            ->take(3)
+            ->values()
+            ->all();
     }
 
     private function normalizeMarketingLabel(string $value): string
@@ -1053,6 +1083,40 @@ class WebsiteAutopilotService
         $value = preg_replace('/\s{2,}/', ' ', $value) ?? $value;
 
         return trim((string) $value, " \t\n\r\0\x0B.-");
+    }
+
+    private function looksLikeYogaWellnessContext(string ...$signals): bool
+    {
+        $haystack = Str::lower(trim(implode(' ', $signals)));
+        if ($haystack === '') {
+            return false;
+        }
+
+        foreach (['yoga', 'wellness', 'meditation', 'breathwork', 'pilates', 'mobility', 'stretch'] as $needle) {
+            if (str_contains($haystack, $needle)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function conciseHeroHeadline(string $companyName, string $city, bool $wellnessContext): string
+    {
+        if ($wellnessContext) {
+            return trim('Beginner-friendly yoga for busy professionals' . ($city !== '' ? ' in ' . $city : '') . '.');
+        }
+
+        return trim($companyName . ' makes the first step feel clear, valuable, and easy.');
+    }
+
+    private function conciseHeroSubhead(string $companyName, string $city, bool $wellnessContext): string
+    {
+        if ($wellnessContext) {
+            return trim('Calm, welcoming classes that reduce stress, improve mobility, and fit a full workweek' . ($city !== '' ? ' in ' . $city : '') . '.');
+        }
+
+        return $companyName . ' helps visitors understand the offer fast, trust the business faster, and know exactly what to do next.';
     }
 
     private function syncStarterOffer(Founder $founder, array $draft): array
@@ -1080,7 +1144,6 @@ class WebsiteAutopilotService
             $this->logAutopilotStep('starter_offer.skip_existing', $founder, [
                 'title' => $title,
             ]);
-            return ['ok' => true, 'message' => 'Starter offer already exists.'];
         }
 
         $payload = $this->websiteAutopilotMapperService->mapStarterRecordPayload($founder, $draft, 0);
@@ -1110,22 +1173,24 @@ class WebsiteAutopilotService
             'title' => $title,
         ]);
 
-        FounderActionPlan::create([
-            'founder_id' => $founder->id,
-            'title' => $title,
-            'description' => trim(implode("\n", [
-                'Type: ' . ($starterOffer['mode'] ?? 'service'),
-                'Engine: ' . (string) $draft['website_engine'],
-                'Price: ' . (trim((string) ($starterOffer['price'] ?? '')) !== '' ? (string) $starterOffer['price'] : '49'),
-                '',
-                (string) ($starterOffer['description'] ?? ''),
-            ])),
-            'platform' => (string) $draft['website_engine'],
-            'priority' => 74,
-            'status' => 'created',
-            'cta_label' => 'Open Commerce',
-            'cta_url' => route('founder.commerce'),
-        ]);
+        if (!$existing) {
+            FounderActionPlan::create([
+                'founder_id' => $founder->id,
+                'title' => $title,
+                'description' => trim(implode("\n", [
+                    'Type: ' . ($starterOffer['mode'] ?? 'service'),
+                    'Engine: ' . (string) $draft['website_engine'],
+                    'Price: ' . (trim((string) ($starterOffer['price'] ?? '')) !== '' ? (string) $starterOffer['price'] : '49'),
+                    '',
+                    (string) ($starterOffer['description'] ?? ''),
+                ])),
+                'platform' => (string) $draft['website_engine'],
+                'priority' => 74,
+                'status' => 'created',
+                'cta_label' => 'Open Commerce',
+                'cta_url' => route('founder.commerce'),
+            ]);
+        }
 
         foreach (array_slice((array) ($draft['catalog_items'] ?? []), 1, 3) as $index => $item) {
             if (!is_array($item)) {
@@ -1137,6 +1202,15 @@ class WebsiteAutopilotService
                 (string) ($starterOffer['mode'] ?? 'service')
             );
             if ($catalogTitle === '') {
+                continue;
+            }
+
+            $catalogExisting = $founder->actionPlans()
+                ->where('platform', (string) $draft['website_engine'])
+                ->where('title', $catalogTitle)
+                ->exists();
+
+            if ($catalogExisting) {
                 continue;
             }
 
@@ -1183,7 +1257,6 @@ class WebsiteAutopilotService
             $this->logAutopilotStep('starter_blog.skip_existing', $founder, [
                 'title' => $title,
             ]);
-            return ['ok' => true, 'message' => 'Starter blog already exists.'];
         }
 
         $payload = $this->websiteAutopilotMapperService->mapStarterBlogPayload($founder, $draft);
@@ -1208,16 +1281,18 @@ class WebsiteAutopilotService
             'title' => $title,
         ]);
 
-        FounderActionPlan::create([
-            'founder_id' => $founder->id,
-            'title' => $title,
-            'description' => $description,
-            'platform' => (string) $draft['website_engine'],
-            'priority' => 70,
-            'status' => 'created',
-            'cta_label' => 'Edit In Servio',
-            'cta_url' => route('workspace.launch', ['module' => 'servio']),
-        ]);
+        if (!$existing) {
+            FounderActionPlan::create([
+                'founder_id' => $founder->id,
+                'title' => $title,
+                'description' => $description,
+                'platform' => (string) $draft['website_engine'],
+                'priority' => 70,
+                'status' => 'created',
+                'cta_label' => 'Edit In Servio',
+                'cta_url' => route('workspace.launch', ['module' => 'servio']),
+            ]);
+        }
 
         return ['ok' => true, 'message' => 'Starter blog created from the website autopilot draft.'];
     }
@@ -1542,7 +1617,7 @@ class WebsiteAutopilotService
 
         return array_values(array_filter([
             $this->slotMedia('hero', 'hero banner', $hero),
-            $this->slotMedia('blog_primary', 'blog feature image', $hero ?? $story ?? $features),
+            $this->slotMedia('blog_primary', 'blog feature image', $story ?? $features ?? $hero),
             $this->slotMedia('landing', 'landing banner', $hero),
             $this->slotMedia('faq', 'faq image', $faq),
             $this->slotMedia('story', 'story image', $story),
@@ -1728,10 +1803,10 @@ class WebsiteAutopilotService
                 '7' => ['tags' => ['dark', 'editorial', 'moody'], 'modes' => ['service'], 'verticals' => ['tutoring-coaching'], 'weight' => 5],
                 '8' => ['tags' => ['friendly', 'clean', 'modern'], 'modes' => ['service'], 'verticals' => ['dog-walking', 'home-cleaning', 'barber-services'], 'weight' => 6],
                 '9' => ['tags' => ['dark', 'luxury', 'cinematic'], 'modes' => ['service'], 'verticals' => ['tutoring-coaching'], 'weight' => 6],
-                '10' => ['tags' => ['premium', 'structured', 'modern'], 'modes' => ['service'], 'verticals' => ['barber-services', 'tutoring-coaching'], 'weight' => 4],
-                '11' => ['tags' => ['warm', 'approachable', 'community'], 'modes' => ['service'], 'verticals' => ['dog-walking', 'home-cleaning'], 'weight' => 5],
-                '12' => ['tags' => ['luxury', 'high-end', 'gallery'], 'modes' => ['service'], 'verticals' => ['barber-services'], 'weight' => 4],
-                '14' => ['tags' => ['sleek', 'minimal', 'high-end'], 'modes' => ['service'], 'verticals' => ['barber-services'], 'weight' => 3],
+            '10' => ['tags' => ['premium', 'structured', 'modern'], 'modes' => ['service'], 'verticals' => ['barber-services', 'tutoring-coaching'], 'weight' => 4],
+            '11' => ['tags' => ['warm', 'approachable', 'community', 'calm', 'wellness', 'studio'], 'modes' => ['service'], 'verticals' => ['dog-walking', 'home-cleaning', 'tutoring-coaching'], 'weight' => 9],
+            '12' => ['tags' => ['luxury', 'high-end', 'gallery'], 'modes' => ['service'], 'verticals' => ['barber-services'], 'weight' => 4],
+            '14' => ['tags' => ['sleek', 'minimal', 'high-end', 'wellness', 'soft', 'editorial'], 'modes' => ['service'], 'verticals' => ['barber-services', 'tutoring-coaching'], 'weight' => 8],
                 '15' => ['tags' => ['full', 'content-rich', 'trust'], 'modes' => ['service'], 'verticals' => ['tutoring-coaching', 'home-cleaning'], 'weight' => 6],
                 '16' => ['tags' => ['luxury', 'dark', 'premium'], 'modes' => ['service'], 'verticals' => ['barber-services', 'tutoring-coaching'], 'weight' => 6],
                 '17' => ['tags' => ['dark', 'moody', 'music', 'artist', 'goth'], 'modes' => ['service'], 'verticals' => ['tutoring-coaching'], 'weight' => 8],
@@ -1762,6 +1837,26 @@ class WebsiteAutopilotService
         $avoid = collect($this->stringList((array) ($direction['avoid'] ?? [])))
             ->map(fn (string $item) => strtolower($item))
             ->all();
+        $wellnessContext = $this->looksLikeYogaWellnessContext(
+            (string) ($company->company_name ?? ''),
+            (string) ($company->company_brief ?? ''),
+            $icpName,
+            (string) ($websiteBuild['special_requests'] ?? ''),
+            (string) ($websiteBuild['services_pricing_notes'] ?? '')
+        );
+
+        if ($wellnessContext) {
+            $queries->prepend(trim(implode(' ', array_filter([
+                $company->primary_city ?: null,
+                'yoga studio',
+                'beginner class',
+                $mood !== '' ? $mood : 'calm',
+            ]))));
+            $queries->push('wellness studio stretching');
+            $queries->push('yoga instructor portrait');
+            $queries->push('small group yoga class');
+            $queries->push('meditation mobility practice');
+        }
 
         if ($company->primary_city) {
             $queries->push(trim((string) $company->primary_city . ' local business'));
@@ -1802,6 +1897,12 @@ class WebsiteAutopilotService
         string $problemSolved,
         string $icpName
     ): array {
+        $wellnessContext = $this->looksLikeYogaWellnessContext(
+            $companyName,
+            $problemSolved,
+            $icpName,
+            implode(' ', $imageQueries)
+        );
         $baseQuery = $imageQueries[0] ?? ($companyName . ' local business');
         $cityHint = $city !== '' ? $city . ' ' : '';
         $secondQuery = $imageQueries[1] ?? ($baseQuery . ' customer');
@@ -1814,40 +1915,46 @@ class WebsiteAutopilotService
                 'slot_key' => 'hero',
                 'slot_label' => 'Hero Banner',
                 'provider' => 'pexels',
-                'query' => trim($cityHint . $baseQuery . ' storefront lifestyle'),
+                'query' => $wellnessContext
+                    ? trim($cityHint . 'yoga studio class calm movement')
+                    : trim($cityHint . $baseQuery . ' storefront lifestyle'),
                 'fallback_queries' => array_values(array_filter([
-                    trim($cityHint . $baseQuery),
-                    trim($baseQuery),
-                    trim($companyName . ' ' . $icpName),
-                    trim($icpName . ' local service'),
+                    $wellnessContext ? trim($cityHint . 'beginner yoga class studio') : trim($cityHint . $baseQuery),
+                    $wellnessContext ? trim('wellness studio stretching') : trim($baseQuery),
+                    $wellnessContext ? trim($companyName . ' yoga') : trim($companyName . ' ' . $icpName),
+                    $wellnessContext ? trim($icpName . ' yoga class') : trim($icpName . ' local service'),
                 ])),
                 'alt_text' => $companyName . ' hero image',
-                'visual_brief' => trim('Use a strong hero image that instantly shows the business context, local trust, and the main outcome for ' . $icpName . '. Problem focus: ' . $problemSolved . '.'),
+                'visual_brief' => $wellnessContext
+                    ? 'Use a calm, premium yoga image with real movement, a clean studio setting, and a welcoming beginner-friendly feel.'
+                    : trim('Use a strong hero image that instantly shows the business context, local trust, and the main outcome for ' . $icpName . '. Problem focus: ' . $problemSolved . '.'),
                 'status' => 'requested',
             ],
             [
                 'slot_key' => 'features',
                 'slot_label' => 'Features Section',
                 'provider' => 'pexels',
-                'query' => trim($fifthQuery . ' professional detail'),
+                'query' => $wellnessContext ? trim('yoga pose studio detail natural light') : trim($fifthQuery . ' professional detail'),
                 'fallback_queries' => array_values(array_filter([
-                    trim($fifthQuery),
-                    trim($baseQuery . ' detail'),
-                    trim($companyName . ' quality service'),
+                    $wellnessContext ? trim('wellness studio detail') : trim($fifthQuery),
+                    $wellnessContext ? trim('yoga mat stretching studio') : trim($baseQuery . ' detail'),
+                    $wellnessContext ? trim($companyName . ' wellness class') : trim($companyName . ' quality service'),
                 ])),
                 'alt_text' => $companyName . ' features section image',
-                'visual_brief' => 'Use a detailed image that supports the offer, process, or quality of the work.',
+                'visual_brief' => $wellnessContext
+                    ? 'Use a detailed yoga or wellness image that feels calm, elevated, and physically grounded.'
+                    : 'Use a detailed image that supports the offer, process, or quality of the work.',
                 'status' => 'requested',
             ],
             [
                 'slot_key' => 'proof',
                 'slot_label' => 'Social Proof',
                 'provider' => 'pexels',
-                'query' => trim($secondQuery . ' happy customer'),
+                'query' => $wellnessContext ? trim('small group yoga class smiling students') : trim($secondQuery . ' happy customer'),
                 'fallback_queries' => array_values(array_filter([
-                    trim($secondQuery),
-                    trim($baseQuery . ' customer'),
-                    trim($icpName . ' satisfied customer'),
+                    $wellnessContext ? trim('yoga class community') : trim($secondQuery),
+                    $wellnessContext ? trim('wellness class student') : trim($baseQuery . ' customer'),
+                    $wellnessContext ? trim($icpName . ' stress relief class') : trim($icpName . ' satisfied customer'),
                 ])),
                 'alt_text' => $companyName . ' proof section image',
                 'visual_brief' => 'Use a people-first image that feels like trust, satisfaction, or a real customer result.',
@@ -1857,11 +1964,11 @@ class WebsiteAutopilotService
                 'slot_key' => 'story',
                 'slot_label' => 'Founder Story',
                 'provider' => 'pexels',
-                'query' => trim($thirdQuery . ' small business owner'),
+                'query' => $wellnessContext ? trim('yoga instructor portrait studio') : trim($thirdQuery . ' small business owner'),
                 'fallback_queries' => array_values(array_filter([
-                    trim($thirdQuery),
-                    trim($companyName . ' founder'),
-                    trim($baseQuery . ' owner'),
+                    $wellnessContext ? trim('wellness instructor portrait') : trim($thirdQuery),
+                    $wellnessContext ? trim($companyName . ' instructor') : trim($companyName . ' founder'),
+                    $wellnessContext ? trim('meditation teacher studio') : trim($baseQuery . ' owner'),
                 ])),
                 'alt_text' => $companyName . ' story section image',
                 'visual_brief' => 'Use a warm, human image that supports the About, founder, or story section.',
@@ -1871,11 +1978,11 @@ class WebsiteAutopilotService
                 'slot_key' => 'faq',
                 'slot_label' => 'FAQ Section',
                 'provider' => 'pexels',
-                'query' => trim($fourthQuery . ' helpful support'),
+                'query' => $wellnessContext ? trim('calm yoga studio conversation guidance') : trim($fourthQuery . ' helpful support'),
                 'fallback_queries' => array_values(array_filter([
-                    trim($fourthQuery),
-                    trim($baseQuery . ' support'),
-                    trim($icpName . ' consultation'),
+                    $wellnessContext ? trim('yoga studio front desk') : trim($fourthQuery),
+                    $wellnessContext ? trim('wellness consultation calm') : trim($baseQuery . ' support'),
+                    $wellnessContext ? trim($icpName . ' beginner yoga help') : trim($icpName . ' consultation'),
                 ])),
                 'alt_text' => $companyName . ' FAQ image',
                 'visual_brief' => 'Use a calm, supportive image that fits questions, guidance, or easy next steps.',
@@ -1885,11 +1992,11 @@ class WebsiteAutopilotService
                 'slot_key' => 'action',
                 'slot_label' => 'Call To Action',
                 'provider' => 'pexels',
-                'query' => trim($baseQuery . ' booking checkout action'),
+                'query' => $wellnessContext ? trim('person arriving for yoga class studio') : trim($baseQuery . ' booking checkout action'),
                 'fallback_queries' => array_values(array_filter([
-                    trim($baseQuery . ' booking'),
-                    trim($baseQuery . ' appointment'),
-                    trim($companyName . ' contact'),
+                    $wellnessContext ? trim('book yoga class') : trim($baseQuery . ' booking'),
+                    $wellnessContext ? trim('yoga check in studio') : trim($baseQuery . ' appointment'),
+                    $wellnessContext ? trim($companyName . ' yoga booking') : trim($companyName . ' contact'),
                 ])),
                 'alt_text' => $companyName . ' action section image',
                 'visual_brief' => 'Use an image that reinforces momentum, action, booking, checkout, or contact.',
@@ -1961,29 +2068,37 @@ class WebsiteAutopilotService
 
     private function heroHeadline(VerticalBlueprint $blueprint, string $companyName, string $problemSolved, string $city): string
     {
-        $cityPrefix = $city !== '' ? $city . ' ' : '';
+        $wellnessContext = $this->looksLikeYogaWellnessContext($companyName, $problemSolved, (string) $blueprint->code);
         $problemSolved = $this->normalizeProblemStatement($problemSolved, $companyName, $city);
 
+        if ($wellnessContext) {
+            return $this->conciseHeroHeadline($companyName, $city, true);
+        }
+
         if ($problemSolved !== '') {
-            return $cityPrefix . $companyName . ' helps ' . Str::of($problemSolved)->lower()->trim(" .")->value() . '.';
+            return $companyName . ' helps ' . Str::limit(Str::of($problemSolved)->lower()->trim(" .")->value(), 72, '') . '.';
         }
 
         return match ((string) $blueprint->code) {
-            'dog-walking' => $cityPrefix . $companyName . ' keeps your dog active, happy, and looked after without the scheduling chaos.',
-            'home-cleaning' => $cityPrefix . $companyName . ' gives busy homes a cleaner space without the back-and-forth.',
-            'barber-services' => $cityPrefix . $companyName . ' makes booking your next sharp cut feel simple and immediate.',
-            'tutoring-coaching' => $cityPrefix . $companyName . ' helps clients get expert guidance with a clear next step.',
-            'handmade-products' => $cityPrefix . $companyName . ' brings handcrafted products to buyers with a simple offer and clear story.',
-            default => $cityPrefix . $companyName . ' helps local customers move from interest to action faster.',
+            'dog-walking' => $companyName . ' keeps your dog active, happy, and looked after without the scheduling chaos.',
+            'home-cleaning' => $companyName . ' gives busy homes a cleaner space without the back-and-forth.',
+            'barber-services' => $companyName . ' makes booking your next sharp cut feel simple and immediate.',
+            'tutoring-coaching' => $companyName . ' helps clients get expert guidance with a clear next step.',
+            'handmade-products' => $companyName . ' brings handcrafted products to buyers with a simple offer and clear story.',
+            default => $companyName . ' helps local customers move from interest to action faster.',
         };
     }
 
     private function heroSubhead(string $companyName, string $coreOffer, string $icpName, string $city): string
     {
+        if ($this->looksLikeYogaWellnessContext($companyName, $coreOffer, $icpName)) {
+            return $this->conciseHeroSubhead($companyName, $city, true);
+        }
+
         $locationTail = $city !== '' ? ' in ' . $city : '';
         $offerLine = $coreOffer !== '' ? $coreOffer : 'a clear first offer';
 
-        return $companyName . ' now launches with ' . $offerLine . ' designed for ' . $icpName . $locationTail . ', using a direct-response structure inspired by Sell Like Crazy.';
+        return $offerLine . ' is designed for ' . $icpName . $locationTail . ' and turns interest into a clearer, easier next step.';
     }
 
     private function normalizeProblemStatement(string $problemSolved, string $companyName, string $city): string
@@ -2190,6 +2305,11 @@ class WebsiteAutopilotService
                 ['title' => 'Daily DogWalker Plan', 'price' => '$129/week', 'description' => 'Recurring weekday walks with updates and a simple schedule for busy owners.'],
                 ['title' => 'Puppy Energy Reset', 'price' => '$39', 'description' => 'A higher-attention session for puppies or high-energy dogs that need structure and movement.'],
             ],
+            'yoga' => [
+                ['title' => 'Drop-In Yoga Class', 'price' => '$28', 'description' => 'A welcoming beginner-friendly class focused on stress relief, mobility, and feeling better fast.'],
+                ['title' => 'Weekly Flow Membership', 'price' => '$89/mo', 'description' => 'A recurring plan for busy professionals who want consistent movement, calm, and accountability.'],
+                ['title' => 'Private Yoga Session', 'price' => '$120', 'description' => 'A tailored one-on-one session for posture, mobility, recovery, and a more personal pace.'],
+            ],
             'music' => [
                 ['title' => 'Artist Growth Audit', 'price' => '$149', 'description' => 'A focused strategy session to diagnose what is blocking growth, audience building, and monetization.'],
                 ['title' => 'Signature Coaching Sprint', 'price' => '$497', 'description' => 'A high-accountability package with clear actions, positioning, and revenue priorities.'],
@@ -2218,6 +2338,7 @@ class WebsiteAutopilotService
         ];
 
         $selected = match (true) {
+            str_contains($seed, 'yoga'), str_contains($seed, 'wellness'), str_contains($seed, 'meditation'), str_contains($seed, 'pilates') => $profiles['yoga'],
             str_contains($seed, 'dog') => $profiles['dog'],
             str_contains($seed, 'artist'), str_contains($seed, 'music'), str_contains($seed, 'musician') => $profiles['music'],
             str_contains($seed, 'clean') => $profiles['clean'],
