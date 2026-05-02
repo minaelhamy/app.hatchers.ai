@@ -84,8 +84,9 @@ class WebsiteAutopilotValidatorService
     {
         $email = $this->stringValue($payload, ['contact', 'contact_email']);
         $phone = $this->stringValue($payload, ['contact', 'contact_phone']);
+        $whatsApp = $this->stringValue($payload, ['contact', 'whatsapp_number']);
 
-        return $email !== '' || $phone !== '';
+        return $email !== '' || $phone !== '' || $whatsApp !== '';
     }
 
     private function mediaReady(array $payload): bool

@@ -872,13 +872,27 @@ class WebsiteAutopilotService
             }
 
             if (trim((string) ($normalized['contact']['contact_email'] ?? '')) === '') {
-                $normalized['contact']['contact_email'] = (string) ($websiteBuild['contact_email'] ?? $founder->email ?? '');
+                $fallbackEmail = trim((string) ($websiteBuild['contact_email'] ?? ''));
+                if ($fallbackEmail === '') {
+                    $fallbackEmail = trim((string) ($founder->email ?? ''));
+                }
+                if ($fallbackEmail === '' && str_contains((string) ($founder->username ?? ''), '@')) {
+                    $fallbackEmail = trim((string) $founder->username);
+                }
+                $normalized['contact']['contact_email'] = $fallbackEmail;
                 if (trim((string) ($normalized['contact']['contact_email'] ?? '')) !== '') {
                     $passChanges[] = 'contact.contact_email';
                 }
             }
             if (trim((string) ($normalized['contact']['contact_phone'] ?? '')) === '') {
-                $normalized['contact']['contact_phone'] = (string) ($websiteBuild['contact_phone'] ?? $websiteBuild['contact_phone_number'] ?? $websiteBuild['contact_mobile'] ?? $founder->phone ?? '');
+                $fallbackPhone = trim((string) ($websiteBuild['contact_phone'] ?? $websiteBuild['contact_phone_number'] ?? $websiteBuild['contact_mobile'] ?? ''));
+                if ($fallbackPhone === '') {
+                    $fallbackPhone = trim((string) ($founder->phone ?? ''));
+                }
+                if ($fallbackPhone === '') {
+                    $fallbackPhone = trim((string) ($websiteBuild['whatsapp_number'] ?? ''));
+                }
+                $normalized['contact']['contact_phone'] = $fallbackPhone;
                 if (trim((string) ($normalized['contact']['contact_phone'] ?? '')) !== '') {
                     $passChanges[] = 'contact.contact_phone';
                 }
@@ -896,7 +910,11 @@ class WebsiteAutopilotService
                 }
             }
             if (trim((string) ($normalized['contact']['whatsapp_number'] ?? '')) === '') {
-                $normalized['contact']['whatsapp_number'] = (string) ($websiteBuild['whatsapp_number'] ?? '');
+                $fallbackWhatsapp = trim((string) ($websiteBuild['whatsapp_number'] ?? ''));
+                if ($fallbackWhatsapp === '') {
+                    $fallbackWhatsapp = trim((string) ($normalized['contact']['contact_phone'] ?? ''));
+                }
+                $normalized['contact']['whatsapp_number'] = $fallbackWhatsapp;
                 if (trim((string) ($normalized['contact']['whatsapp_number'] ?? '')) !== '') {
                     $passChanges[] = 'contact.whatsapp_number';
                 }
