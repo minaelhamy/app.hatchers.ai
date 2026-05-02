@@ -18,6 +18,11 @@ return [
     'servio' => [
         'base_url' => env('SERVIO_BASE_URL', 'https://servio.hatchers.ai'),
     ],
+    'stock_media' => [
+        'unsplash_access_key' => env('UNSPLASH_ACCESS_KEY', ''),
+        'pexels_api_key' => env('PEXELS_API_KEY', ''),
+        'pixabay_api_key' => env('PIXABAY_API_KEY', ''),
+    ],
     'stripe' => [
         'secret' => env('STRIPE_SECRET', ''),
         'publishable_key' => env('STRIPE_PUBLISHABLE_KEY', ''),

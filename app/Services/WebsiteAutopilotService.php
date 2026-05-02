@@ -13,6 +13,7 @@ use App\Models\VerticalBlueprint;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class WebsiteAutopilotService
@@ -660,13 +661,17 @@ class WebsiteAutopilotService
             $problemSolved = trim((string) ($draft['funnel_blocks']['problem']['body'] ?? ''));
 
             $mediaState = $this->resolvedWebsiteMediaState($founder, $draft);
-            if (!empty($mediaState['media_assets']) && empty($normalized['media']['media_assets'] ?? [])) {
-                $normalized['media']['media_assets'] = array_values(array_filter((array) $mediaState['media_assets'], fn ($item) => is_array($item)));
+            $currentMediaAssets = array_values(array_filter((array) ($normalized['media']['media_assets'] ?? []), fn ($item) => is_array($item)));
+            $repairedMediaAssets = array_values(array_filter((array) ($mediaState['media_assets'] ?? []), fn ($item) => is_array($item)));
+            if ($repairedMediaAssets !== [] && $this->mediaAssetsNeedRepair($currentMediaAssets) && $currentMediaAssets !== $repairedMediaAssets) {
+                $normalized['media']['media_assets'] = $repairedMediaAssets;
                 $draft['media_assets'] = $normalized['media']['media_assets'];
                 $passChanges[] = 'media.media_assets';
             }
-            if (!empty($mediaState['asset_slots']) && empty($normalized['media']['media_queries'] ?? [])) {
-                $normalized['media']['media_queries'] = array_values(array_filter((array) $mediaState['asset_slots'], fn ($item) => is_array($item)));
+            $repairedAssetSlots = array_values(array_filter((array) ($mediaState['asset_slots'] ?? []), fn ($item) => is_array($item)));
+            $currentMediaQueries = array_values(array_filter((array) ($normalized['media']['media_queries'] ?? []), fn ($item) => is_array($item)));
+            if ($repairedAssetSlots !== [] && $currentMediaQueries !== $repairedAssetSlots) {
+                $normalized['media']['media_queries'] = $repairedAssetSlots;
                 $draft['atlas_handoff']['asset_slots'] = $normalized['media']['media_queries'];
                 $passChanges[] = 'media.media_queries';
             }
@@ -1667,6 +1672,9 @@ class WebsiteAutopilotService
         );
 
         $mediaAssets = $this->websiteMediaAssets($founder, $draft);
+        if ($this->mediaAssetsNeedRepair($mediaAssets)) {
+            $mediaAssets = $this->repairMediaAssetsFromProviders($draft, $mediaAssets, $assetSlots);
+        }
         $mediaAssets = $this->ensurePublishableMediaAssets($mediaAssets, $draft);
 
         return [
@@ -1677,22 +1685,7 @@ class WebsiteAutopilotService
 
     private function fallbackAssetSlotsFromDraft(Founder $founder, array $draft): array
     {
-        $company = $founder->company;
-        $companyName = trim((string) ($draft['website_title'] ?? $company?->company_name ?? $founder->full_name));
-        $city = trim((string) ($company?->primary_city ?? ''));
-        $problemSolved = trim((string) ($draft['funnel_blocks']['problem']['body'] ?? ''));
-        $icpName = trim((string) ($draft['normalized_payload']['market']['primary_icp_name'] ?? 'local customers'));
-        $pages = array_values(array_filter((array) ($draft['page_plan'] ?? []), fn ($item) => $item !== null && $item !== ''));
-        $imageQueries = array_values(array_filter(array_map('strval', (array) ($draft['image_queries'] ?? []))));
-
-        return $this->buildAssetSlots(
-            $companyName,
-            $city,
-            $pages,
-            $imageQueries,
-            $problemSolved,
-            $icpName
-        );
+        return $this->draftAssetSlotPlan($draft, $founder->company, $founder->full_name);
     }
 
     private function normalizeResolvedAssets(array $assets): array
@@ -1814,6 +1807,335 @@ class WebsiteAutopilotService
             $carry[$target] = $asset;
             return $carry;
         }, []));
+    }
+
+    private function mediaAssetsNeedRepair(array $mediaAssets): bool
+    {
+        $assets = array_values(array_filter($mediaAssets, fn ($item) => is_array($item)));
+        $distinct = collect($assets)
+            ->pluck('source_url')
+            ->map(fn ($url) => $this->normalizeMediaSourceKey((string) $url))
+            ->filter()
+            ->unique()
+            ->values();
+
+        $requiredServiceTargets = ['service_primary', 'service_detail', 'service_support'];
+        $presentTargets = collect($assets)
+            ->pluck('target')
+            ->map(fn ($target) => trim((string) $target))
+            ->filter()
+            ->values();
+
+        foreach ($requiredServiceTargets as $target) {
+            if (!$presentTargets->contains($target)) {
+                return true;
+            }
+        }
+
+        return $distinct->count() < 3;
+    }
+
+    private function repairMediaAssetsFromProviders(array $draft, array $mediaAssets, array $assetSlots): array
+    {
+        $assetsByTarget = collect(array_values(array_filter($mediaAssets, fn ($item) => is_array($item))))
+            ->keyBy(fn (array $item): string => trim((string) ($item['target'] ?? '')));
+        $slotPlan = collect($assetSlots)
+            ->filter(fn ($item): bool => is_array($item))
+            ->keyBy(fn (array $item): string => trim((string) ($item['slot_key'] ?? '')));
+
+        $resolved = [];
+        $used = [];
+
+        foreach ($this->requiredMediaTargets() as $target => $meta) {
+            $existing = $assetsByTarget->get($target);
+            $existingKey = $this->normalizeMediaSourceKey((string) ($existing['source_url'] ?? ''));
+
+            if (is_array($existing) && $existingKey !== '' && !in_array($existingKey, $used, true)) {
+                $resolved[$target] = $existing;
+                $used[] = $existingKey;
+                continue;
+            }
+
+            $slot = $slotPlan->get($target);
+            if (!is_array($slot)) {
+                $slot = $this->fallbackSlotForTarget($target, $draft);
+            }
+
+            $candidate = is_array($slot) ? $this->resolveDistinctWebsiteMediaCandidate($slot, $used) : null;
+            if (is_array($candidate)) {
+                $resolved[$target] = $this->slotMedia($target, (string) ($meta['label'] ?? $target), $candidate);
+                $used[] = $this->normalizeMediaSourceKey((string) ($candidate['source_url'] ?? ''));
+                continue;
+            }
+
+            if (is_array($existing)) {
+                $resolved[$target] = $existing;
+            }
+        }
+
+        foreach ($assetsByTarget as $target => $asset) {
+            if (!isset($resolved[$target])) {
+                $resolved[$target] = $asset;
+            }
+        }
+
+        return array_values(array_filter($resolved, fn ($item) => is_array($item)));
+    }
+
+    private function requiredMediaTargets(): array
+    {
+        return [
+            'hero' => ['label' => 'hero banner'],
+            'blog_primary' => ['label' => 'blog feature image'],
+            'category' => ['label' => 'category image'],
+            'service_primary' => ['label' => 'service primary image'],
+            'service_detail' => ['label' => 'service detail image'],
+            'service_support' => ['label' => 'service support image'],
+            'section_one' => ['label' => 'section one banner'],
+            'section_two' => ['label' => 'section two banner'],
+            'section_three' => ['label' => 'section three banner'],
+        ];
+    }
+
+    private function fallbackSlotForTarget(string $target, array $draft): ?array
+    {
+        $fallbackSlots = collect($this->draftAssetSlotPlan($draft))
+            ->filter(fn ($item): bool => is_array($item))
+            ->keyBy(fn (array $item): string => trim((string) ($item['slot_key'] ?? '')));
+
+        return $fallbackSlots->get($target);
+    }
+
+    private function draftAssetSlotPlan(array $draft, ?Company $company = null, string $fallbackName = ''): array
+    {
+        $companyName = trim((string) ($draft['website_title'] ?? $company?->company_name ?? $fallbackName));
+        $city = trim((string) ($company?->primary_city ?? ''));
+        $problemSolved = trim((string) ($draft['funnel_blocks']['problem']['body'] ?? ''));
+        $icpName = trim((string) ($draft['normalized_payload']['market']['primary_icp_name'] ?? 'local customers'));
+        $pages = array_values(array_filter((array) ($draft['page_plan'] ?? []), fn ($item) => $item !== null && $item !== ''));
+        $imageQueries = array_values(array_filter(array_map('strval', (array) ($draft['image_queries'] ?? []))));
+
+        return $this->buildAssetSlots(
+            $companyName,
+            $city,
+            $pages,
+            $imageQueries,
+            $problemSolved,
+            $icpName
+        );
+    }
+
+    private function resolveDistinctWebsiteMediaCandidate(array $slot, array $usedSources = []): ?array
+    {
+        $queries = $this->slotQueriesFromMediaPlan($slot);
+        if ($queries === []) {
+            return null;
+        }
+
+        foreach ($queries as $query) {
+            $assets = array_merge(
+                $this->searchWikimediaAssets($query),
+                $this->searchUnsplashAssets($query),
+                $this->searchPexelsAssets($query),
+                $this->searchPixabayAssets($query)
+            );
+
+            $candidate = collect($assets)
+                ->filter(fn ($asset): bool => is_array($asset) && trim((string) ($asset['source_url'] ?? '')) !== '')
+                ->first(function (array $asset) use ($usedSources): bool {
+                    $key = $this->normalizeMediaSourceKey((string) ($asset['source_url'] ?? ''));
+                    return $key !== '' && !in_array($key, $usedSources, true);
+                });
+
+            if (is_array($candidate)) {
+                return $candidate;
+            }
+        }
+
+        return null;
+    }
+
+    private function slotQueriesFromMediaPlan(array $slot): array
+    {
+        $queries = [];
+        foreach (array_merge(
+            [trim((string) ($slot['query'] ?? ''))],
+            array_map(fn ($item) => trim((string) $item), (array) ($slot['fallback_queries'] ?? []))
+        ) as $query) {
+            if ($query !== '') {
+                $queries[] = preg_replace('/\s+/', ' ', $query) ?: $query;
+            }
+        }
+
+        return array_values(array_unique($queries));
+    }
+
+    private function normalizeMediaSourceKey(string $url): string
+    {
+        $url = trim($url);
+        if ($url === '') {
+            return '';
+        }
+
+        return preg_replace('/#.*$/', '', $url) ?? $url;
+    }
+
+    private function searchUnsplashAssets(string $query): array
+    {
+        $key = trim((string) config('services.stock_media.unsplash_access_key', ''));
+        if ($key === '') {
+            return [];
+        }
+
+        try {
+            $response = Http::timeout(20)->withHeaders([
+                'Authorization' => 'Client-ID ' . $key,
+                'Accept-Version' => 'v1',
+            ])->get('https://api.unsplash.com/search/photos', [
+                'query' => $query,
+                'per_page' => 8,
+                'orientation' => 'landscape',
+                'content_filter' => 'high',
+                'order_by' => 'relevant',
+            ]);
+        } catch (\Throwable $exception) {
+            return [];
+        }
+
+        $results = (array) ($response->json('results') ?? []);
+
+        return collect($results)->map(function (array $item): ?array {
+            $url = trim((string) ($item['urls']['regular'] ?? ''));
+            if ($url === '') {
+                return null;
+            }
+
+            return [
+                'provider' => 'unsplash',
+                'source_url' => $url,
+                'preview_url' => trim((string) ($item['urls']['small'] ?? $url)),
+                'alt_text' => trim((string) ($item['alt_description'] ?? 'Website image')),
+                'credit_name' => trim((string) ($item['user']['name'] ?? '')),
+                'credit_url' => trim((string) ($item['user']['links']['html'] ?? '')),
+            ];
+        })->filter()->values()->all();
+    }
+
+    private function searchPexelsAssets(string $query): array
+    {
+        $key = trim((string) config('services.stock_media.pexels_api_key', ''));
+        if ($key === '') {
+            return [];
+        }
+
+        try {
+            $response = Http::timeout(20)->withHeaders([
+                'Authorization' => $key,
+            ])->get('https://api.pexels.com/v1/search', [
+                'query' => $query,
+                'per_page' => 8,
+                'orientation' => 'landscape',
+            ]);
+        } catch (\Throwable $exception) {
+            return [];
+        }
+
+        $results = (array) ($response->json('photos') ?? []);
+
+        return collect($results)->map(function (array $item): ?array {
+            $url = trim((string) ($item['src']['large2x'] ?? ''));
+            if ($url === '') {
+                return null;
+            }
+
+            return [
+                'provider' => 'pexels',
+                'source_url' => $url,
+                'preview_url' => trim((string) ($item['src']['medium'] ?? $url)),
+                'alt_text' => trim((string) ($item['alt'] ?? 'Website image')),
+                'credit_name' => trim((string) ($item['photographer'] ?? '')),
+                'credit_url' => trim((string) ($item['url'] ?? '')),
+            ];
+        })->filter()->values()->all();
+    }
+
+    private function searchPixabayAssets(string $query): array
+    {
+        $key = trim((string) config('services.stock_media.pixabay_api_key', ''));
+        if ($key === '') {
+            return [];
+        }
+
+        try {
+            $response = Http::timeout(20)->get('https://pixabay.com/api/', [
+                'key' => $key,
+                'q' => $query,
+                'image_type' => 'photo',
+                'orientation' => 'horizontal',
+                'per_page' => 8,
+                'safesearch' => 'true',
+            ]);
+        } catch (\Throwable $exception) {
+            return [];
+        }
+
+        $results = (array) ($response->json('hits') ?? []);
+
+        return collect($results)->map(function (array $item): ?array {
+            $url = trim((string) ($item['largeImageURL'] ?? ''));
+            if ($url === '') {
+                return null;
+            }
+
+            return [
+                'provider' => 'pixabay',
+                'source_url' => $url,
+                'preview_url' => trim((string) ($item['webformatURL'] ?? $url)),
+                'alt_text' => trim((string) ($item['tags'] ?? 'Website image')),
+                'credit_name' => trim((string) ($item['user'] ?? '')),
+                'credit_url' => '',
+            ];
+        })->filter()->values()->all();
+    }
+
+    private function searchWikimediaAssets(string $query): array
+    {
+        try {
+            $searchResponse = Http::timeout(20)->get('https://commons.wikimedia.org/w/api.php', [
+                'action' => 'query',
+                'format' => 'json',
+                'generator' => 'search',
+                'gsrsearch' => $query,
+                'gsrlimit' => 8,
+                'gsrnamespace' => 6,
+                'prop' => 'imageinfo',
+                'iiprop' => 'url|extmetadata',
+                'iiurlwidth' => 1200,
+            ]);
+        } catch (\Throwable $exception) {
+            return [];
+        }
+
+        $pages = collect((array) ($searchResponse->json('query.pages') ?? []));
+
+        return $pages->map(function (array $page): ?array {
+            $imageInfo = (array) (($page['imageinfo'][0] ?? null) ?: []);
+            $sourceUrl = trim((string) ($imageInfo['thumburl'] ?? $imageInfo['url'] ?? ''));
+            if ($sourceUrl === '') {
+                return null;
+            }
+
+            $meta = (array) ($imageInfo['extmetadata'] ?? []);
+
+            return [
+                'provider' => 'wikimedia',
+                'source_url' => $sourceUrl,
+                'preview_url' => $sourceUrl,
+                'alt_text' => trim(strip_tags((string) (($meta['ImageDescription']['value'] ?? '') ?: ($page['title'] ?? 'Website image')))),
+                'credit_name' => trim(strip_tags((string) ($meta['Artist']['value'] ?? 'Wikimedia Commons'))),
+                'credit_url' => trim((string) ($imageInfo['descriptionurl'] ?? '')),
+            ];
+        })->filter()->values()->all();
     }
 
     private function syntheticMediaVariant(array $asset, string $target, string $label): array
