@@ -74,6 +74,7 @@ class PublicWebsiteService
             'engine_vendor_slug' => $engineVendorSlug,
             'uses_engine_storefront' => $usesEngineStorefront,
             'theme' => (string) ($summary['theme_template'] ?? ''),
+            'hero_image_url' => $this->resolveHeroImageUrl($draftOutput),
             'hero' => $this->buildHero($company, $founder?->full_name ?? '', $businessModel, $counts, $currency, $draftOutput),
             'metrics' => $this->buildMetrics($businessModel, $counts, (float) ($summary['gross_revenue'] ?? 0), $currency),
             'offers' => $this->buildOffers($payload, $businessModel, $currency, $offerPreferences),
@@ -115,10 +116,10 @@ class PublicWebsiteService
                 $asset = is_array($section['asset'] ?? null) ? $section['asset'] : [];
 
                 return [
-                    'title' => (string) ($section['title'] ?? ''),
-                    'body' => (string) ($section['body'] ?? ''),
+                    'title' => $this->cleanTitle((string) ($section['title'] ?? '')),
+                    'body' => $this->cleanMarketingCopy((string) ($section['body'] ?? '')),
                     'bullets' => collect((array) ($section['bullets'] ?? []))
-                        ->map(fn ($bullet) => trim((string) $bullet))
+                        ->map(fn ($bullet) => $this->cleanListItem((string) $bullet))
                         ->filter()
                         ->values()
                         ->all(),
@@ -219,20 +220,27 @@ class PublicWebsiteService
         if ($headline === '') {
             $headline = $companyName !== '' ? $companyName : ($founderName !== '' ? $founderName : 'Hatchers Business');
         }
+        $headline = $this->cleanHeadline($headline);
+        if ($this->headlineFeelsTooLong($headline)) {
+            $headline = $companyName !== '' ? $companyName : ($founderName !== '' ? $founderName : 'Hatchers Business');
+        }
+        $headline = $this->cleanHeadline($headline);
 
         $subhead = trim((string) ($draftOutput['hero']['subhead'] ?? ''));
         if ($subhead === '') {
             $subhead = match ($businessModel) {
-            'product' => 'Browse products, place orders, and buy directly from one operating system.',
-            'service' => 'Book services, confirm time slots, and work with a business that runs from one operating system.',
-            default => 'Explore products and services from one unified business operating system.',
-        };
+                'product' => 'Browse the featured offers, choose the right fit, and buy directly from this storefront.',
+                'service' => 'Discover the best-fit classes or services, book with confidence, and take the next step today.',
+                default => 'Explore the best-fit offers, services, and next steps from one polished storefront.',
+            };
         }
+        $subhead = $this->cleanMarketingCopy($subhead);
 
         $heroBrief = trim((string) ($draftOutput['hero']['brief'] ?? ''));
         if ($heroBrief !== '') {
             $brief = $heroBrief;
         }
+        $brief = $this->cleanMarketingCopy($brief);
 
         return [
             'headline' => $headline,
@@ -260,7 +268,11 @@ class PublicWebsiteService
 
         $metrics[] = ['label' => 'Revenue tracked', 'value' => $currency . ' ' . number_format($grossRevenue, 0)];
 
-        return array_slice($metrics, 0, 4);
+        $visibleMetrics = array_values(array_filter($metrics, function (array $metric): bool {
+            return !preg_match('/\b0(?:\.00)?\b/', (string) $metric['value']);
+        }));
+
+        return array_slice($visibleMetrics, 0, 4);
     }
 
     private function buildOffers(array $payload, string $businessModel, string $currency, array $offerPreferences = []): array
@@ -276,8 +288,8 @@ class PublicWebsiteService
                 $paymentCollection = $offerPreferences['bazaar:' . strtolower((string) ($product['title'] ?? ''))] ?? 'both';
                 $items[] = [
                     'type' => 'product',
-                    'title' => (string) ($product['title'] ?? 'Product'),
-                    'meta' => trim('SKU ' . (string) ($product['sku'] ?? '') . (($product['qty'] ?? null) !== null ? ' · Stock ' . (int) $product['qty'] : '')),
+                    'title' => $this->cleanTitle((string) ($product['title'] ?? 'Product')),
+                    'meta' => $this->cleanMarketingCopy(trim('SKU ' . (string) ($product['sku'] ?? '') . (($product['qty'] ?? null) !== null ? ' · Stock ' . (int) $product['qty'] : ''))),
                     'price' => $currency . ' ' . number_format((float) ($product['price'] ?? 0), 2),
                     'base_price' => (float) ($product['price'] ?? 0),
                     'currency' => $currency,
@@ -305,10 +317,10 @@ class PublicWebsiteService
                     ],
                     'details' => array_values(array_filter(array_merge(
                         collect((array) ($product['variants'] ?? []))
-                            ->map(fn ($variant) => is_array($variant) ? trim((string) (($variant['name'] ?? '') . ' · ' . ($variant['qty'] ?? 0) . ' in stock')) : '')
+                            ->map(fn ($variant) => is_array($variant) ? $this->cleanListItem((string) (($variant['name'] ?? '') . ' · ' . ($variant['qty'] ?? 0) . ' in stock')) : '')
                             ->all(),
                         collect((array) ($product['extras'] ?? []))
-                            ->map(fn ($extra) => is_array($extra) ? trim((string) (($extra['name'] ?? '') . ' · +' . $currency . ' ' . number_format((float) ($extra['price'] ?? 0), 2))) : '')
+                            ->map(fn ($extra) => is_array($extra) ? $this->cleanListItem((string) (($extra['name'] ?? '') . ' · +' . $currency . ' ' . number_format((float) ($extra['price'] ?? 0), 2))) : '')
                             ->all()
                     ))),
                 ];
@@ -326,8 +338,8 @@ class PublicWebsiteService
                 $paymentCollection = $offerPreferences['servio:' . strtolower((string) ($service['title'] ?? ''))] ?? 'both';
                 $items[] = [
                     'type' => 'service',
-                    'title' => (string) ($service['title'] ?? 'Service'),
-                    'meta' => trim(($duration > 0 ? $duration . ' ' . $durationUnit : '') . ((int) ($service['capacity'] ?? 0) > 0 ? ' · Capacity ' . (int) $service['capacity'] : '')),
+                    'title' => $this->cleanTitle((string) ($service['title'] ?? 'Service')),
+                    'meta' => $this->cleanMarketingCopy(trim(($duration > 0 ? $duration . ' ' . $durationUnit : '') . ((int) ($service['capacity'] ?? 0) > 0 ? ' · Capacity ' . (int) $service['capacity'] : ''))),
                     'price' => $currency . ' ' . number_format((float) ($service['price'] ?? 0), 2),
                     'base_price' => (float) ($service['price'] ?? 0),
                     'currency' => $currency,
@@ -355,10 +367,10 @@ class PublicWebsiteService
                     ],
                     'details' => array_values(array_filter(array_merge(
                         collect((array) ($service['additional_services'] ?? []))
-                            ->map(fn ($extra) => is_array($extra) ? trim((string) (($extra['name'] ?? '') . ' · +' . $currency . ' ' . number_format((float) ($extra['price'] ?? 0), 2))) : '')
+                            ->map(fn ($extra) => is_array($extra) ? $this->cleanListItem((string) (($extra['name'] ?? '') . ' · +' . $currency . ' ' . number_format((float) ($extra['price'] ?? 0), 2))) : '')
                             ->all(),
                         collect((array) ($service['staff_ids'] ?? []))
-                            ->map(fn ($staffId) => trim((string) ('Staff ID ' . $staffId)))
+                            ->map(fn ($staffId) => $this->cleanListItem((string) ('Staff ID ' . $staffId)))
                             ->all()
                     ))),
                 ];
@@ -391,22 +403,17 @@ class PublicWebsiteService
 
         if ($businessModel !== 'service') {
             $proof[] = [
-                'title' => 'Commerce running in OS',
-                'description' => (int) ($counts['order_count'] ?? 0) . ' orders tracked and ' . $currency . ' ' . number_format($grossRevenue, 0) . ' in revenue signals.',
+                'title' => 'Orders are already flowing',
+                'description' => $this->cleanMarketingCopy((int) ($counts['order_count'] ?? 0) . ' orders tracked and ' . $currency . ' ' . number_format($grossRevenue, 0) . ' in revenue signals.'),
             ];
         }
 
         if ($businessModel !== 'product') {
             $proof[] = [
-                'title' => 'Bookings running in OS',
-                'description' => (int) ($counts['booking_count'] ?? 0) . ' bookings tracked with service operations flowing through Servio.',
+                'title' => 'Designed to turn interest into bookings',
+                'description' => $this->cleanMarketingCopy((int) ($counts['booking_count'] ?? 0) . ' bookings tracked with service operations flowing through Servio.'),
             ];
         }
-
-        $proof[] = [
-            'title' => 'Managed from Hatchers Ai Business OS',
-            'description' => 'This public site is published from app.hatchers.ai while Bazaar and Servio keep powering the backend.',
-        ];
 
         foreach (array_slice((array) ($draftOutput['sections'] ?? []), 0, 2) as $section) {
             if (!is_array($section)) {
@@ -414,15 +421,15 @@ class PublicWebsiteService
             }
 
             $proof[] = [
-                'title' => (string) ($section['title'] ?? 'Launch section'),
-                'description' => trim(implode(' ', array_filter(array_merge(
+                'title' => $this->cleanTitle((string) ($section['title'] ?? 'Launch section')),
+                'description' => $this->cleanMarketingCopy(trim(implode(' ', array_filter(array_merge(
                     [(string) ($section['body'] ?? '')],
                     array_slice(array_values(array_filter(array_map('strval', (array) ($section['bullets'] ?? [])))), 0, 2)
-                )))),
+                ))))),
             ];
         }
 
-        return $proof;
+        return array_values(array_filter($proof, fn (array $item): bool => trim((string) ($item['description'] ?? '')) !== ''));
     }
 
     private function acceptedPaymentMethods(string $paymentCollection): array
@@ -535,5 +542,92 @@ class PublicWebsiteService
         $businessModel = strtolower(trim($businessModel));
 
         return in_array($businessModel, ['product', 'service', 'hybrid'], true) ? $businessModel : 'hybrid';
+    }
+
+    private function resolveHeroImageUrl(array $draftOutput): ?string
+    {
+        foreach ((array) ($draftOutput['atlas_handoff']['asset_slots'] ?? []) as $slot) {
+            if (!is_array($slot)) {
+                continue;
+            }
+
+            $previewUrl = trim((string) ($slot['preview_url'] ?? ''));
+            if ($previewUrl !== '') {
+                return $previewUrl;
+            }
+        }
+
+        foreach ((array) ($draftOutput['sections'] ?? []) as $section) {
+            if (!is_array($section)) {
+                continue;
+            }
+
+            $previewUrl = trim((string) (($section['asset']['preview_url'] ?? '')));
+            if ($previewUrl !== '') {
+                return $previewUrl;
+            }
+        }
+
+        return null;
+    }
+
+    private function cleanHeadline(string $value): string
+    {
+        $value = $this->dedupeRepeatedWords($value);
+        $value = preg_replace('/\b(helps\s+you\s+we\s+help)\b/i', 'helps', $value) ?? $value;
+        $value = preg_replace('/\b(many\s+busy\s+professionals\s+want\s+the\s+benefits\s+of)\b/i', 'busy professionals get', $value) ?? $value;
+        $value = preg_replace('/\s{2,}/', ' ', trim($value)) ?? trim($value);
+
+        return $value;
+    }
+
+    private function cleanTitle(string $value): string
+    {
+        $value = $this->dedupeRepeatedWords($value);
+        $value = preg_replace('/\b(starter)(?:\s+\1)+\b/i', 'Starter', $value) ?? $value;
+        $value = preg_replace('/\s{2,}/', ' ', trim($value)) ?? trim($value);
+
+        return $value;
+    }
+
+    private function cleanMarketingCopy(string $value): string
+    {
+        $value = trim($value);
+        if ($value === '') {
+            return '';
+        }
+
+        $value = $this->dedupeRepeatedWords($value);
+        $value = preg_replace('/\b(starter)(?:\s+\1)+\b/i', 'starter', $value) ?? $value;
+        $value = preg_replace('/\b(helps\s+you\s+we\s+help)\b/i', 'helps', $value) ?? $value;
+        $value = preg_replace('/\bmanaged entirely from Hatchers OS\b/i', 'available online and ready for the next customer', $value) ?? $value;
+        $value = preg_replace('/\s{2,}/', ' ', $value) ?? $value;
+
+        return trim($value);
+    }
+
+    private function cleanListItem(string $value): string
+    {
+        return $this->cleanMarketingCopy($value);
+    }
+
+    private function dedupeRepeatedWords(string $value): string
+    {
+        $previous = null;
+        $cleaned = trim($value);
+
+        while ($cleaned !== $previous) {
+            $previous = $cleaned;
+            $cleaned = preg_replace('/\b([A-Za-z][A-Za-z\'-]*)\s+\1\b/i', '$1', $cleaned) ?? $cleaned;
+        }
+
+        return trim($cleaned);
+    }
+
+    private function headlineFeelsTooLong(string $value): bool
+    {
+        $words = preg_split('/\s+/', trim($value)) ?: [];
+
+        return count($words) > 11 || mb_strlen($value) > 88;
     }
 }
