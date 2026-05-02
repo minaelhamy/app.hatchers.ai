@@ -69,7 +69,11 @@ class PublicWebsiteService
             $engineProxyUrl = $storefrontUrl;
         }
 
-        $usesEngineStorefront = $engineProxyUrl !== '';
+        if ($engineProxyUrl === '' && !empty($engineProxyCandidates)) {
+            $engineProxyUrl = (string) $engineProxyCandidates[0];
+        }
+
+        $usesEngineStorefront = $engineProxyUrl !== '' || !empty($engineProxyCandidates);
 
         return [
             'title' => $websiteTitle,

@@ -4924,7 +4924,7 @@ class OsShellController extends Controller
         $site = $publicWebsiteService->build($company);
         $this->logPublicWebsiteResolutionSuccess($websitePath, $company, $site, 'page');
 
-        if (($site['uses_engine_storefront'] ?? false) && !empty($site['engine_proxy_url'])) {
+        if (($site['uses_engine_storefront'] ?? false) && (!empty($site['engine_proxy_url']) || !empty($site['engine_proxy_candidates'] ?? []))) {
             $canonicalPath = trim((string) ($site['engine_vendor_slug'] ?? $site['path'] ?? $websitePath), '/');
             $requestedPath = trim($websitePath, '/');
 
