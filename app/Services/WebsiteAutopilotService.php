@@ -1559,6 +1559,10 @@ class WebsiteAutopilotService
             }
         }
 
+        if ($assetSlots === []) {
+            $assetSlots = $this->fallbackAssetSlotsFromDraft($founder, $draft);
+        }
+
         $draft['atlas_handoff'] = array_merge(
             is_array($draft['atlas_handoff'] ?? null) ? $draft['atlas_handoff'] : [],
             ['asset_slots' => $assetSlots]
@@ -1568,6 +1572,26 @@ class WebsiteAutopilotService
             'asset_slots' => $assetSlots,
             'media_assets' => $this->websiteMediaAssets($founder, $draft),
         ];
+    }
+
+    private function fallbackAssetSlotsFromDraft(Founder $founder, array $draft): array
+    {
+        $company = $founder->company;
+        $companyName = trim((string) ($draft['website_title'] ?? $company?->company_name ?? $founder->full_name));
+        $city = trim((string) ($company?->primary_city ?? ''));
+        $problemSolved = trim((string) ($draft['funnel_blocks']['problem']['body'] ?? ''));
+        $icpName = trim((string) ($draft['normalized_payload']['market']['primary_icp_name'] ?? 'local customers'));
+        $pages = array_values(array_filter((array) ($draft['page_plan'] ?? []), fn ($item) => $item !== null && $item !== ''));
+        $imageQueries = array_values(array_filter(array_map('strval', (array) ($draft['image_queries'] ?? []))));
+
+        return $this->buildAssetSlots(
+            $companyName,
+            $city,
+            $pages,
+            $imageQueries,
+            $problemSolved,
+            $icpName
+        );
     }
 
     private function normalizeResolvedAssets(array $assets): array
