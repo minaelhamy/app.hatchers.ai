@@ -37,6 +37,14 @@ class WebsiteAutopilotQualityGateService
             $issues[] = 'The blog image is missing.';
         }
 
+        if (in_array('media.service_images', $missing, true)) {
+            $issues[] = 'The services are missing dedicated images.';
+        }
+
+        if (in_array('media.distinct_images', $missing, true)) {
+            $issues[] = 'The media pack is too repetitive and needs more distinct images.';
+        }
+
         if (in_array('media.media_assets', $missing, true)) {
             $issues[] = 'The visible website media pack was not generated.';
         }

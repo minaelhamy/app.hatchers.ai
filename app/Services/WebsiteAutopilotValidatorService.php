@@ -21,6 +21,8 @@ class WebsiteAutopilotValidatorService
             'blog.blog_title' => $this->stringValue($normalizedPayload, ['blog', 'blog_title']),
             'blog.blog_body' => $this->stringValue($normalizedPayload, ['blog', 'blog_body']),
             'blog.blog_featured_image' => $this->blogImageReady($normalizedPayload),
+            'media.service_images' => $this->serviceMediaReady($normalizedPayload),
+            'media.distinct_images' => $this->distinctMediaReady($normalizedPayload),
         ];
 
         foreach ($checks as $field => $value) {
@@ -91,7 +93,7 @@ class WebsiteAutopilotValidatorService
 
     private function mediaReady(array $payload): bool
     {
-        $mediaAssets = $this->arrayValue($payload, ['media', 'media_assets']);
+        $mediaAssets = $this->mediaAssets($payload);
         $mediaQueries = $this->arrayValue($payload, ['media', 'media_queries']);
 
         return count($mediaAssets) >= 1 || count($mediaQueries) >= 1;
@@ -105,5 +107,42 @@ class WebsiteAutopilotValidatorService
         }
 
         return $this->mediaReady($payload);
+    }
+
+    private function serviceMediaReady(array $payload): bool
+    {
+        $serviceTargets = ['service_primary', 'service_detail', 'service_support', 'service'];
+        $targetedAssets = collect($this->mediaAssets($payload))
+            ->filter(function (array $asset) use ($serviceTargets): bool {
+                return in_array(trim((string) ($asset['target'] ?? '')), $serviceTargets, true)
+                    && trim((string) ($asset['source_url'] ?? '')) !== '';
+            })
+            ->pluck('source_url')
+            ->map(fn ($url) => trim((string) $url))
+            ->filter()
+            ->unique()
+            ->values();
+
+        return $targetedAssets->count() >= 1;
+    }
+
+    private function distinctMediaReady(array $payload): bool
+    {
+        $uniqueSources = collect($this->mediaAssets($payload))
+            ->pluck('source_url')
+            ->map(fn ($url) => trim((string) $url))
+            ->filter()
+            ->unique()
+            ->values();
+
+        return $uniqueSources->count() >= 3;
+    }
+
+    private function mediaAssets(array $payload): array
+    {
+        return array_values(array_filter(
+            $this->arrayValue($payload, ['media', 'media_assets']),
+            fn ($item) => is_array($item)
+        ));
     }
 }
