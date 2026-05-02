@@ -49,6 +49,14 @@ class PublicWebsiteService
         $engineVendorSlug = $this->resolveEngineVendorSlug($storefrontUrl, $engineBaseUrl, $payload, $founder?->username, $websitePath);
         $osBaseUrl = rtrim((string) config('app.url'), '/');
         $engineProxyUrl = '';
+        $engineProxyCandidates = $this->buildEngineProxyCandidates(
+            $engineBaseUrl,
+            $storefrontUrl,
+            $payload,
+            $founder?->username,
+            $websitePath,
+            $osBaseUrl
+        );
 
         if ($engineBaseUrl !== '' && $engineVendorSlug !== '') {
             $candidateProxyUrl = $engineBaseUrl . '/' . ltrim($engineVendorSlug, '/');
@@ -72,6 +80,7 @@ class PublicWebsiteService
             'source_storefront_url' => $storefrontUrl,
             'engine_proxy_url' => $engineProxyUrl,
             'engine_vendor_slug' => $engineVendorSlug,
+            'engine_proxy_candidates' => $engineProxyCandidates,
             'uses_engine_storefront' => $usesEngineStorefront,
             'theme' => (string) ($summary['theme_template'] ?? ''),
             'hero_image_url' => $this->resolveHeroImageUrl($draftOutput),
@@ -163,6 +172,51 @@ class PublicWebsiteService
         }
 
         return trim((string) $websitePath);
+    }
+
+    private function buildEngineProxyCandidates(
+        string $engineBaseUrl,
+        string $storefrontUrl,
+        array $payload,
+        ?string $founderUsername,
+        string $websitePath,
+        string $osBaseUrl
+    ): array {
+        $candidates = collect();
+
+        $directUrl = trim($storefrontUrl);
+        if ($directUrl !== '' && !$this->isRecursiveOsStorefrontUrl($directUrl, $osBaseUrl, $websitePath)) {
+            $candidates->push($directUrl);
+        }
+
+        $slugs = [
+            trim((string) parse_url($storefrontUrl, PHP_URL_PATH), '/'),
+            trim((string) ($payload['slug'] ?? '')),
+            trim((string) ($payload['vendor_slug'] ?? '')),
+            trim((string) $founderUsername),
+            trim((string) $websitePath),
+        ];
+
+        foreach ($slugs as $slug) {
+            $slug = trim($slug, '/');
+            if ($slug === '' || $engineBaseUrl === '') {
+                continue;
+            }
+
+            $candidate = rtrim($engineBaseUrl, '/') . '/' . ltrim($slug, '/');
+            if ($this->isRecursiveOsStorefrontUrl($candidate, $osBaseUrl, $websitePath)) {
+                continue;
+            }
+
+            $candidates->push($candidate);
+        }
+
+        return $candidates
+            ->map(fn ($url) => rtrim((string) $url, '/'))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
     }
 
     private function shouldUseDirectStorefrontUrl(string $storefrontUrl, string $engineBaseUrl): bool

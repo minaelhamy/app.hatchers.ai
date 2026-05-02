@@ -8658,7 +8658,14 @@ class OsShellController extends Controller
     private function proxyEngineStorefront(Company $company, string $proxyPath, Request $request, PublicWebsiteService $publicWebsiteService)
     {
         $site = $publicWebsiteService->build($company);
+        $engineProxyCandidates = collect((array) ($site['engine_proxy_candidates'] ?? []))
+            ->map(fn ($url) => trim((string) $url))
+            ->filter()
+            ->values();
         $engineProxyUrl = trim((string) ($site['engine_proxy_url'] ?? ''));
+        if ($engineProxyUrl !== '' && !$engineProxyCandidates->contains($engineProxyUrl)) {
+            $engineProxyCandidates->prepend($engineProxyUrl);
+        }
         $websiteRoot = trim((string) ($site['path'] ?? $company->website_path ?? ''), '/');
 
         if ($engineProxyUrl === '' || $websiteRoot === '') {
@@ -8694,13 +8701,6 @@ class OsShellController extends Controller
         $targetUrl = rtrim($engineProxyUrl, '/');
         $engineOrigin = $this->engineStorefrontOrigin($engineProxyUrl);
         $proxyPath = trim($proxyPath, '/');
-        if ($proxyPath !== '') {
-            if ($this->isEngineRootAssetPath($proxyPath) && $engineOrigin !== '') {
-                $targetUrl = rtrim($engineOrigin, '/') . '/' . $proxyPath;
-            } else {
-                $targetUrl .= '/' . $proxyPath;
-            }
-        }
 
         $options = [
             'query' => $request->query(),
@@ -8737,7 +8737,66 @@ class OsShellController extends Controller
             }
         }
 
-        $upstream = $client->send($method, $targetUrl, $options);
+        $candidateUrls = $engineProxyCandidates->isNotEmpty()
+            ? $engineProxyCandidates
+            : collect([$engineProxyUrl]);
+        $targetUrl = '';
+        $engineOrigin = '';
+        $upstream = null;
+
+        foreach ($candidateUrls as $candidateUrl) {
+            $candidateUrl = rtrim((string) $candidateUrl, '/');
+            if ($candidateUrl === '') {
+                continue;
+            }
+
+            $candidateOrigin = $this->engineStorefrontOrigin($candidateUrl);
+            $resolvedTargetUrl = $candidateUrl;
+            if ($proxyPath !== '') {
+                if ($this->isEngineRootAssetPath($proxyPath) && $candidateOrigin !== '') {
+                    $resolvedTargetUrl = rtrim($candidateOrigin, '/') . '/' . $proxyPath;
+                } else {
+                    $resolvedTargetUrl .= '/' . $proxyPath;
+                }
+            }
+
+            $candidateResponse = $client->send($method, $resolvedTargetUrl, $options);
+            $candidateStatus = $candidateResponse->status();
+
+            Log::info('Storefront proxy candidate attempted.', [
+                'company_id' => (int) $company->id,
+                'website_root' => $websiteRoot,
+                'proxy_path' => $proxyPath,
+                'candidate_url' => $candidateUrl,
+                'target_url' => $resolvedTargetUrl,
+                'status' => $candidateStatus,
+            ]);
+
+            $upstream = $candidateResponse;
+            $targetUrl = $resolvedTargetUrl;
+            $engineOrigin = $candidateOrigin;
+
+            if ($proxyPath !== '' || $candidateStatus !== 404) {
+                if ($candidateUrl !== $engineProxyUrl) {
+                    $site['engine_proxy_url'] = $candidateUrl;
+                    $site['source_storefront_url'] = $candidateUrl;
+                }
+                break;
+            }
+        }
+
+        if ($upstream === null) {
+            return view('os.public-website', [
+                'pageTitle' => (string) ($company->company_name ?: 'Business Website'),
+                'site' => $this->disableEngineStorefrontFallback($site),
+                'sourceContext' => [
+                    'src' => trim((string) $request->query('src', '')),
+                    'promo' => trim((string) $request->query('promo', '')),
+                    'offer' => trim((string) $request->query('offer', '')),
+                ],
+            ]);
+        }
+
         $status = $upstream->status();
         $contentType = strtolower((string) $upstream->header('Content-Type', 'text/html; charset=UTF-8'));
 
