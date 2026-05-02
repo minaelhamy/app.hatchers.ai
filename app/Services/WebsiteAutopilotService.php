@@ -294,6 +294,7 @@ class WebsiteAutopilotService
             strtolower(trim((string) ($company->business_model ?? $blueprint->business_model ?? 'service'))),
             (string) ($websiteBuild['primary_website_focus'] ?? 'auto')
         );
+        $intelligence = $company->intelligence;
         $engine = $websiteMode === 'product' ? 'bazaar' : 'servio';
         $companyName = trim((string) ($brief->business_name ?: $company->company_name ?: $founder->full_name));
         $city = trim((string) ($company->primary_city ?: $brief->location_city));
@@ -307,7 +308,7 @@ class WebsiteAutopilotService
         $catalogItems = $this->catalogItemsFromWebsiteBuild(
             $websiteBuild,
             $websiteMode,
-            $company->intelligence,
+            $intelligence,
             (string) $blueprint->code,
             $companyName,
             $coreOffer
@@ -322,7 +323,7 @@ class WebsiteAutopilotService
         $themeRankings = $this->rankThemes(
             $this->websiteProvisioningService->availableThemes($engine),
             $this->imageDirectionText($websiteBuild) . ' ' . trim((string) ($websiteBuild['special_requests'] ?? '')),
-            (string) ($company->intelligence?->visual_style ?? ''),
+            (string) ($intelligence?->visual_style ?? ''),
             (string) $blueprint->code,
             $websiteMode,
             $engine

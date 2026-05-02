@@ -4376,9 +4376,16 @@ class OsShellController extends Controller
                 }
 
                 if ($crashedFounder) {
+                    $failureMessage = trim((string) $e->getMessage());
+                    if ($failureMessage === '') {
+                        $failureMessage = 'The website build ran into a technical issue before it could finish.';
+                    } else {
+                        $failureMessage = 'The website build ran into a technical issue: ' . $failureMessage;
+                    }
+
                     app(FounderNotificationService::class)->websiteBuildFailed(
                         $crashedFounder,
-                        'The website build ran into a technical issue before it could finish. Please try again after the latest fixes.'
+                        $failureMessage
                     );
                 }
 
