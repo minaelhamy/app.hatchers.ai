@@ -957,8 +957,9 @@ class WebsiteAutopilotService
         );
 
         $currentTheme = (string) ($draft['theme_template'] ?? '');
-        $currentScore = (int) collect((array) ($draft['theme_candidates'] ?? []))
-            ->firstWhere('id', $currentTheme)['score'] ?? 0;
+        $currentThemeCandidate = collect((array) ($draft['theme_candidates'] ?? []))
+            ->firstWhere('id', $currentTheme);
+        $currentScore = (int) (is_array($currentThemeCandidate) ? ($currentThemeCandidate['score'] ?? 0) : 0);
         $bestTheme = $themeRankings[0] ?? null;
 
         if (is_array($bestTheme) && !empty($bestTheme['id']) && ((string) $bestTheme['id'] !== $currentTheme || $currentScore < 8)) {
