@@ -8763,7 +8763,7 @@ class OsShellController extends Controller
             $candidateResponse = $client->send($method, $resolvedTargetUrl, $options);
             $candidateStatus = $candidateResponse->status();
 
-            Log::info('Storefront proxy candidate attempted.', [
+            Log::warning('Storefront proxy candidate attempted.', [
                 'company_id' => (int) $company->id,
                 'website_root' => $websiteRoot,
                 'proxy_path' => $proxyPath,
