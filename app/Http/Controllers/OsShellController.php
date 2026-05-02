@@ -8667,8 +8667,23 @@ class OsShellController extends Controller
             $engineProxyCandidates->prepend($engineProxyUrl);
         }
         $websiteRoot = trim((string) ($site['path'] ?? $company->website_path ?? ''), '/');
+        $this->appendPublicWebsiteDebugLog('proxy-start', [
+            'company_id' => (int) $company->id,
+            'website_root' => $websiteRoot,
+            'proxy_path' => $proxyPath,
+            'engine_proxy_url' => $engineProxyUrl,
+            'engine_proxy_candidates' => $engineProxyCandidates->all(),
+            'uses_engine_storefront' => (bool) ($site['uses_engine_storefront'] ?? false),
+        ]);
 
         if ($engineProxyUrl === '' || $websiteRoot === '') {
+            $this->appendPublicWebsiteDebugLog('proxy-skipped', [
+                'reason' => 'missing_engine_proxy_or_website_root',
+                'company_id' => (int) $company->id,
+                'website_root' => $websiteRoot,
+                'engine_proxy_url' => $engineProxyUrl,
+                'engine_proxy_candidates' => $engineProxyCandidates->all(),
+            ]);
             return view('os.public-website', [
                 'pageTitle' => (string) ($company->company_name ?: 'Business Website'),
                 'site' => $this->disableEngineStorefrontFallback($site),
@@ -8683,6 +8698,12 @@ class OsShellController extends Controller
         if ($this->isRecursiveStorefrontTarget($engineProxyUrl, $websiteRoot)) {
             Log::warning('Skipped recursive storefront proxy target.', [
                 'company_id' => $company->id,
+                'website_root' => $websiteRoot,
+                'target' => $engineProxyUrl,
+            ]);
+            $this->appendPublicWebsiteDebugLog('proxy-skipped', [
+                'reason' => 'recursive_storefront_target',
+                'company_id' => (int) $company->id,
                 'website_root' => $websiteRoot,
                 'target' => $engineProxyUrl,
             ]);
@@ -8763,14 +8784,16 @@ class OsShellController extends Controller
             $candidateResponse = $client->send($method, $resolvedTargetUrl, $options);
             $candidateStatus = $candidateResponse->status();
 
-            Log::warning('Storefront proxy candidate attempted.', [
+            $candidateContext = [
                 'company_id' => (int) $company->id,
                 'website_root' => $websiteRoot,
                 'proxy_path' => $proxyPath,
                 'candidate_url' => $candidateUrl,
                 'target_url' => $resolvedTargetUrl,
                 'status' => $candidateStatus,
-            ]);
+            ];
+            Log::warning('Storefront proxy candidate attempted.', $candidateContext);
+            $this->appendPublicWebsiteDebugLog('proxy-candidate', $candidateContext);
 
             $upstream = $candidateResponse;
             $targetUrl = $resolvedTargetUrl;
@@ -8786,6 +8809,13 @@ class OsShellController extends Controller
         }
 
         if ($upstream === null) {
+            $this->appendPublicWebsiteDebugLog('proxy-skipped', [
+                'reason' => 'no_upstream_response',
+                'company_id' => (int) $company->id,
+                'website_root' => $websiteRoot,
+                'proxy_path' => $proxyPath,
+                'engine_proxy_candidates' => $engineProxyCandidates->all(),
+            ]);
             return view('os.public-website', [
                 'pageTitle' => (string) ($company->company_name ?: 'Business Website'),
                 'site' => $this->disableEngineStorefrontFallback($site),
@@ -8802,6 +8832,12 @@ class OsShellController extends Controller
 
         if ($status === 404 && $proxyPath === '') {
             Log::warning('Storefront proxy returned 404 for website root; falling back to local public website view.', [
+                'company_id' => (int) $company->id,
+                'website_root' => $websiteRoot,
+                'target_url' => $targetUrl,
+                'engine' => (string) ($site['engine'] ?? ''),
+            ]);
+            $this->appendPublicWebsiteDebugLog('proxy-root-404', [
                 'company_id' => (int) $company->id,
                 'website_root' => $websiteRoot,
                 'target_url' => $targetUrl,
