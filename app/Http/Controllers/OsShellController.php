@@ -4392,6 +4392,19 @@ class OsShellController extends Controller
                 Log::error('Website build crashed during after-response generation.', [
                     'founder_id' => $founderId,
                     'message' => $e->getMessage(),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                    'exception' => get_class($e),
+                    'trace_preview' => collect($e->getTrace())
+                        ->take(5)
+                        ->map(fn (array $frame): array => [
+                            'file' => $frame['file'] ?? null,
+                            'line' => $frame['line'] ?? null,
+                            'function' => $frame['function'] ?? null,
+                            'class' => $frame['class'] ?? null,
+                        ])
+                        ->values()
+                        ->all(),
                 ]);
             }
         });
