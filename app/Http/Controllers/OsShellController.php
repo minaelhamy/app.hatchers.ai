@@ -95,13 +95,8 @@ class OsShellController extends Controller
             'pageTitle' => 'Founder Onboarding',
             'submitted' => session('submitted'),
             'selectedPlan' => $selectedPlan,
-            'verticalBlueprintOptions' => array_values($this->verticalBlueprintDefinitions()),
             'businessModelOptions' => $this->founderBusinessModelOptions(),
             'stageOptions' => $this->founderStageOptions(),
-            'industryOptions' => $this->founderIndustryOptions(),
-            'targetAudienceOptions' => $this->founderTargetAudienceOptions(),
-            'brandVoiceOptions' => $this->founderBrandVoiceOptions(),
-            'coreOfferOptions' => $this->founderCoreOfferOptions(),
             'growthGoalOptions' => $this->founderPrimaryGrowthGoalOptions(),
             'knownBlockerOptions' => $this->founderKnownBlockerOptions(),
         ]);
@@ -6605,31 +6600,16 @@ class OsShellController extends Controller
             'username' => ['required', 'string', 'max:255', 'unique:founders,username'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
             'company_name' => ['required', 'string', 'max:255'],
-            'vertical_blueprint' => ['required', Rule::in(array_keys($this->verticalBlueprintDefinitions()))],
             'business_model' => ['required', Rule::in(array_keys($this->founderBusinessModelOptions()))],
-            'primary_city' => ['required', 'string', 'max:191'],
-            'service_radius' => ['required', 'string', 'max:191'],
-            'industry' => ['required', Rule::in($this->founderIndustryOptions())],
             'stage' => ['required', Rule::in(array_keys($this->founderStageOptions()))],
-            'target_audience' => ['required', Rule::in($this->founderTargetAudienceOptions())],
-            'primary_icp_name' => ['required', 'string', 'max:255'],
-            'ideal_customer_profile' => ['required', 'string', 'max:1000'],
-            'pain_points' => ['required', 'string', 'max:1200'],
-            'desired_outcomes' => ['required', 'string', 'max:1200'],
-            'objections' => ['required', 'string', 'max:1200'],
-            'brand_voice' => ['required', Rule::in($this->founderBrandVoiceOptions())],
-            'differentiators' => ['required', 'string', 'max:1000'],
-            'problem_solved' => ['required', 'string', 'max:1000'],
-            'core_offer' => ['required', Rule::in($this->founderCoreOfferOptions())],
+            'company_description' => ['required', 'string', 'max:3000'],
+            'ideal_customer_profile' => ['required', 'string', 'max:2000'],
             'primary_growth_goal' => ['required', Rule::in($this->founderPrimaryGrowthGoalOptions())],
             'known_blockers' => ['required', Rule::in($this->founderKnownBlockerOptions())],
-            'company_brief' => ['required', 'string', 'max:2000'],
         ], [
             'plan_code.required' => 'Please choose a founder plan before signing up.',
-            'industry.required' => 'Please choose your industry.',
-            'industry.in' => 'Please choose an industry from the list.',
-            'core_offer.required' => 'Please choose the offer type that fits your business.',
-            'core_offer.in' => 'Please choose an offer type from the list.',
+            'company_description.required' => 'Please tell Hatchers what the company does.',
+            'ideal_customer_profile.required' => 'Please describe the ideal customer profile.',
         ]);
 
         $plan = $this->founderSignupPlans()[$validated['plan_code']] ?? null;
@@ -6637,10 +6617,12 @@ class OsShellController extends Controller
             return redirect()->route('plans')->with('error', 'Please choose a valid founder plan.');
         }
 
-        $blueprint = $this->upsertVerticalBlueprint((string) $validated['vertical_blueprint']);
+        $deducedProfile = $this->deduceFounderSignupProfile($validated);
+        $blueprint = $this->upsertVerticalBlueprint((string) $deducedProfile['vertical_blueprint']);
+        $atlasPayload = $this->atlasFounderOnboardingPayload($validated, $deducedProfile, $blueprint);
 
         try {
-            DB::transaction(function () use ($validated, $atlas, $plan, $blueprint) {
+            DB::transaction(function () use ($validated, $atlas, $plan, $blueprint, $deducedProfile, $atlasPayload) {
                 $founder = Founder::create(
                     [
                         'username' => $validated['username'],
@@ -6662,15 +6644,15 @@ class OsShellController extends Controller
                         'company_name' => $validated['company_name'],
                         'business_model' => $validated['business_model'],
                         'vertical_blueprint_id' => $blueprint->id,
-                        'industry' => $validated['industry'],
+                        'industry' => (string) ($deducedProfile['industry'] ?? ''),
                         'stage' => $validated['stage'],
-                        'primary_city' => $validated['primary_city'],
-                        'service_radius' => $validated['service_radius'],
+                        'primary_city' => (string) ($deducedProfile['primary_city'] ?? ''),
+                        'service_radius' => (string) ($deducedProfile['service_radius'] ?? ''),
                         'primary_goal' => $validated['primary_growth_goal'],
                         'launch_stage' => 'brief_captured',
                         'website_generation_status' => 'queued',
                         'website_status' => 'not_started',
-                        'company_brief' => $validated['company_brief'],
+                        'company_brief' => $validated['company_description'],
                     ]
                 );
 
@@ -6679,16 +6661,16 @@ class OsShellController extends Controller
                     [
                         'vertical_blueprint_id' => $blueprint->id,
                         'business_name' => $validated['company_name'],
-                        'business_summary' => $validated['company_brief'],
-                        'problem_solved' => $validated['problem_solved'],
-                        'core_offer' => $validated['core_offer'],
+                        'business_summary' => $validated['company_description'],
+                        'problem_solved' => (string) ($deducedProfile['problem_solved'] ?? ''),
+                        'core_offer' => (string) ($deducedProfile['core_offer'] ?? ''),
                         'business_type_detail' => $blueprint->name,
-                        'location_city' => $validated['primary_city'],
-                        'location_country' => 'Egypt',
-                        'service_radius' => $validated['service_radius'],
-                        'delivery_scope' => $validated['service_radius'],
-                        'proof_points' => $validated['differentiators'],
-                        'founder_story' => $validated['company_brief'],
+                        'location_city' => (string) ($deducedProfile['primary_city'] ?? ''),
+                        'location_country' => (string) ($deducedProfile['location_country'] ?? ''),
+                        'service_radius' => (string) ($deducedProfile['service_radius'] ?? ''),
+                        'delivery_scope' => (string) ($deducedProfile['service_radius'] ?? ''),
+                        'proof_points' => (string) ($deducedProfile['differentiators'] ?? ''),
+                        'founder_story' => $validated['company_description'],
                         'constraints_json' => [
                             'known_blockers' => $validated['known_blockers'],
                         ],
@@ -6699,32 +6681,32 @@ class OsShellController extends Controller
                 FounderIcpProfile::updateOrCreate(
                     ['founder_id' => $founder->id, 'company_id' => $company->id],
                     [
-                        'primary_icp_name' => $validated['primary_icp_name'],
-                        'pain_points_json' => $this->commaSeparatedValues($validated['pain_points']),
-                        'desired_outcomes_json' => $this->commaSeparatedValues($validated['desired_outcomes']),
-                        'objections_json' => $this->commaSeparatedValues($validated['objections']),
+                        'primary_icp_name' => (string) ($deducedProfile['primary_icp_name'] ?? 'Ideal customer'),
+                        'pain_points_json' => array_values((array) ($deducedProfile['pain_points'] ?? [])),
+                        'desired_outcomes_json' => array_values((array) ($deducedProfile['desired_outcomes'] ?? [])),
+                        'objections_json' => array_values((array) ($deducedProfile['objections'] ?? [])),
                         'price_sensitivity' => 'unknown',
                         'primary_channels_json' => $blueprint->default_channels_json ?? [],
-                        'local_area_focus_json' => [$validated['primary_city']],
-                        'language_style' => $validated['brand_voice'],
+                        'local_area_focus_json' => array_values(array_filter([(string) ($deducedProfile['primary_city'] ?? '')])),
+                        'language_style' => (string) ($deducedProfile['brand_voice'] ?? ''),
                     ]
                 );
 
                 CompanyIntelligence::updateOrCreate(
                     ['company_id' => $company->id],
                     [
-                        'target_audience' => $validated['target_audience'],
+                        'target_audience' => (string) ($deducedProfile['target_audience'] ?? ''),
                         'ideal_customer_profile' => $validated['ideal_customer_profile'],
-                        'primary_icp_name' => $validated['primary_icp_name'],
-                        'problem_solved' => $validated['problem_solved'],
-                        'brand_voice' => $validated['brand_voice'],
-                        'differentiators' => $validated['differentiators'],
-                        'core_offer' => $validated['core_offer'],
+                        'primary_icp_name' => (string) ($deducedProfile['primary_icp_name'] ?? ''),
+                        'problem_solved' => (string) ($deducedProfile['problem_solved'] ?? ''),
+                        'brand_voice' => (string) ($deducedProfile['brand_voice'] ?? ''),
+                        'differentiators' => (string) ($deducedProfile['differentiators'] ?? ''),
+                        'core_offer' => (string) ($deducedProfile['core_offer'] ?? ''),
                         'primary_growth_goal' => $validated['primary_growth_goal'],
                         'known_blockers' => $validated['known_blockers'],
-                        'objections' => $validated['objections'],
-                        'buying_triggers' => $validated['desired_outcomes'],
-                        'local_market_notes' => $validated['primary_city'] . ' · ' . $validated['service_radius'],
+                        'objections' => implode(', ', array_values((array) ($deducedProfile['objections'] ?? []))),
+                        'buying_triggers' => implode(', ', array_values((array) ($deducedProfile['desired_outcomes'] ?? []))),
+                        'local_market_notes' => $this->localMarketNotesFromProfile($deducedProfile),
                         'intelligence_updated_at' => now(),
                     ]
                 );
@@ -6800,7 +6782,7 @@ class OsShellController extends Controller
                     );
                 }
 
-                $atlas->syncFounderOnboarding($founder, $company, $validated);
+                $atlas->syncFounderOnboarding($founder, $company, $atlasPayload);
             });
         } catch (Throwable $exception) {
             Log::error('Founder signup failed unexpectedly.', [
@@ -9284,9 +9266,347 @@ class OsShellController extends Controller
         ];
     }
 
+    private function deduceFounderSignupProfile(array $validated): array
+    {
+        $fallback = $this->fallbackFounderSignupProfile($validated);
+        $aiProfile = $this->requestOpenAiFounderSignupProfile($validated, $fallback);
+
+        return $this->normalizeFounderSignupProfile($validated, array_merge($fallback, $aiProfile));
+    }
+
+    private function fallbackFounderSignupProfile(array $validated): array
+    {
+        $description = trim((string) ($validated['company_description'] ?? ''));
+        $icp = trim((string) ($validated['ideal_customer_profile'] ?? ''));
+        $combined = Str::lower($description . ' ' . $icp . ' ' . (string) ($validated['company_name'] ?? ''));
+        $businessModel = (string) ($validated['business_model'] ?? 'service');
+
+        $verticalBlueprint = match (true) {
+            str_contains($combined, 'yoga') || str_contains($combined, 'wellness') || str_contains($combined, 'meditation') => 'yoga-wellness-studio',
+            str_contains($combined, 'dog') || str_contains($combined, 'pet') => 'dog-walking',
+            str_contains($combined, 'clean') => 'home-cleaning',
+            str_contains($combined, 'barber') || str_contains($combined, 'haircut') => 'barber-services',
+            str_contains($combined, 'coach') || str_contains($combined, 'tutor') || str_contains($combined, 'training') => 'tutoring-coaching',
+            $businessModel === 'product' => 'handmade-products',
+            default => 'tutoring-coaching',
+        };
+
+        $industry = match ($verticalBlueprint) {
+            'yoga-wellness-studio' => 'Health and wellness',
+            'dog-walking', 'home-cleaning', 'barber-services' => 'Professional services',
+            'tutoring-coaching' => 'Education and training',
+            'handmade-products' => 'E-commerce and retail',
+            default => 'Professional services',
+        };
+
+        $targetAudience = match (true) {
+            str_contains($combined, 'business') || str_contains($combined, 'team') || str_contains($combined, 'company') => 'Small businesses / SMB',
+            str_contains($combined, 'local') || str_contains($combined, 'neighborhood') => 'Local community / Neighborhood market',
+            default => 'Consumers / B2C',
+        };
+
+        $brandVoice = match (true) {
+            str_contains($combined, 'luxury') || str_contains($combined, 'premium') => 'Premium and polished',
+            str_contains($combined, 'bold') || str_contains($combined, 'energetic') => 'Bold and energetic',
+            str_contains($combined, 'calm') || str_contains($combined, 'welcoming') || str_contains($combined, 'wellness') => 'Warm and supportive',
+            default => 'Professional and credible',
+        };
+
+        $coreOffer = match ($businessModel) {
+            'product' => 'Physical products',
+            'hybrid' => 'Hybrid offer',
+            default => str_contains($combined, 'class') || str_contains($combined, 'session') ? 'Group programs' : '1:1 services',
+        };
+
+        $primaryIcpName = Str::limit(trim($icp) !== '' ? trim($icp) : 'Ideal customer for ' . (string) $validated['company_name'], 120, '');
+
+        return [
+            'vertical_blueprint' => $verticalBlueprint,
+            'industry' => $industry,
+            'target_audience' => $targetAudience,
+            'primary_icp_name' => $primaryIcpName,
+            'problem_solved' => Str::limit($description !== '' ? $description : ('We help ' . $primaryIcpName), 500, ''),
+            'brand_voice' => $brandVoice,
+            'differentiators' => 'Built around the founder perspective, offer, and customer context captured during signup.',
+            'core_offer' => $coreOffer,
+            'pain_points' => $this->extractFounderSignupBullets($icp, ['overwhelm', 'wasted time', 'unclear options']),
+            'desired_outcomes' => $this->extractFounderSignupBullets($description, ['clarity', 'confidence', 'better results']),
+            'objections' => ['Need more trust', 'Need clearer pricing', 'Need a simpler first step'],
+            'primary_city' => $this->inferPrimaryCity($description . ' ' . $icp),
+            'service_radius' => $this->inferServiceRadius($description . ' ' . $icp, $businessModel),
+            'location_country' => '',
+        ];
+    }
+
+    private function requestOpenAiFounderSignupProfile(array $validated, array $fallback): array
+    {
+        $apiKey = trim((string) config('services.openai.api_key'));
+        if ($apiKey === '') {
+            return [];
+        }
+
+        $model = trim((string) config('services.openai.website_copy_model', 'gpt-4.1-mini'));
+        $baseUrl = rtrim((string) config('services.openai.base_url', 'https://api.openai.com/v1'), '/');
+        $blueprints = collect($this->verticalBlueprintDefinitions())
+            ->map(fn (array $definition): array => [
+                'code' => (string) $definition['code'],
+                'name' => (string) $definition['name'],
+                'business_model' => (string) $definition['business_model'],
+                'engine' => (string) $definition['engine'],
+                'description' => (string) $definition['description'],
+            ])
+            ->values()
+            ->all();
+
+        $prompt = [
+            'task' => 'Infer a high-quality company intelligence profile from a minimal founder signup.',
+            'instructions' => [
+                'Return JSON only.',
+                'Choose the closest vertical_blueprint from the provided blueprint codes.',
+                'Infer concise, commercially useful fields for website generation and company intelligence.',
+                'Do not invent hyper-specific facts like addresses, prices, certifications, or years of experience.',
+                'If location is not explicit, leave primary_city empty and choose a sensible service_radius.',
+                'Make copy practical, specific, and founder-trustworthy, not generic startup fluff.',
+            ],
+            'allowed_values' => [
+                'business_model' => array_keys($this->founderBusinessModelOptions()),
+                'industry' => $this->founderIndustryOptions(),
+                'target_audience' => $this->founderTargetAudienceOptions(),
+                'brand_voice' => $this->founderBrandVoiceOptions(),
+                'core_offer' => $this->founderCoreOfferOptions(),
+                'vertical_blueprint_codes' => array_keys($this->verticalBlueprintDefinitions()),
+            ],
+            'signup' => [
+                'company_name' => $validated['company_name'],
+                'company_description' => $validated['company_description'],
+                'ideal_customer_profile' => $validated['ideal_customer_profile'],
+                'business_model' => $validated['business_model'],
+                'stage' => $validated['stage'],
+                'primary_growth_goal' => $validated['primary_growth_goal'],
+                'known_blockers' => $validated['known_blockers'],
+            ],
+            'fallback' => $fallback,
+            'blueprints' => $blueprints,
+            'response_schema' => [
+                'vertical_blueprint' => 'string',
+                'industry' => 'string',
+                'target_audience' => 'string',
+                'primary_icp_name' => 'string',
+                'problem_solved' => 'string',
+                'brand_voice' => 'string',
+                'differentiators' => 'string',
+                'core_offer' => 'string',
+                'pain_points' => ['string'],
+                'desired_outcomes' => ['string'],
+                'objections' => ['string'],
+                'primary_city' => 'string',
+                'service_radius' => 'string',
+                'location_country' => 'string',
+            ],
+        ];
+
+        try {
+            $response = Http::withToken($apiKey)
+                ->acceptJson()
+                ->timeout(40)
+                ->post($baseUrl . '/chat/completions', [
+                    'model' => $model,
+                    'response_format' => ['type' => 'json_object'],
+                    'messages' => [
+                        ['role' => 'system', 'content' => 'You are a founder onboarding intelligence engine. Produce practical, structured business intelligence for website generation.'],
+                        ['role' => 'user', 'content' => json_encode($prompt, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)],
+                    ],
+                ]);
+
+            if (!$response->successful()) {
+                Log::warning('Founder signup AI deduction failed.', [
+                    'status' => $response->status(),
+                    'body' => Str::limit((string) $response->body(), 1000),
+                ]);
+
+                return [];
+            }
+
+            $content = trim((string) data_get($response->json(), 'choices.0.message.content', ''));
+            $decoded = json_decode($content, true);
+
+            return is_array($decoded) ? $decoded : [];
+        } catch (Throwable $exception) {
+            Log::warning('Founder signup AI deduction threw an exception.', [
+                'message' => $exception->getMessage(),
+            ]);
+
+            return [];
+        }
+    }
+
+    private function normalizeFounderSignupProfile(array $validated, array $profile): array
+    {
+        $fallback = $this->fallbackFounderSignupProfile($validated);
+        $blueprintCode = (string) ($profile['vertical_blueprint'] ?? '');
+        if (!array_key_exists($blueprintCode, $this->verticalBlueprintDefinitions())) {
+            $blueprintCode = $fallback['vertical_blueprint'];
+        }
+
+        $industry = (string) ($profile['industry'] ?? '');
+        if (!in_array($industry, $this->founderIndustryOptions(), true)) {
+            $industry = $fallback['industry'];
+        }
+
+        $targetAudience = (string) ($profile['target_audience'] ?? '');
+        if (!in_array($targetAudience, $this->founderTargetAudienceOptions(), true)) {
+            $targetAudience = $fallback['target_audience'];
+        }
+
+        $brandVoice = (string) ($profile['brand_voice'] ?? '');
+        if (!in_array($brandVoice, $this->founderBrandVoiceOptions(), true)) {
+            $brandVoice = $fallback['brand_voice'];
+        }
+
+        $coreOffer = (string) ($profile['core_offer'] ?? '');
+        if (!in_array($coreOffer, $this->founderCoreOfferOptions(), true)) {
+            $coreOffer = $fallback['core_offer'];
+        }
+
+        $painPoints = $this->sanitizeFounderSignupList(is_array($profile['pain_points'] ?? null) ? $profile['pain_points'] : []);
+        if ($painPoints === []) {
+            $painPoints = array_values((array) ($fallback['pain_points'] ?? []));
+        }
+
+        $desiredOutcomes = $this->sanitizeFounderSignupList(is_array($profile['desired_outcomes'] ?? null) ? $profile['desired_outcomes'] : []);
+        if ($desiredOutcomes === []) {
+            $desiredOutcomes = array_values((array) ($fallback['desired_outcomes'] ?? []));
+        }
+
+        $objections = $this->sanitizeFounderSignupList(is_array($profile['objections'] ?? null) ? $profile['objections'] : []);
+        if ($objections === []) {
+            $objections = array_values((array) ($fallback['objections'] ?? []));
+        }
+
+        return [
+            'vertical_blueprint' => $blueprintCode,
+            'industry' => $industry,
+            'target_audience' => $targetAudience,
+            'primary_icp_name' => Str::limit(trim((string) ($profile['primary_icp_name'] ?? $fallback['primary_icp_name'] ?? 'Ideal customer')), 255, ''),
+            'problem_solved' => Str::limit(trim((string) ($profile['problem_solved'] ?? $validated['company_description'])), 1000, ''),
+            'brand_voice' => $brandVoice,
+            'differentiators' => Str::limit(trim((string) ($profile['differentiators'] ?? $fallback['differentiators'] ?? '')), 1000, ''),
+            'core_offer' => $coreOffer,
+            'pain_points' => $painPoints,
+            'desired_outcomes' => $desiredOutcomes,
+            'objections' => $objections,
+            'primary_city' => Str::limit(trim((string) ($profile['primary_city'] ?? $fallback['primary_city'] ?? '')), 191, ''),
+            'service_radius' => Str::limit(trim((string) ($profile['service_radius'] ?? $fallback['service_radius'] ?? '')), 191, ''),
+            'location_country' => Str::limit(trim((string) ($profile['location_country'] ?? '')), 120, ''),
+        ];
+    }
+
+    private function atlasFounderOnboardingPayload(array $validated, array $profile, VerticalBlueprint $blueprint): array
+    {
+        return [
+            'company_name' => $validated['company_name'],
+            'business_model' => $validated['business_model'],
+            'vertical_blueprint' => $profile['vertical_blueprint'],
+            'primary_city' => $profile['primary_city'],
+            'service_radius' => $profile['service_radius'],
+            'industry' => $profile['industry'],
+            'stage' => $validated['stage'],
+            'target_audience' => $profile['target_audience'],
+            'primary_icp_name' => $profile['primary_icp_name'],
+            'ideal_customer_profile' => $validated['ideal_customer_profile'],
+            'pain_points' => implode(', ', $profile['pain_points']),
+            'desired_outcomes' => implode(', ', $profile['desired_outcomes']),
+            'objections' => implode(', ', $profile['objections']),
+            'brand_voice' => $profile['brand_voice'],
+            'differentiators' => $profile['differentiators'],
+            'problem_solved' => $profile['problem_solved'],
+            'core_offer' => $profile['core_offer'],
+            'primary_growth_goal' => $validated['primary_growth_goal'],
+            'known_blockers' => $validated['known_blockers'],
+            'company_brief' => $validated['company_description'],
+            'business_type_detail' => $blueprint->name,
+        ];
+    }
+
+    private function localMarketNotesFromProfile(array $profile): string
+    {
+        $parts = array_values(array_filter([
+            trim((string) ($profile['primary_city'] ?? '')),
+            trim((string) ($profile['service_radius'] ?? '')),
+        ]));
+
+        return $parts !== [] ? implode(' · ', $parts) : 'Market inferred from founder signup';
+    }
+
+    private function sanitizeFounderSignupList(mixed $values): array
+    {
+        return collect(is_array($values) ? $values : [])
+            ->map(fn ($value): string => trim((string) $value))
+            ->filter()
+            ->unique(fn (string $value): string => Str::lower($value))
+            ->take(6)
+            ->values()
+            ->all();
+    }
+
+    private function extractFounderSignupBullets(string $source, array $fallback): array
+    {
+        $parts = preg_split('/[\r\n,.;]+/', $source) ?: [];
+        $values = collect($parts)
+            ->map(fn (string $item): string => trim($item))
+            ->filter(fn (string $item): bool => Str::length($item) >= 4)
+            ->take(5)
+            ->values()
+            ->all();
+
+        return $values !== [] ? $values : $fallback;
+    }
+
+    private function inferPrimaryCity(string $text): string
+    {
+        if (preg_match('/\b(?:in|based in|serving)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2})/', $text, $matches)) {
+            return trim((string) ($matches[1] ?? ''));
+        }
+
+        return '';
+    }
+
+    private function inferServiceRadius(string $text, string $businessModel): string
+    {
+        $lower = Str::lower($text);
+
+        if (str_contains($lower, 'nationwide') || str_contains($lower, 'online')) {
+            return 'nationwide';
+        }
+
+        if (str_contains($lower, 'local') || str_contains($lower, 'studio') || str_contains($lower, 'in-person')) {
+            return 'local area';
+        }
+
+        return $businessModel === 'product' ? 'nationwide shipping' : 'local area';
+    }
+
     private function verticalBlueprintDefinitions(): array
     {
         return [
+            'yoga-wellness-studio' => [
+                'code' => 'yoga-wellness-studio',
+                'name' => 'Yoga / Wellness Studio',
+                'business_model' => 'service',
+                'engine' => 'servio',
+                'description' => 'A class-based wellness booking system focused on first bookings, memberships, trust, and repeat visits.',
+                'default_offer_json' => ['core_offer' => 'Group programs', 'upsells' => ['Starter pack', 'Private session', 'Membership']],
+                'default_pricing_json' => ['tier_1' => 'Drop-in class', 'tier_2' => 'Starter pack', 'tier_3' => 'Monthly membership'],
+                'default_pages_json' => ['hero', 'class_menu', 'why_choose_us', 'about', 'faq', 'booking_cta'],
+                'default_tasks_json' => ['Clarify the starter class offer', 'Publish trust-building visuals', 'Review class flow and pricing'],
+                'default_channels_json' => ['Instagram', 'Google Business Profile', 'WhatsApp', 'Local SEO'],
+                'default_cta_json' => ['primary' => 'Book your first class', 'secondary' => 'See class plans'],
+                'default_image_queries_json' => ['yoga studio natural light', 'wellness stretching class', 'calm yoga indoor'],
+                'funnel_framework_json' => ['Problem', 'Promise', 'Offer stack', 'Proof', 'FAQ', 'Booking CTA'],
+                'pricing_preset_json' => ['tier_1' => 'Drop-in class', 'tier_2' => 'Starter pack', 'tier_3' => 'Monthly membership'],
+                'channel_playbook_json' => ['Instagram', 'Google Business Profile', 'Local SEO'],
+                'script_library_json' => ['First class invitation', 'Beginner reassurance follow-up', 'Membership close'],
+            ],
             'dog-walking' => [
                 'code' => 'dog-walking',
                 'name' => 'Dog Walking',

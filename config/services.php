@@ -23,6 +23,11 @@ return [
         'pexels_api_key' => env('PEXELS_API_KEY', ''),
         'pixabay_api_key' => env('PIXABAY_API_KEY', ''),
     ],
+    'openai' => [
+        'api_key' => env('OPENAI_API_KEY', ''),
+        'base_url' => env('OPENAI_BASE_URL', 'https://api.openai.com/v1'),
+        'website_copy_model' => env('OPENAI_WEBSITE_COPY_MODEL', 'gpt-4o-mini'),
+    ],
     'stripe' => [
         'secret' => env('STRIPE_SECRET', ''),
         'publishable_key' => env('STRIPE_PUBLISHABLE_KEY', ''),

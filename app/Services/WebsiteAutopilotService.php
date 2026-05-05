@@ -44,14 +44,9 @@ class WebsiteAutopilotService
         }
 
         $output = is_array($run->output_json) ? $run->output_json : [];
-        $atlasAssets = $this->atlasWebsiteAssets($company);
-        if (!empty($atlasAssets)) {
-            $output['atlas_handoff'] = is_array($output['atlas_handoff'] ?? null) ? $output['atlas_handoff'] : [];
-            $output['atlas_handoff']['asset_slots'] = $atlasAssets;
-        }
-        $output['sections'] = $this->hydrateSectionsWithAssets(
+        $output['sections'] = $this->hydrateSectionsWithMediaAssets(
             is_array($output['sections'] ?? null) ? $output['sections'] : [],
-            $atlasAssets
+            array_values(array_filter((array) ($output['media_assets'] ?? []), fn ($item) => is_array($item)))
         );
 
         if ($output !== (is_array($run->output_json) ? $run->output_json : [])) {
@@ -160,10 +155,10 @@ class WebsiteAutopilotService
                 'generated_at' => now(),
             ]);
 
-            $this->syncDraftToAtlas($founder, $draft);
             $engineSync = $this->syncDraftToWebsiteEngine($founder, $draft);
             $starterSync = $this->syncStarterOffer($founder, $draft);
             $blogSync = $this->syncStarterBlog($founder, $draft);
+            $this->syncDraftToAtlas($founder, $draft);
             $engineSyncOk = (bool) ($engineSync['ok'] ?? false);
             $starterSyncOk = (bool) ($starterSync['ok'] ?? false);
             $blogSyncOk = (bool) ($blogSync['ok'] ?? false);
@@ -471,6 +466,28 @@ class WebsiteAutopilotService
                     'primary_cta' => $primaryCta,
                     'secondary_cta' => $secondaryCta,
                     'catalog_items' => $catalogItems,
+                    'creative_brief' => [
+                        'goal' => 'Create persuasive, premium, founder-trustworthy website copy that feels specific to the business and strong enough to publish.',
+                        'rules' => [
+                            'Avoid generic filler, startup clichés, and stock phrases.',
+                            'Lead with the customer problem, then the promise, then the offer.',
+                            'Keep the hero concise and readable; do not overload it with long stacked sentences.',
+                            'Use real business context, target audience language, and practical outcomes.',
+                            'Make service copy concrete, differentiated, and conversion-oriented.',
+                            'Make blog copy editorial, useful, and non-repetitive.',
+                            'Make every section feel like it belongs to this founder, not a template demo.',
+                        ],
+                        'required_outputs' => [
+                            'hero_headline',
+                            'hero_subhead',
+                            'about_content',
+                            'starter_offer',
+                            'faq_items',
+                            'blog_title',
+                            'blog_body',
+                        ],
+                    ],
+                    'media_checklist' => array_keys($this->requiredMediaTargets()),
                 ],
             ],
             'launch_checklist' => array_values(array_filter([
@@ -559,31 +576,24 @@ class WebsiteAutopilotService
             $draft['normalized_payload'] = $normalizedPayload;
         }
 
-        $repairSummary = $this->selfHealDraftBeforePreflight($founder, $draft, $websiteBuild);
+        $checklist = $this->runWebsiteExecutionChecklist($founder, $draft, $websiteBuild);
         $normalizedPayload = is_array($draft['normalized_payload'] ?? null) ? $draft['normalized_payload'] : [];
-        if (($repairSummary['attempts'] ?? 0) > 0) {
-            $this->logAutopilotStep('preflight.repair_attempted', $founder, [
-                'attempts' => (int) ($repairSummary['attempts'] ?? 0),
-                'changes' => (array) ($repairSummary['changes'] ?? []),
-            ]);
-            $this->appendDraftTrace($draft, 'preflight.repair_attempted', 'ok', [
-                'attempts' => (int) ($repairSummary['attempts'] ?? 0),
-                'changes' => (array) ($repairSummary['changes'] ?? []),
-            ]);
-        }
+        $draft['quality_execution'] = $checklist;
 
-        $validation = $this->websiteAutopilotValidatorService->validateNormalizedPayload($normalizedPayload);
-        if (!($validation['ok'] ?? false)) {
-            $qualityGate = $this->websiteAutopilotQualityGateService->summarize($normalizedPayload, $validation);
-            $message = (string) ($qualityGate['summary'] ?? 'Website autopilot preflight failed.');
+        if (!($checklist['ok'] ?? false)) {
+            $qualityGate = (array) ($checklist['quality_gate'] ?? []);
+            $message = (string) ($checklist['message'] ?? ($qualityGate['summary'] ?? 'Website autopilot preflight failed.'));
             $this->logAutopilotStep('preflight.failed', $founder, [
                 'engine' => (string) ($draft['website_engine'] ?? ''),
-                'missing' => (array) ($validation['missing'] ?? []),
+                'failed_step' => (string) ($checklist['failed_step'] ?? ''),
+                'missing' => (array) ($qualityGate['missing'] ?? []),
                 'issues' => (array) ($qualityGate['issues'] ?? []),
                 'readiness_score' => (int) ($qualityGate['readiness_score'] ?? 0),
             ], 'warning');
             $this->appendDraftTrace($draft, 'preflight.failed', 'failed', [
-                'missing' => (array) ($validation['missing'] ?? []),
+                'failed_step' => (string) ($checklist['failed_step'] ?? ''),
+                'steps' => (array) ($checklist['steps'] ?? []),
+                'missing' => (array) ($qualityGate['missing'] ?? []),
                 'issues' => (array) ($qualityGate['issues'] ?? []),
                 'summary' => (string) ($qualityGate['summary'] ?? ''),
                 'readiness_score' => (int) ($qualityGate['readiness_score'] ?? 0),
@@ -597,6 +607,7 @@ class WebsiteAutopilotService
                 'public_url' => '',
                 'media_assets_count' => count((array) ($draft['media_assets'] ?? [])),
                 'quality_gate' => $qualityGate,
+                'quality_execution' => $checklist,
             ];
         }
 
@@ -606,6 +617,7 @@ class WebsiteAutopilotService
         $this->appendDraftTrace($draft, 'preflight.ok', 'ok', [
             'engine' => (string) ($draft['website_engine'] ?? ''),
         ]);
+        $validation = $this->websiteAutopilotValidatorService->validateNormalizedPayload($normalizedPayload);
         $draft['quality_gate'] = $this->websiteAutopilotQualityGateService->summarize($normalizedPayload, $validation);
         $draft['quality_audit']['readiness_score'] = (int) ($draft['quality_gate']['readiness_score'] ?? 100);
 
@@ -954,6 +966,608 @@ class WebsiteAutopilotService
             'attempts' => $attempts,
             'changes' => $changes,
         ];
+    }
+
+    private function runWebsiteExecutionChecklist(Founder $founder, array &$draft, array $websiteBuild): array
+    {
+        $steps = [];
+        $failedStep = null;
+
+        $repairSummary = $this->selfHealDraftBeforePreflight($founder, $draft, $websiteBuild);
+        $steps[] = [
+            'key' => 'content.repair',
+            'status' => 'ok',
+            'details' => [
+                'attempts' => (int) ($repairSummary['attempts'] ?? 0),
+                'changes' => (array) ($repairSummary['changes'] ?? []),
+            ],
+        ];
+
+        $contentChecklist = $this->completeCopyChecklist($founder, $draft, $websiteBuild);
+        $steps[] = [
+            'key' => 'content.generate_repair',
+            'status' => ($contentChecklist['ok'] ?? false) ? 'ok' : 'failed',
+            'details' => [
+                'attempts' => (int) ($contentChecklist['attempts'] ?? 0),
+                'provider' => (string) ($contentChecklist['provider'] ?? 'fallback'),
+                'issues' => (array) ($contentChecklist['issues'] ?? []),
+                'missing' => (array) ($contentChecklist['missing'] ?? []),
+                'rewritten_blocks' => (array) ($contentChecklist['rewritten_blocks'] ?? []),
+            ],
+        ];
+        if ($failedStep === null && !($contentChecklist['ok'] ?? false)) {
+            $failedStep = 'content.generate_repair';
+        }
+
+        $normalized = is_array($draft['normalized_payload'] ?? null) ? $draft['normalized_payload'] : [];
+        $mediaQueries = array_values(array_filter((array) ($normalized['media']['media_queries'] ?? []), fn ($item) => is_array($item)));
+        $steps[] = [
+            'key' => 'media.plan',
+            'status' => $mediaQueries !== [] ? 'ok' : 'failed',
+            'details' => [
+                'required_targets' => array_keys($this->requiredMediaTargets()),
+                'query_count' => count($mediaQueries),
+            ],
+        ];
+        if ($mediaQueries === []) {
+            $failedStep = 'media.plan';
+        }
+
+        $mediaChecklist = $this->completeMediaChecklist($founder, $draft);
+        $steps[] = [
+            'key' => 'media.fetch_assign',
+            'status' => ($mediaChecklist['ok'] ?? false) ? 'ok' : 'failed',
+            'details' => [
+                'attempts' => (int) ($mediaChecklist['attempts'] ?? 0),
+                'required_targets' => (array) ($mediaChecklist['required_targets'] ?? []),
+                'present_targets' => (array) ($mediaChecklist['present_targets'] ?? []),
+                'distinct_sources' => (int) ($mediaChecklist['distinct_sources'] ?? 0),
+                'missing_targets' => (array) ($mediaChecklist['missing_targets'] ?? []),
+                'duplicate_targets' => (array) ($mediaChecklist['duplicate_targets'] ?? []),
+            ],
+        ];
+        if ($failedStep === null && !($mediaChecklist['ok'] ?? false)) {
+            $failedStep = 'media.fetch_assign';
+        }
+
+        $normalized = is_array($draft['normalized_payload'] ?? null) ? $draft['normalized_payload'] : [];
+        $validation = $this->websiteAutopilotValidatorService->validateNormalizedPayload($normalized);
+        $qualityGate = $this->websiteAutopilotQualityGateService->summarize($normalized, $validation);
+        $steps[] = [
+            'key' => 'validation.final',
+            'status' => ($validation['ok'] ?? false) ? 'ok' : 'failed',
+            'details' => [
+                'missing' => (array) ($validation['missing'] ?? []),
+                'issues' => (array) ($qualityGate['issues'] ?? []),
+                'readiness_score' => (int) ($qualityGate['readiness_score'] ?? 0),
+            ],
+        ];
+        if ($failedStep === null && !($validation['ok'] ?? false)) {
+            $failedStep = 'validation.final';
+        }
+
+        if (($validation['ok'] ?? false) === true) {
+            return [
+                'ok' => true,
+                'steps' => $steps,
+                'failed_step' => null,
+                'quality_gate' => $qualityGate,
+                'message' => '',
+            ];
+        }
+
+        $stepMessages = [
+            'media.plan' => 'We paused the website build at the media planning step because the required template image checklist was not generated.',
+            'media.fetch_assign' => 'We paused the website build at the media assignment step because we could not complete the required distinct image checklist for the template.',
+            'validation.final' => 'We paused the website build at the final quality review step because one or more required publishable fields are still incomplete.',
+        ];
+
+        return [
+            'ok' => false,
+            'steps' => $steps,
+            'failed_step' => $failedStep,
+            'quality_gate' => $qualityGate,
+            'message' => (string) ($stepMessages[$failedStep] ?? ($qualityGate['summary'] ?? 'Website autopilot preflight failed.')),
+        ];
+    }
+
+    private function completeCopyChecklist(Founder $founder, array &$draft, array $websiteBuild): array
+    {
+        $attempts = 0;
+        $provider = $this->openAiWebsiteCopyAvailable() ? 'openai' : 'fallback';
+        $rewrittenBlocks = [];
+
+        for ($pass = 1; $pass <= 2; $pass++) {
+            $attempts = $pass;
+            $normalized = is_array($draft['normalized_payload'] ?? null) ? $draft['normalized_payload'] : [];
+            $status = $this->copyChecklistStatus($normalized);
+
+            if ($status['ok']) {
+                return array_merge($status, [
+                    'attempts' => $attempts,
+                    'provider' => $provider,
+                    'rewritten_blocks' => $rewrittenBlocks,
+                ]);
+            }
+
+            foreach ($status['missing_blocks'] as $block) {
+                $changes = $this->generateCopyBlock($founder, $draft, $websiteBuild, $block, $status);
+                if ($changes !== []) {
+                    $rewrittenBlocks[] = $block;
+                    $this->applyGeneratedCopyBlock($draft, $block, $changes);
+                }
+            }
+        }
+
+        return array_merge($this->copyChecklistStatus(is_array($draft['normalized_payload'] ?? null) ? $draft['normalized_payload'] : []), [
+            'attempts' => $attempts,
+            'provider' => $provider,
+            'rewritten_blocks' => array_values(array_unique($rewrittenBlocks)),
+        ]);
+    }
+
+    private function copyChecklistStatus(array $normalized): array
+    {
+        $heroHeadline = trim((string) ($normalized['hero']['hero_headline'] ?? ''));
+        $heroSubhead = trim((string) ($normalized['hero']['hero_subhead'] ?? ''));
+        $heroBrief = trim((string) ($normalized['hero']['hero_brief'] ?? ''));
+        $aboutContent = trim((string) ($normalized['story']['about_content'] ?? ''));
+        $faqItems = array_values(array_filter((array) ($normalized['trust']['faq_items'] ?? []), fn ($item) => is_array($item)));
+        $blogTitle = trim((string) ($normalized['blog']['blog_title'] ?? ''));
+        $blogBody = trim((string) ($normalized['blog']['blog_body'] ?? ''));
+        $starterOffer = is_array($normalized['conversion']['starter_offer'] ?? null) ? $normalized['conversion']['starter_offer'] : [];
+        $offerTitle = trim((string) ($starterOffer['title'] ?? ''));
+        $offerDescription = trim((string) ($starterOffer['description'] ?? ''));
+        $missing = [];
+        $issues = [];
+
+        if ($heroHeadline === '' || mb_strlen($heroHeadline) > 110 || str_word_count($heroHeadline) > 16) {
+            $missing[] = 'hero';
+            $issues[] = 'Hero headline is missing or too long.';
+        }
+        if ($heroSubhead === '' || mb_strlen($heroSubhead) > 260) {
+            $missing[] = 'hero';
+            $issues[] = 'Hero subhead is missing or too long.';
+        }
+        if ($heroBrief === '' || mb_strlen($heroBrief) > 220) {
+            $missing[] = 'hero';
+            $issues[] = 'Hero brief is missing or too long.';
+        }
+        if ($aboutContent === '' || mb_strlen(strip_tags($aboutContent)) < 220) {
+            $missing[] = 'story';
+            $issues[] = 'Brand story is too thin.';
+        }
+        if ($offerTitle === '' || $offerDescription === '' || mb_strlen($offerDescription) < 80) {
+            $missing[] = 'offer';
+            $issues[] = 'Starter offer copy is incomplete.';
+        }
+        if (count($faqItems) < 3 || collect($faqItems)->contains(fn (array $item): bool => trim((string) ($item['answer'] ?? '')) === '')) {
+            $missing[] = 'faq';
+            $issues[] = 'FAQ coverage is incomplete.';
+        }
+        if ($blogTitle === '' || $blogBody === '' || mb_strlen(strip_tags($blogBody)) < 700) {
+            $missing[] = 'blog';
+            $issues[] = 'Blog copy is incomplete or too shallow.';
+        }
+
+        return [
+            'ok' => $missing === [],
+            'missing_blocks' => array_values(array_unique($missing)),
+            'missing' => array_values(array_unique($missing)),
+            'issues' => array_values(array_unique($issues)),
+        ];
+    }
+
+    private function generateCopyBlock(Founder $founder, array $draft, array $websiteBuild, string $block, array $status): array
+    {
+        $context = $this->websiteCopyContext($founder, $draft, $websiteBuild);
+        $openAiResult = $this->requestOpenAiWebsiteCopy($context, $block);
+        if ($openAiResult !== []) {
+            return $openAiResult;
+        }
+
+        return $this->fallbackGeneratedCopyBlock($draft, $websiteBuild, $block, $status);
+    }
+
+    private function websiteCopyContext(Founder $founder, array $draft, array $websiteBuild): array
+    {
+        $normalized = is_array($draft['normalized_payload'] ?? null) ? $draft['normalized_payload'] : [];
+        $company = $founder->company;
+
+        return [
+            'company_name' => (string) ($draft['website_title'] ?? $company?->company_name ?? $founder->full_name),
+            'city' => (string) ($normalized['market']['city'] ?? $company?->primary_city ?? ''),
+            'problem_solved' => (string) ($draft['funnel_blocks']['problem']['body'] ?? ''),
+            'ideal_customer_profile' => (string) ($normalized['market']['primary_icp_name'] ?? 'customers'),
+            'brand_voice' => (string) ($normalized['brand']['brand_voice'] ?? ''),
+            'visual_direction' => (string) ($normalized['brand']['visual_direction'] ?? ''),
+            'website_goal' => (string) ($websiteBuild['website_goal'] ?? ''),
+            'core_offer' => (string) ($draft['starter_offer']['title'] ?? ''),
+            'offer_price' => (string) ($draft['starter_offer']['price'] ?? ''),
+            'founder_story' => (string) ($websiteBuild['founder_story_notes'] ?? ''),
+            'services_pricing_notes' => (string) ($websiteBuild['services_pricing_notes'] ?? ''),
+            'special_requests' => (string) ($websiteBuild['special_requests'] ?? ''),
+            'trust_points' => array_values((array) ($websiteBuild['trust_points_list'] ?? [])),
+            'faq_questions' => array_values((array) ($websiteBuild['faq_questions_list'] ?? [])),
+        ];
+    }
+
+    private function requestOpenAiWebsiteCopy(array $context, string $block): array
+    {
+        if (!$this->openAiWebsiteCopyAvailable()) {
+            return [];
+        }
+
+        $schema = $this->openAiCopySchema($block);
+        if ($schema === []) {
+            return [];
+        }
+
+        $apiKey = trim((string) config('services.openai.api_key', ''));
+        $baseUrl = rtrim((string) config('services.openai.base_url', 'https://api.openai.com/v1'), '/');
+        $model = trim((string) config('services.openai.website_copy_model', 'gpt-4o-mini'));
+
+        $prompt = $this->openAiCopyPrompt($context, $block);
+
+        try {
+            $response = Http::timeout(45)
+                ->withHeaders([
+                    'Authorization' => 'Bearer ' . $apiKey,
+                    'Content-Type' => 'application/json',
+                ])->post($baseUrl . '/chat/completions', [
+                    'model' => $model,
+                    'temperature' => 0.8,
+                    'response_format' => ['type' => 'json_object'],
+                    'messages' => [
+                        [
+                            'role' => 'system',
+                            'content' => 'You are a premium direct-response website copywriter. Return valid JSON only. Write specific, publishable, non-generic copy.',
+                        ],
+                        [
+                            'role' => 'user',
+                            'content' => $prompt,
+                        ],
+                    ],
+                ]);
+        } catch (\Throwable $exception) {
+            return [];
+        }
+
+        $content = trim((string) ($response->json('choices.0.message.content') ?? ''));
+        if ($content === '') {
+            return [];
+        }
+
+        $decoded = json_decode($content, true);
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    private function openAiWebsiteCopyAvailable(): bool
+    {
+        return trim((string) config('services.openai.api_key', '')) !== '';
+    }
+
+    private function openAiCopySchema(string $block): array
+    {
+        return match ($block) {
+            'hero' => ['hero_headline', 'hero_subhead', 'hero_brief'],
+            'story' => ['about_content', 'story_title', 'story_subtitle', 'story_description'],
+            'offer' => ['title', 'description'],
+            'faq' => ['faq_items'],
+            'blog' => ['blog_title', 'blog_body', 'blog_excerpt'],
+            default => [],
+        };
+    }
+
+    private function openAiCopyPrompt(array $context, string $block): string
+    {
+        $jsonContext = json_encode($context, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+
+        return match ($block) {
+            'hero' => <<<PROMPT
+Write homepage hero copy for this business.
+
+Rules:
+- Keep the headline under 16 words.
+- Keep the subhead under 240 characters.
+- Keep the brief under 180 characters.
+- Make it sound premium, specific, and founder-trustworthy.
+- Avoid generic filler, hype, or repetitive phrases.
+
+Return JSON with keys:
+- hero_headline
+- hero_subhead
+- hero_brief
+
+Business context:
+{$jsonContext}
+PROMPT,
+            'story' => <<<PROMPT
+Write the About/Story section for this business.
+
+Rules:
+- Make it feel real, trustworthy, and specific.
+- Use the founder story and philosophy if present.
+- Avoid clichés and vague wellness language.
+- about_content should be HTML using only h2, h3, p, ul, li.
+- story_title and story_subtitle should be concise.
+- story_description should be one clear supporting paragraph.
+
+Return JSON with keys:
+- about_content
+- story_title
+- story_subtitle
+- story_description
+
+Business context:
+{$jsonContext}
+PROMPT,
+            'offer' => <<<PROMPT
+Write the primary starter offer copy for this business.
+
+Rules:
+- Keep the title clear and commercially strong.
+- Make the description specific, useful, and conversion-oriented.
+- Avoid sounding naive or templated.
+- Keep the description between 90 and 220 words.
+
+Return JSON with keys:
+- title
+- description
+
+Business context:
+{$jsonContext}
+PROMPT,
+            'faq' => <<<PROMPT
+Write 4 founder-relevant FAQs for this business.
+
+Rules:
+- Questions should address hesitation, fit, process, pricing clarity, or beginner concerns.
+- Answers should be direct, specific, and reassuring.
+- Avoid generic support language.
+
+Return JSON with key:
+- faq_items: array of objects with question and answer
+
+Business context:
+{$jsonContext}
+PROMPT,
+            'blog' => <<<PROMPT
+Write a high-quality editorial blog post for this business.
+
+Rules:
+- Title should be specific and useful.
+- Body should be at least 700 characters and feel publishable.
+- Make it relevant to the ICP and real business offer.
+- Avoid repetitive wording, thin filler, or SEO sludge.
+- Excerpt should be concise and readable.
+
+Return JSON with keys:
+- blog_title
+- blog_body
+- blog_excerpt
+
+Business context:
+{$jsonContext}
+PROMPT,
+            default => '',
+        };
+    }
+
+    private function fallbackGeneratedCopyBlock(array $draft, array $websiteBuild, string $block, array $status): array
+    {
+        $companyName = (string) ($draft['website_title'] ?? 'This business');
+        $city = (string) (($draft['normalized_payload']['market']['city'] ?? '') ?: '');
+        $problemSolved = (string) ($draft['funnel_blocks']['problem']['body'] ?? '');
+        $icpName = (string) ($draft['normalized_payload']['market']['primary_icp_name'] ?? 'customers');
+        $starterTitle = (string) ($draft['starter_offer']['title'] ?? 'Signature offer');
+        $founderStory = trim((string) ($websiteBuild['founder_story_notes'] ?? ''));
+
+        return match ($block) {
+            'hero' => [
+                'hero_headline' => $this->heroHeadline($this->fallbackBlueprint(new Company(['business_model' => $draft['website_mode'] ?? 'service'])), $companyName, $problemSolved, $city),
+                'hero_subhead' => $this->heroSubhead($companyName, $starterTitle, $icpName, $city),
+                'hero_brief' => Str::limit($problemSolved !== '' ? $problemSolved : ('A clearer way for ' . $icpName . ' to get the right result from ' . $companyName . '.'), 170, ''),
+            ],
+            'story' => [
+                'about_content' => $this->aboutContent($draft),
+                'story_title' => 'Why ' . $companyName . ' exists',
+                'story_subtitle' => 'A more trustworthy and human approach for ' . $icpName,
+                'story_description' => $founderStory !== '' ? $founderStory : ($problemSolved !== '' ? $problemSolved : ($companyName . ' was built to help ' . $icpName . ' move forward with more clarity and confidence.')),
+            ],
+            'offer' => [
+                'title' => $starterTitle,
+                'description' => $this->starterDescription($companyName, $starterTitle, $icpName, $city, $this->stringListFromText((string) ($draft['normalized_payload']['market']['top_pain_points'] ?? '')), $this->stringListFromText((string) ($draft['normalized_payload']['market']['desired_outcomes'] ?? ''))),
+            ],
+            'faq' => [
+                'faq_items' => collect((array) ($websiteBuild['faq_questions_list'] ?? ['How does it work?', 'Who is this for?', 'What happens next?', 'How do I get started?']))
+                    ->map(fn (string $question): array => [
+                        'question' => $question,
+                        'answer' => $this->faqAnswer($question, $companyName, $starterTitle, $problemSolved, $icpName, $city),
+                    ])->take(4)->values()->all(),
+            ],
+            'blog' => [
+                'blog_title' => $this->relatedBlogSubject($starterTitle, $icpName, $city),
+                'blog_body' => $this->starterBlogDraft($companyName, $problemSolved, $starterTitle, $icpName, $city)['description'] ?? '',
+                'blog_excerpt' => Str::limit(strip_tags((string) ($this->starterBlogDraft($companyName, $problemSolved, $starterTitle, $icpName, $city)['description'] ?? '')), 180, ''),
+            ],
+            default => [],
+        };
+    }
+
+    private function applyGeneratedCopyBlock(array &$draft, string $block, array $changes): void
+    {
+        $normalized = is_array($draft['normalized_payload'] ?? null) ? $draft['normalized_payload'] : [];
+
+        switch ($block) {
+            case 'hero':
+                $normalized['hero']['hero_headline'] = trim((string) ($changes['hero_headline'] ?? $normalized['hero']['hero_headline'] ?? ''));
+                $normalized['hero']['hero_subhead'] = trim((string) ($changes['hero_subhead'] ?? $normalized['hero']['hero_subhead'] ?? ''));
+                $normalized['hero']['hero_brief'] = trim((string) ($changes['hero_brief'] ?? $normalized['hero']['hero_brief'] ?? ''));
+                $draft['hero']['headline'] = (string) ($normalized['hero']['hero_headline'] ?? '');
+                $draft['hero']['subhead'] = (string) ($normalized['hero']['hero_subhead'] ?? '');
+                $draft['hero']['brief'] = (string) ($normalized['hero']['hero_brief'] ?? '');
+                break;
+            case 'story':
+                $normalized['story']['about_content'] = trim((string) ($changes['about_content'] ?? $normalized['story']['about_content'] ?? ''));
+                $normalized['story']['story_title'] = trim((string) ($changes['story_title'] ?? $normalized['story']['story_title'] ?? ''));
+                $normalized['story']['story_subtitle'] = trim((string) ($changes['story_subtitle'] ?? $normalized['story']['story_subtitle'] ?? ''));
+                $normalized['story']['story_description'] = trim((string) ($changes['story_description'] ?? $normalized['story']['story_description'] ?? ''));
+                break;
+            case 'offer':
+                $normalized['conversion']['starter_offer']['title'] = trim((string) ($changes['title'] ?? $normalized['conversion']['starter_offer']['title'] ?? ''));
+                $normalized['conversion']['starter_offer']['description'] = trim((string) ($changes['description'] ?? $normalized['conversion']['starter_offer']['description'] ?? ''));
+                $draft['starter_offer']['title'] = (string) ($normalized['conversion']['starter_offer']['title'] ?? '');
+                $draft['starter_offer']['description'] = (string) ($normalized['conversion']['starter_offer']['description'] ?? '');
+                break;
+            case 'faq':
+                $normalized['trust']['faq_items'] = array_values(array_filter((array) ($changes['faq_items'] ?? []), fn ($item) => is_array($item)));
+                $draft['funnel_blocks']['faq'] = $normalized['trust']['faq_items'];
+                break;
+            case 'blog':
+                $normalized['blog']['blog_title'] = trim((string) ($changes['blog_title'] ?? $normalized['blog']['blog_title'] ?? ''));
+                $normalized['blog']['blog_body'] = trim((string) ($changes['blog_body'] ?? $normalized['blog']['blog_body'] ?? ''));
+                $normalized['blog']['blog_excerpt'] = trim((string) ($changes['blog_excerpt'] ?? $normalized['blog']['blog_excerpt'] ?? ''));
+                $draft['starter_blog'] = [
+                    'title' => (string) ($normalized['blog']['blog_title'] ?? ''),
+                    'description' => (string) ($normalized['blog']['blog_body'] ?? ''),
+                ];
+                break;
+        }
+
+        $draft['normalized_payload'] = $normalized;
+    }
+
+    private function completeMediaChecklist(Founder $founder, array &$draft): array
+    {
+        $requiredTargets = array_keys($this->requiredMediaTargets());
+        $bestAssets = [];
+        $attempts = 0;
+
+        for ($pass = 1; $pass <= 3; $pass++) {
+            $attempts = $pass;
+            $mediaState = $this->resolvedWebsiteMediaState($founder, $draft);
+            $candidateAssets = array_values(array_filter((array) ($mediaState['media_assets'] ?? []), fn ($item) => is_array($item)));
+            $status = $this->mediaChecklistStatus($candidateAssets, $requiredTargets);
+            $bestAssets = $candidateAssets;
+
+            if ($status['ok']) {
+                $draft['media_assets'] = $candidateAssets;
+                if (is_array($draft['normalized_payload'] ?? null)) {
+                    $draft['normalized_payload']['media']['media_assets'] = $candidateAssets;
+                    $draft['normalized_payload']['media']['media_queries'] = array_values(array_filter((array) ($mediaState['asset_slots'] ?? []), fn ($item) => is_array($item)));
+                }
+                $draft['atlas_handoff'] = array_merge(
+                    is_array($draft['atlas_handoff'] ?? null) ? $draft['atlas_handoff'] : [],
+                    ['asset_slots' => array_values(array_filter((array) ($mediaState['asset_slots'] ?? []), fn ($item) => is_array($item)))]
+                );
+
+                return array_merge($status, ['attempts' => $attempts]);
+            }
+
+            $draft['atlas_handoff'] = array_merge(
+                is_array($draft['atlas_handoff'] ?? null) ? $draft['atlas_handoff'] : [],
+                ['asset_slots' => $this->expandAssetSlotsForMediaRecovery($draft, $status, $pass)]
+            );
+        }
+
+        $draft['media_assets'] = $bestAssets;
+        if (is_array($draft['normalized_payload'] ?? null)) {
+            $draft['normalized_payload']['media']['media_assets'] = $bestAssets;
+        }
+
+        return array_merge($this->mediaChecklistStatus($bestAssets, $requiredTargets), ['attempts' => $attempts]);
+    }
+
+    private function mediaChecklistStatus(array $mediaAssets, array $requiredTargets): array
+    {
+        $assets = collect(array_values(array_filter($mediaAssets, fn ($item) => is_array($item))))
+            ->filter(fn (array $asset): bool => trim((string) ($asset['source_url'] ?? '')) !== '');
+        $presentTargets = $assets
+            ->pluck('target')
+            ->map(fn ($target) => trim((string) $target))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+        $missingTargets = array_values(array_diff($requiredTargets, $presentTargets));
+        $byTarget = $assets->groupBy(fn (array $asset): string => trim((string) ($asset['target'] ?? '')));
+        $duplicateTargets = [];
+        $usedSources = [];
+
+        foreach ($byTarget as $target => $group) {
+            $sourceKey = $this->normalizeMediaSourceKey((string) (($group->first()['source_url'] ?? '')));
+            if ($sourceKey !== '' && in_array($sourceKey, $usedSources, true)) {
+                $duplicateTargets[] = (string) $target;
+            }
+            if ($sourceKey !== '') {
+                $usedSources[] = $sourceKey;
+            }
+        }
+
+        return [
+            'ok' => $missingTargets === [] && $duplicateTargets === [],
+            'required_targets' => $requiredTargets,
+            'present_targets' => $presentTargets,
+            'missing_targets' => $missingTargets,
+            'duplicate_targets' => array_values(array_unique($duplicateTargets)),
+            'distinct_sources' => count(array_values(array_unique(array_filter($usedSources)))),
+        ];
+    }
+
+    private function expandAssetSlotsForMediaRecovery(array $draft, array $status, int $pass): array
+    {
+        $slotPlan = collect($this->draftAssetSlotPlan($draft))
+            ->filter(fn ($item): bool => is_array($item))
+            ->keyBy(fn (array $item): string => trim((string) ($item['slot_key'] ?? '')));
+        $companyName = trim((string) ($draft['website_title'] ?? 'business'));
+        $market = trim((string) (($draft['normalized_payload']['market']['city'] ?? '') ?: ''));
+        $problem = trim((string) ($draft['funnel_blocks']['problem']['body'] ?? ''));
+        $icp = trim((string) ($draft['normalized_payload']['market']['primary_icp_name'] ?? 'customers'));
+
+        foreach ((array) ($status['missing_targets'] ?? []) as $target) {
+            $base = is_array($slotPlan->get($target)) ? $slotPlan->get($target) : [
+                'slot_key' => $target,
+                'slot_label' => Str::title(str_replace('_', ' ', (string) $target)),
+                'provider' => 'pexels',
+            ];
+            $slotPlan->put($target, array_merge($base, [
+                'provider' => 'pexels',
+                'query' => $this->recoveryQueryForTarget((string) $target, $companyName, $market, $problem, $icp, $pass),
+                'fallback_queries' => $this->recoveryFallbackQueriesForTarget((string) $target, $companyName, $market, $problem, $icp, $pass),
+                'status' => 'retrying',
+            ]));
+        }
+
+        return $slotPlan->values()->all();
+    }
+
+    private function recoveryQueryForTarget(string $target, string $companyName, string $market, string $problem, string $icp, int $pass): string
+    {
+        $prefix = trim(implode(' ', array_filter([$market, $companyName])));
+
+        return match ($target) {
+            'hero' => trim($prefix . ' yoga studio premium calm interior'),
+            'blog_primary' => trim($prefix . ' yoga wellness editorial lifestyle'),
+            'category' => trim($prefix . ' group yoga class studio overview'),
+            'service_primary' => trim($prefix . ' beginner yoga class instructor student'),
+            'service_detail' => trim($prefix . ' yoga pose stretching studio detail'),
+            'service_support' => trim($prefix . ' yoga breathing relaxation studio'),
+            'section_one' => trim($prefix . ' yoga studio natural light'),
+            'section_two' => trim($prefix . ' happy yoga students wellness'),
+            'section_three' => trim($prefix . ' book yoga class arrival'),
+            default => trim($prefix . ' ' . $problem . ' ' . $icp . ' photo ' . $pass),
+        };
+    }
+
+    private function recoveryFallbackQueriesForTarget(string $target, string $companyName, string $market, string $problem, string $icp, int $pass): array
+    {
+        return array_values(array_filter([
+            trim($companyName . ' ' . str_replace('_', ' ', $target)),
+            trim($market . ' ' . str_replace('_', ' ', $target)),
+            trim($problem . ' ' . $icp),
+            trim('yoga wellness ' . str_replace('_', ' ', $target) . ' ' . $pass),
+        ]));
     }
 
     private function improveWeakThemeAndOfferDraft(Founder $founder, array &$draft, array &$normalized, array $websiteBuild): array
@@ -1606,6 +2220,34 @@ class WebsiteAutopilotService
 
     private function websiteMediaAssets(Founder $founder, array $draft): array
     {
+        $existing = collect((array) ($draft['media_assets'] ?? []))
+            ->filter(fn ($item): bool => is_array($item))
+            ->map(function (array $asset): ?array {
+                $sourceUrl = trim((string) ($asset['source_url'] ?? ''));
+                $target = trim((string) ($asset['target'] ?? ''));
+                if ($sourceUrl === '' || $target === '') {
+                    return null;
+                }
+
+                return [
+                    'target' => $target,
+                    'label' => trim((string) ($asset['label'] ?? Str::headline(str_replace('_', ' ', $target)))),
+                    'source_url' => $sourceUrl,
+                    'preview_url' => trim((string) ($asset['preview_url'] ?? $sourceUrl)),
+                    'alt_text' => trim((string) ($asset['alt_text'] ?? $asset['label'] ?? Str::headline(str_replace('_', ' ', $target)))),
+                    'credit_name' => trim((string) ($asset['credit_name'] ?? '')),
+                    'credit_url' => trim((string) ($asset['credit_url'] ?? '')),
+                    'provider' => trim((string) ($asset['provider'] ?? 'pexels')),
+                ];
+            })
+            ->filter()
+            ->values()
+            ->all();
+
+        if ($existing !== []) {
+            return $existing;
+        }
+
         $resolved = $this->normalizeResolvedAssets((array) ($draft['atlas_handoff']['asset_slots'] ?? []));
 
         if ($resolved === []) {
@@ -1646,22 +2288,6 @@ class WebsiteAutopilotService
     private function resolvedWebsiteMediaState(Founder $founder, array $draft): array
     {
         $assetSlots = (array) ($draft['atlas_handoff']['asset_slots'] ?? []);
-        $resolved = $this->normalizeResolvedAssets($assetSlots);
-
-        for ($attempt = 0; $attempt < 4 && $resolved === []; $attempt++) {
-            $atlasAssets = $this->atlasWorkspaceService->websiteAssets($founder);
-            $assetSlots = is_array($atlasAssets['asset_slots'] ?? null) ? $atlasAssets['asset_slots'] : [];
-            $resolved = $this->normalizeResolvedAssets($assetSlots);
-
-            if ($resolved !== []) {
-                break;
-            }
-
-            if ($attempt < 3) {
-                usleep(750000);
-            }
-        }
-
         if ($assetSlots === []) {
             $assetSlots = $this->fallbackAssetSlotsFromDraft($founder, $draft);
         }
@@ -1934,11 +2560,14 @@ class WebsiteAutopilotService
 
         foreach ($queries as $query) {
             $assets = array_merge(
-                $this->searchWikimediaAssets($query),
-                $this->searchUnsplashAssets($query),
                 $this->searchPexelsAssets($query),
+                $this->searchUnsplashAssets($query),
                 $this->searchPixabayAssets($query)
             );
+
+            if ($assets === []) {
+                $assets = $this->searchWikimediaAssets($query);
+            }
 
             $candidate = collect($assets)
                 ->filter(fn ($asset): bool => is_array($asset) && trim((string) ($asset['source_url'] ?? '')) !== '')
@@ -2506,6 +3135,39 @@ class WebsiteAutopilotService
         return collect((array) ($payload['website_autopilot']['asset_slots'] ?? []))
             ->filter(fn ($asset): bool => is_array($asset))
             ->values()
+            ->all();
+    }
+
+    private function hydrateSectionsWithMediaAssets(array $sections, array $mediaAssets): array
+    {
+        $byTarget = collect($mediaAssets)
+            ->filter(fn ($item): bool => is_array($item))
+            ->keyBy(fn (array $item): string => trim((string) ($item['target'] ?? '')));
+
+        $targetOrder = ['section_one', 'section_two', 'section_three', 'story', 'faq', 'why_choose_item'];
+
+        return collect($sections)
+            ->filter(fn ($section): bool => is_array($section))
+            ->values()
+            ->map(function (array $section, int $index) use ($byTarget, $targetOrder): array {
+                $target = $targetOrder[$index] ?? null;
+                $asset = $target ? $byTarget->get($target) : null;
+                if (!is_array($asset)) {
+                    return $section;
+                }
+
+                $section['asset'] = [
+                    'slot_label' => (string) ($asset['label'] ?? ''),
+                    'status' => 'assigned',
+                    'preview_url' => (string) ($asset['preview_url'] ?? $asset['source_url'] ?? ''),
+                    'asset_url' => (string) ($asset['source_url'] ?? ''),
+                    'alt_text' => (string) ($asset['alt_text'] ?? ''),
+                    'credit_name' => (string) ($asset['credit_name'] ?? ''),
+                    'credit_url' => (string) ($asset['credit_url'] ?? ''),
+                ];
+
+                return $section;
+            })
             ->all();
     }
 

@@ -398,17 +398,7 @@
                             <input class="signup-input" required type="password" name="password_confirmation">
                         </label>
                     </div>
-                    <div class="signup-grid-3">
-                        <label>
-                            <div class="signup-label">Business Blueprint</div>
-                            <select class="signup-select" required name="vertical_blueprint">
-                                <option value="">Select the closest blueprint</option>
-                                @foreach ($verticalBlueprintOptions as $verticalBlueprint)
-                                    <option value="{{ $verticalBlueprint['code'] }}" @selected(old('vertical_blueprint') === $verticalBlueprint['code'])>{{ $verticalBlueprint['name'] }} · {{ ucfirst($verticalBlueprint['business_model']) }}</option>
-                                @endforeach
-                            </select>
-                            @error('vertical_blueprint')<div class="signup-error">{{ $message }}</div>@enderror
-                        </label>
+                    <div class="signup-grid-2">
                         <label>
                             <div class="signup-label">Business Model</div>
                             <select class="signup-select" required name="business_model">
@@ -430,108 +420,16 @@
                             @error('stage')<div class="signup-error">{{ $message }}</div>@enderror
                         </label>
                     </div>
-                    <div class="signup-grid-2">
-                        <label>
-                            <div class="signup-label">Primary City / Market</div>
-                            <input class="signup-input" required type="text" name="primary_city" value="{{ old('primary_city') }}" placeholder="Austin, Cairo, London...">
-                            @error('primary_city')<div class="signup-error">{{ $message }}</div>@enderror
-                        </label>
-                        <label>
-                            <div class="signup-label">Service Radius / Delivery Scope</div>
-                            <input class="signup-input" required type="text" name="service_radius" value="{{ old('service_radius') }}" placeholder="10 miles, nationwide shipping, city center...">
-                            @error('service_radius')<div class="signup-error">{{ $message }}</div>@enderror
-                        </label>
-                    </div>
                     <label>
-                        <div class="signup-label">Industry</div>
-                        <select class="signup-select" required name="industry">
-                            <option value="">Select your industry</option>
-                            @foreach ($industryOptions as $industryOption)
-                                <option value="{{ $industryOption }}" @selected(old('industry') === $industryOption)>{{ $industryOption }}</option>
-                            @endforeach
-                        </select>
-                        @error('industry')<div class="signup-error">{{ $message }}</div>@enderror
+                        <div class="signup-label">Company Description</div>
+                        <textarea class="signup-textarea" required name="company_description" rows="5">{{ old('company_description') }}</textarea>
+                        @error('company_description')<div class="signup-error">{{ $message }}</div>@enderror
                     </label>
                     <label>
-                        <div class="signup-label">Company Brief</div>
-                        <textarea class="signup-textarea" required name="company_brief" rows="4">{{ old('company_brief') }}</textarea>
-                        @error('company_brief')<div class="signup-error">{{ $message }}</div>@enderror
+                        <div class="signup-label">Ideal Customer Profile</div>
+                        <textarea class="signup-textarea" required name="ideal_customer_profile" rows="4">{{ old('ideal_customer_profile') }}</textarea>
+                        @error('ideal_customer_profile')<div class="signup-error">{{ $message }}</div>@enderror
                     </label>
-                    <div class="signup-grid-2">
-                        <label>
-                            <div class="signup-label">Problem You Solve</div>
-                            <textarea class="signup-textarea" required name="problem_solved" rows="3">{{ old('problem_solved') }}</textarea>
-                            @error('problem_solved')<div class="signup-error">{{ $message }}</div>@enderror
-                        </label>
-                        <label>
-                            <div class="signup-label">What Makes You Different?</div>
-                            <textarea class="signup-textarea" required name="differentiators" rows="3">{{ old('differentiators') }}</textarea>
-                            @error('differentiators')<div class="signup-error">{{ $message }}</div>@enderror
-                        </label>
-                    </div>
-                    <div class="signup-grid-2">
-                        <label>
-                            <div class="signup-label">Target Audience</div>
-                            <select class="signup-select" required name="target_audience">
-                                <option value="">Select your audience</option>
-                                @foreach ($targetAudienceOptions as $option)
-                                    <option value="{{ $option }}" @selected(old('target_audience') === $option)>{{ $option }}</option>
-                                @endforeach
-                            </select>
-                            @error('target_audience')<div class="signup-error">{{ $message }}</div>@enderror
-                        </label>
-                        <label>
-                            <div class="signup-label">Primary ICP Name</div>
-                            <input class="signup-input" required type="text" name="primary_icp_name" value="{{ old('primary_icp_name') }}" placeholder="Busy dog owners, first-time homebuyers...">
-                            @error('primary_icp_name')<div class="signup-error">{{ $message }}</div>@enderror
-                        </label>
-                    </div>
-                    <div class="signup-grid-2">
-                        <label>
-                            <div class="signup-label">Ideal Customer Profile</div>
-                            <textarea class="signup-textarea" required name="ideal_customer_profile" rows="3">{{ old('ideal_customer_profile') }}</textarea>
-                            @error('ideal_customer_profile')<div class="signup-error">{{ $message }}</div>@enderror
-                        </label>
-                        <label>
-                            <div class="signup-label">Top Pain Points</div>
-                            <textarea class="signup-textarea" required name="pain_points" rows="3" placeholder="Separate with commas">{{ old('pain_points') }}</textarea>
-                            @error('pain_points')<div class="signup-error">{{ $message }}</div>@enderror
-                        </label>
-                    </div>
-                    <div class="signup-grid-2">
-                        <label>
-                            <div class="signup-label">Desired Outcomes</div>
-                            <textarea class="signup-textarea" required name="desired_outcomes" rows="3" placeholder="Separate with commas">{{ old('desired_outcomes') }}</textarea>
-                            @error('desired_outcomes')<div class="signup-error">{{ $message }}</div>@enderror
-                        </label>
-                        <label>
-                            <div class="signup-label">Common Objections</div>
-                            <textarea class="signup-textarea" required name="objections" rows="3" placeholder="Separate with commas">{{ old('objections') }}</textarea>
-                            @error('objections')<div class="signup-error">{{ $message }}</div>@enderror
-                        </label>
-                    </div>
-                    <div class="signup-grid-2">
-                        <label>
-                            <div class="signup-label">Brand Voice</div>
-                            <select class="signup-select" required name="brand_voice">
-                                <option value="">Select a brand voice</option>
-                                @foreach ($brandVoiceOptions as $option)
-                                    <option value="{{ $option }}" @selected(old('brand_voice') === $option)>{{ $option }}</option>
-                                @endforeach
-                            </select>
-                            @error('brand_voice')<div class="signup-error">{{ $message }}</div>@enderror
-                        </label>
-                        <label>
-                            <div class="signup-label">Core Offer</div>
-                            <select class="signup-select" required name="core_offer">
-                                <option value="">Select your core offer</option>
-                                @foreach ($coreOfferOptions as $coreOfferOption)
-                                    <option value="{{ $coreOfferOption }}" @selected(old('core_offer') === $coreOfferOption)>{{ $coreOfferOption }}</option>
-                                @endforeach
-                            </select>
-                            @error('core_offer')<div class="signup-error">{{ $message }}</div>@enderror
-                        </label>
-                    </div>
                     <div class="signup-grid-2">
                         <label>
                             <div class="signup-label">Primary Growth Goal</div>
@@ -558,7 +456,7 @@
                         <button class="signup-submit" type="submit">Complete founder signup</button>
                         <a class="signup-secondary" href="{{ route('plans') }}">Back to plans</a>
                     </div>
-                    <p class="signup-footnote">Every field is still required so Hatchers AI OS can personalize the workspace from day one.</p>
+                    <p class="signup-footnote">Hatchers will infer the blueprint, industry, offer structure, customer pains, objections, and website direction from this shorter founder brief before building your workspace.</p>
                 </form>
             </div>
         </section>
