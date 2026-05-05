@@ -154,9 +154,15 @@ class WebsiteAutopilotMapperService
             ];
         }
 
+        $positionalTargets = ['service_primary', 'service_detail', 'service_support'];
         foreach ($slice as $asset) {
+            $target = trim((string) ($asset['target'] ?? ''));
+            if (!in_array($target, $positionalTargets, true)) {
+                $target = $positionalTargets[count($mapped) - (is_array($categoryAsset) ? 1 : 0)] ?? 'service_primary';
+            }
+
             $mapped[] = [
-                'target' => 'service',
+                'target' => $target,
                 'source_url' => trim((string) ($asset['source_url'] ?? '')),
             ];
         }
