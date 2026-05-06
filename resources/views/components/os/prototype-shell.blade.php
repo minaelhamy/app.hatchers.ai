@@ -7,7 +7,7 @@
     'showAiToolsButton' => true,
     'showSidepane' => false,
     'recentItems' => [],
-    'aiToolsMode' => 'link',
+    'aiToolsMode' => 'overlay',
 ])
 
 @php
@@ -16,6 +16,50 @@
     $founderAvatarUrl = !empty($founder?->avatar_path) ? asset('storage/' . ltrim((string) $founder->avatar_path, '/')) : null;
     $unreadCount = (int) ($workspace['unread_notification_count'] ?? 0);
     $statusLabel = $statusText ?: now()->format('D, M j g:i A');
+    $windowApps = [
+        [
+            'key' => 'account-settings',
+            'label' => 'Account Settings',
+            'description' => 'Username, password, and profile photo',
+            'url' => route('founder.settings', ['step' => 'account', 'os_embed' => 1]),
+        ],
+        [
+            'key' => 'servio',
+            'label' => 'Servio',
+            'description' => 'Website and service operations',
+            'url' => route('workspace.launch', ['module' => 'servio']),
+        ],
+        [
+            'key' => 'bazaar',
+            'label' => 'Bazaar',
+            'description' => 'Commerce and storefront management',
+            'url' => route('workspace.launch', ['module' => 'bazaar']),
+        ],
+        [
+            'key' => 'atlas-agents',
+            'label' => 'Atlas Agents',
+            'description' => 'Agent tools and prompt workflows',
+            'url' => route('founder.ai-tools.open', ['target' => '/ai-chat-bots', 'title' => 'Atlas Agents']),
+        ],
+        [
+            'key' => 'atlas-chat',
+            'label' => 'Atlas Chat',
+            'description' => 'Atlas conversational workspace',
+            'url' => route('founder.ai-tools.open', ['target' => '/ai-chat', 'title' => 'Atlas Chat']),
+        ],
+        [
+            'key' => 'campaign-studio',
+            'label' => 'Campaign Studio',
+            'description' => 'Marketing plans and campaign execution',
+            'url' => route('founder.marketing'),
+        ],
+        [
+            'key' => 'website-workspace',
+            'label' => 'Website Workspace',
+            'description' => 'Website build and publishing controls',
+            'url' => route('website'),
+        ],
+    ];
     $icons = [
         'panel-left' => '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 5.5A2.5 2.5 0 0 1 5.5 3h13A2.5 2.5 0 0 1 21 5.5v13a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 18.5z"/><path d="M9 3v18"/></svg>',
         'settings' => '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 15.5A3.5 3.5 0 1 0 12 8.5a3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1 1 0 0 0 .2 1.1l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1 1 0 0 0-1.1-.2 1 1 0 0 0-.6.9V20a2 2 0 1 1-4 0v-.1a1 1 0 0 0-.6-.9 1 1 0 0 0-1.1.2l-.1.1a2 2 0 0 1-2.8-2.8l.1-.1a1 1 0 0 0 .2-1.1 1 1 0 0 0-.9-.6H4a2 2 0 1 1 0-4h.1a1 1 0 0 0 .9-.6 1 1 0 0 0-.2-1.1l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1 1 0 0 0 1.1.2 1 1 0 0 0 .6-.9V4a2 2 0 1 1 4 0v.1a1 1 0 0 0 .6.9 1 1 0 0 0 1.1-.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1 1 0 0 0-.2 1.1 1 1 0 0 0 .9.6H20a2 2 0 1 1 0 4h-.1a1 1 0 0 0-.9.6Z"/></svg>',
@@ -132,11 +176,153 @@
         .workspace-window-title { font-size:11px; font-weight:600; letter-spacing:0.10em; text-transform:uppercase; color:var(--text-muted); }
         .workspace-window-body { padding:28px 28px 30px; }
         .sidepane-user-caret, .sidepane-upgrade-icon { display:inline-flex; align-items:center; justify-content:center; }
+        .os-window-layer {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 90;
+        }
+        .os-window {
+            position: absolute;
+            width: 880px;
+            height: 620px;
+            min-width: 420px;
+            min-height: 320px;
+            background: var(--surface);
+            border: 0.5px solid var(--border);
+            border-radius: 18px;
+            box-shadow: 0 24px 72px rgba(20, 16, 12, 0.18), 0 8px 20px rgba(20, 16, 12, 0.10);
+            overflow: hidden;
+            resize: both;
+            pointer-events: auto;
+            display: flex;
+            flex-direction: column;
+        }
+        .os-window.is-hidden { display: none; }
+        .os-window.is-maximized {
+            inset: 24px 24px 84px 84px !important;
+            width: auto !important;
+            height: auto !important;
+            resize: none;
+        }
+        .os-window-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 12px 16px;
+            border-bottom: 0.5px solid var(--hairline);
+            background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(249,248,246,0.92));
+            cursor: move;
+            user-select: none;
+        }
+        .os-window-titlegroup { display: grid; gap: 2px; min-width: 0; }
+        .os-window-title { font-size: 13px; font-weight: 700; color: var(--text); }
+        .os-window-subtitle { font-size: 11.5px; color: var(--text-subtle); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 420px; }
+        .os-window-controls {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            flex: 0 0 auto;
+        }
+        .os-window-control {
+            width: 28px;
+            height: 28px;
+            border-radius: 999px;
+            border: 0.5px solid var(--border);
+            background: #fff;
+            color: var(--text-muted);
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font: inherit;
+            font-size: 13px;
+        }
+        .os-window-control:hover { background: var(--surface-2); color: var(--text); }
+        .os-window-body {
+            position: relative;
+            flex: 1;
+            min-height: 0;
+            background: #fff;
+        }
+        .os-window-frame {
+            width: 100%;
+            height: 100%;
+            border: 0;
+            background: #fff;
+        }
+        .os-window-launcher {
+            width: 760px;
+            max-width: calc(100vw - 140px);
+            height: auto;
+            min-height: 0;
+            resize: none;
+        }
+        .os-window-launcher .os-window-body {
+            padding: 18px;
+            background: var(--surface);
+        }
+        .os-launcher-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 14px;
+        }
+        .os-launcher-card {
+            display: grid;
+            gap: 8px;
+            text-align: left;
+            width: 100%;
+            padding: 16px;
+            border-radius: 16px;
+            border: 0.5px solid var(--border);
+            background: #fff;
+            cursor: pointer;
+            box-shadow: var(--shadow-sm);
+        }
+        .os-launcher-card:hover {
+            background: var(--surface-2);
+            transform: translateY(-1px);
+        }
+        .os-launcher-title { font-size: 14px; font-weight: 700; color: var(--text); }
+        .os-launcher-copy { font-size: 12.5px; line-height: 1.5; color: var(--text-muted); }
+        .os-window-dock {
+            position: fixed;
+            right: 24px;
+            bottom: 24px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            z-index: 95;
+            pointer-events: none;
+        }
+        .os-window-dock-chip {
+            pointer-events: auto;
+            border: 0.5px solid var(--border);
+            background: rgba(255, 255, 255, 0.96);
+            box-shadow: var(--shadow-md);
+            border-radius: 999px;
+            padding: 10px 14px;
+            font: inherit;
+            font-size: 12.5px;
+            font-weight: 600;
+            color: var(--text);
+            cursor: pointer;
+        }
         @media (max-width: 980px) {
             .content { grid-template-columns: 1fr; }
             .tile-rail { flex-direction: row; justify-content: center; padding: 20px; }
             .workspace { padding: 20px 20px 60px; }
             .workspace-window { width: calc(100% - 20px); }
+            .os-window,
+            .os-window.is-maximized {
+                inset: 16px 16px 96px 16px !important;
+                width: auto !important;
+                height: auto !important;
+            }
+            .os-window-launcher {
+                max-width: calc(100vw - 32px);
+            }
         }
     </style>
 @endonce
@@ -175,7 +361,7 @@
                         <div class="rail-profile-name">{{ $founderName }}</div>
                         <div class="rail-profile-email">{{ $founder->email ?? '' }}</div>
                     </div>
-                    <a href="{{ route('founder.settings', ['step' => 'account']) }}" class="rail-profile-link">Account settings</a>
+                    <button type="button" class="rail-profile-link" data-open-app="account-settings">Account settings</button>
                     <form method="POST" action="{{ route('logout') }}">
                         @csrf
                         <button type="submit" class="rail-profile-submit">Log out</button>
@@ -298,4 +484,239 @@
     @isset($afterMain)
         {{ $afterMain }}
     @endisset
+
+    <div class="os-window-layer" id="osWindowLayer" aria-live="polite"></div>
+    <div class="os-window-dock" id="osWindowDock"></div>
+    <script type="application/json" id="osWindowApps">@json($windowApps)</script>
 </div>
+
+<script>
+    (() => {
+        if (window.HatchersOsDesktop) return;
+
+        const shell = document.currentScript?.closest('.prototype-app');
+        const layer = document.getElementById('osWindowLayer');
+        const dock = document.getElementById('osWindowDock');
+        const apps = JSON.parse(document.getElementById('osWindowApps')?.textContent || '[]');
+        if (!shell || !layer || !dock || !apps.length) return;
+
+        const registry = new Map(apps.map((app) => [app.key, app]));
+        const windows = new Map();
+        let zIndex = 120;
+
+        function bringToFront(win) {
+            zIndex += 1;
+            win.style.zIndex = String(zIndex);
+        }
+
+        function buildWindow(app, options = {}) {
+            const win = document.createElement('section');
+            win.className = 'os-window';
+            win.dataset.appKey = app.key;
+            win.style.left = options.left || '120px';
+            win.style.top = options.top || '96px';
+            win.style.width = options.width || '880px';
+            win.style.height = options.height || '620px';
+
+            const header = document.createElement('header');
+            header.className = 'os-window-header';
+
+            const titleGroup = document.createElement('div');
+            titleGroup.className = 'os-window-titlegroup';
+            titleGroup.innerHTML = `<div class="os-window-title">${app.label}</div><div class="os-window-subtitle">${app.description || app.url}</div>`;
+
+            const controls = document.createElement('div');
+            controls.className = 'os-window-controls';
+
+            const minBtn = document.createElement('button');
+            minBtn.type = 'button';
+            minBtn.className = 'os-window-control';
+            minBtn.textContent = '–';
+            minBtn.setAttribute('aria-label', `Minimize ${app.label}`);
+
+            const maxBtn = document.createElement('button');
+            maxBtn.type = 'button';
+            maxBtn.className = 'os-window-control';
+            maxBtn.textContent = '□';
+            maxBtn.setAttribute('aria-label', `Maximize ${app.label}`);
+
+            const closeBtn = document.createElement('button');
+            closeBtn.type = 'button';
+            closeBtn.className = 'os-window-control';
+            closeBtn.textContent = '×';
+            closeBtn.setAttribute('aria-label', `Close ${app.label}`);
+
+            controls.append(minBtn, maxBtn, closeBtn);
+            header.append(titleGroup, controls);
+
+            const body = document.createElement('div');
+            body.className = 'os-window-body';
+
+            if (app.key === 'app-launcher') {
+                win.classList.add('os-window-launcher');
+                const launcherGrid = document.createElement('div');
+                launcherGrid.className = 'os-launcher-grid';
+                apps.forEach((entry) => {
+                    const card = document.createElement('button');
+                    card.type = 'button';
+                    card.className = 'os-launcher-card';
+                    card.innerHTML = `<div class="os-launcher-title">${entry.label}</div><div class="os-launcher-copy">${entry.description || 'Open workspace'}</div>`;
+                    card.addEventListener('click', () => openApp(entry.key));
+                    launcherGrid.appendChild(card);
+                });
+                body.appendChild(launcherGrid);
+            } else {
+                const frame = document.createElement('iframe');
+                frame.className = 'os-window-frame';
+                frame.src = app.url;
+                frame.loading = 'lazy';
+                frame.referrerPolicy = 'strict-origin-when-cross-origin';
+                body.appendChild(frame);
+            }
+
+            win.append(header, body);
+            layer.appendChild(win);
+            bringToFront(win);
+
+            let startX = 0;
+            let startY = 0;
+            let startLeft = 0;
+            let startTop = 0;
+            let dragging = false;
+
+            function onPointerMove(event) {
+                if (!dragging || win.classList.contains('is-maximized')) return;
+                const dx = event.clientX - startX;
+                const dy = event.clientY - startY;
+                win.style.left = `${Math.max(20, startLeft + dx)}px`;
+                win.style.top = `${Math.max(20, startTop + dy)}px`;
+            }
+
+            function stopDrag() {
+                dragging = false;
+                window.removeEventListener('pointermove', onPointerMove);
+                window.removeEventListener('pointerup', stopDrag);
+            }
+
+            header.addEventListener('pointerdown', (event) => {
+                if (event.target.closest('.os-window-controls')) return;
+                if (win.classList.contains('is-maximized')) return;
+                dragging = true;
+                startX = event.clientX;
+                startY = event.clientY;
+                startLeft = parseFloat(win.style.left || '0');
+                startTop = parseFloat(win.style.top || '0');
+                bringToFront(win);
+                window.addEventListener('pointermove', onPointerMove);
+                window.addEventListener('pointerup', stopDrag);
+            });
+
+            win.addEventListener('mousedown', () => bringToFront(win));
+
+            minBtn.addEventListener('click', () => minimizeWindow(app.key));
+            closeBtn.addEventListener('click', () => closeWindow(app.key));
+            maxBtn.addEventListener('click', () => {
+                if (win.classList.contains('is-maximized')) {
+                    win.classList.remove('is-maximized');
+                    win.style.left = win.dataset.restoreLeft || '120px';
+                    win.style.top = win.dataset.restoreTop || '96px';
+                    win.style.width = win.dataset.restoreWidth || '880px';
+                    win.style.height = win.dataset.restoreHeight || '620px';
+                } else {
+                    win.dataset.restoreLeft = win.style.left;
+                    win.dataset.restoreTop = win.style.top;
+                    win.dataset.restoreWidth = win.style.width;
+                    win.dataset.restoreHeight = win.style.height;
+                    win.classList.add('is-maximized');
+                }
+                bringToFront(win);
+            });
+
+            const state = { app, element: win, minimized: false, dockChip: null };
+            windows.set(app.key, state);
+            return state;
+        }
+
+        function ensureDockChip(state) {
+            if (state.dockChip) return state.dockChip;
+            const chip = document.createElement('button');
+            chip.type = 'button';
+            chip.className = 'os-window-dock-chip';
+            chip.textContent = state.app.label;
+            chip.addEventListener('click', () => restoreWindow(state.app.key));
+            dock.appendChild(chip);
+            state.dockChip = chip;
+            return chip;
+        }
+
+        function openApp(key) {
+            const app = key === 'app-launcher'
+                ? { key: 'app-launcher', label: 'AI Tools', description: 'Open Hatchers workspaces and tools' }
+                : registry.get(key);
+            if (!app) return;
+
+            let state = windows.get(app.key);
+            if (!state) {
+                const offset = windows.size * 22;
+                state = buildWindow(app, {
+                    left: `${96 + offset}px`,
+                    top: `${72 + offset}px`,
+                    width: app.key === 'app-launcher' ? '760px' : '880px',
+                    height: app.key === 'app-launcher' ? '520px' : '620px',
+                });
+            }
+
+            state.minimized = false;
+            state.element.classList.remove('is-hidden');
+            if (state.dockChip) {
+                state.dockChip.remove();
+                state.dockChip = null;
+            }
+            bringToFront(state.element);
+        }
+
+        function minimizeWindow(key) {
+            const state = windows.get(key);
+            if (!state) return;
+            state.minimized = true;
+            state.element.classList.add('is-hidden');
+            ensureDockChip(state);
+        }
+
+        function restoreWindow(key) {
+            const state = windows.get(key);
+            if (!state) return;
+            state.minimized = false;
+            state.element.classList.remove('is-hidden');
+            if (state.dockChip) {
+                state.dockChip.remove();
+                state.dockChip = null;
+            }
+            bringToFront(state.element);
+        }
+
+        function closeWindow(key) {
+            const state = windows.get(key);
+            if (!state) return;
+            state.element.remove();
+            state.dockChip?.remove();
+            windows.delete(key);
+        }
+
+        shell.querySelectorAll('[data-open-app]').forEach((button) => {
+            button.addEventListener('click', () => openApp(button.getAttribute('data-open-app')));
+        });
+
+        document.getElementById('openToolsBtn')?.addEventListener('click', () => openApp('app-launcher'));
+        document.getElementById('railAiToolsBtn')?.addEventListener('click', () => openApp('app-launcher'));
+        document.getElementById('sidepaneNewAgentBtn')?.addEventListener('click', () => openApp('app-launcher'));
+
+        window.HatchersOsDesktop = {
+            openApp,
+            openLauncher: () => openApp('app-launcher'),
+            closeWindow,
+            minimizeWindow,
+            restoreWindow,
+        };
+    })();
+</script>

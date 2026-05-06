@@ -1281,26 +1281,6 @@
                     </aside>
         </div>
 
-        <x-slot:afterMain>
-            <div class="agent-overlay" id="toolsPanel">
-                <div class="agent-panel">
-                    <button class="agent-close" type="button" aria-label="Close" id="closeToolsBtn">×</button>
-                    <h1 class="agent-heading">
-                        <span class="agent-orb"></span>
-                        <span>What are we achieving today?</span>
-                    </h1>
-                    <div class="agent-composer">
-                        <div class="agent-composer-prompt">How can we help you today?</div>
-                        <button class="agent-composer-add" type="button" aria-label="Add">＋</button>
-                    </div>
-                    <div class="agent-actions">
-                        @foreach($toolLinks as $tool)
-                            <a href="{{ $tool['href'] }}" class="agent-chip">{{ $tool['label'] }}</a>
-                        @endforeach
-                    </div>
-                </div>
-            </div>
-        </x-slot:afterMain>
     </x-os.prototype-shell>
 @endsection
 
@@ -1323,8 +1303,6 @@
             const openToolsBtn = document.getElementById('openToolsBtn');
             const railAiToolsBtn = document.getElementById('railAiToolsBtn');
             const sidepaneNewAgentBtn = document.getElementById('sidepaneNewAgentBtn');
-            const toolsPanel = document.getElementById('toolsPanel');
-            const closeToolsBtn = document.getElementById('closeToolsBtn');
             const newProjectBtn = document.getElementById('newProjectBtn');
             const openSidebarBtn = document.getElementById('openSidebarBtn');
             const closeSidebarBtn = document.getElementById('closeSidebarBtn');
@@ -1387,10 +1365,6 @@
                 chatCard.classList.toggle('is-open', state === 'card');
                 chatPanel.classList.toggle('is-open', state === 'panel');
                 chatFab.classList.toggle('is-active', state !== 'closed');
-            }
-
-            function setToolsOpen(open) {
-                toolsPanel.classList.toggle('is-open', open);
             }
 
             function setSidebarOpen(open) {
@@ -1585,13 +1559,9 @@
 
             chatCard?.addEventListener('click', () => setChatState('panel'));
             closeChatBtn?.addEventListener('click', () => setChatState('closed'));
-            openToolsBtn?.addEventListener('click', () => setToolsOpen(true));
-            railAiToolsBtn?.addEventListener('click', () => setToolsOpen(true));
-            sidepaneNewAgentBtn?.addEventListener('click', () => setToolsOpen(true));
-            closeToolsBtn?.addEventListener('click', () => setToolsOpen(false));
-            toolsPanel?.addEventListener('click', (event) => {
-                if (event.target === toolsPanel) setToolsOpen(false);
-            });
+            openToolsBtn?.addEventListener('click', () => window.HatchersOsDesktop?.openLauncher());
+            railAiToolsBtn?.addEventListener('click', () => window.HatchersOsDesktop?.openLauncher());
+            sidepaneNewAgentBtn?.addEventListener('click', () => window.HatchersOsDesktop?.openLauncher());
             openSidebarBtn?.addEventListener('click', () => setSidebarOpen(true));
             closeSidebarBtn?.addEventListener('click', () => setSidebarOpen(false));
             newProjectBtn?.addEventListener('click', startOnboardingFlow);

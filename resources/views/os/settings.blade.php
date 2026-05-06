@@ -379,6 +379,52 @@
         $osEmbedMode = request()->boolean('os_embed');
     @endphp
 
+    @if ($osEmbedMode)
+        <style>
+            .page.founder-home-page { background: #fff; }
+            .intelligence-shell {
+                min-height: auto;
+                display: block;
+                background: #fff;
+            }
+            .intelligence-sidebar,
+            .intelligence-hero,
+            .intelligence-card,
+            .checkpoint-card {
+                display: none !important;
+            }
+            .intelligence-main {
+                padding: 0;
+            }
+            .intelligence-wrap {
+                max-width: none;
+                margin: 0;
+                display: block;
+            }
+            .intelligence-layout {
+                display: block;
+            }
+            .step-card {
+                padding: 20px;
+                border: 0;
+                border-radius: 0;
+                box-shadow: none;
+                background: #fff;
+            }
+            .step-card-top {
+                margin-bottom: 16px;
+            }
+            .wizard-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+            @media (max-width: 900px) {
+                .wizard-grid {
+                    grid-template-columns: 1fr;
+                }
+            }
+        </style>
+    @endif
+
     <div class="intelligence-shell">
         <aside class="intelligence-sidebar">
             @include('os.partials.founder-sidebar', [
@@ -398,14 +444,16 @@
 
         <main class="intelligence-main">
             <div class="intelligence-wrap">
-                @include('os.partials.guidebook-workspace-topbar', [
-                    'founder' => $founder,
-                    'company' => $company,
-                    'workspace' => $dashboard['workspace'] ?? [],
-                    'projectName' => $company?->company_name ?? 'Founder workspace',
-                    'sectionLabel' => 'Brand Studio',
-                    'searchPlaceholder' => 'Sharpen positioning, review intelligence, and guide what Hatchers builds next...',
-                ])
+                @unless ($osEmbedMode)
+                    @include('os.partials.guidebook-workspace-topbar', [
+                        'founder' => $founder,
+                        'company' => $company,
+                        'workspace' => $dashboard['workspace'] ?? [],
+                        'projectName' => $company?->company_name ?? 'Founder workspace',
+                        'sectionLabel' => 'Brand Studio',
+                        'searchPlaceholder' => 'Sharpen positioning, review intelligence, and guide what Hatchers builds next...',
+                    ])
+                @endunless
                 <section class="intelligence-hero">
                     <div class="intelligence-kicker">Company Intelligence</div>
                     <h1>Build the business core once, then let the whole OS use it.</h1>
