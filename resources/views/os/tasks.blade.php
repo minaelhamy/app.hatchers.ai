@@ -10,6 +10,7 @@
     $taskEntries = $workspace['task_center_entries'] ?? [];
     $projectName = trim((string) ($company?->company_name ?? 'New Project'));
     $hasProject = !empty($taskEntries) || strcasecmp($projectName, 'New Project') !== 0;
+    $osEmbedMode = request()->boolean('os_embed');
 @endphp
 
 @section('head')
@@ -62,13 +63,18 @@
             color:var(--text-muted);
         }
         .tasks-window-body { padding:28px 28px 30px; }
+        .tasks-embed {
+            padding: 24px;
+            background: #fff;
+            min-height: 100%;
+        }
         @media (max-width: 980px) { .tasks-hello { font-size:36px; } .task-body { flex-direction:column; } }
     </style>
 @endsection
 
 @section('content')
-    <x-os.prototype-shell :founder="$founder" :workspace="$workspace" active-tile="tasks">
-        <div class="workspace">
+    @if ($osEmbedMode)
+        <div class="tasks-embed">
             @if (!$hasProject)
                 <div class="empty-card">
                     <div class="empty-label">Tasks</div>
@@ -81,6 +87,51 @@
                 </div>
             @else
                 <div class="tasks-stage">
+                    <h1 class="tasks-hello">Welcome back {{ strtok((string) ($founder->full_name ?? 'Founder'), ' ') }},</h1>
+                    <p class="tasks-sub">Here's what's on for you for this week:</p>
+                    <div class="tasks-section-label">Tasks</div>
+
+                    @forelse($taskEntries as $task)
+                        <article class="task-card">
+                            <div class="task-meta">
+                                <span class="task-meta-label">{{ strtoupper($task['label'] ?? 'Milestone') }}</span>
+                                @if(!empty($task['due']))
+                                    <span class="task-meta-dot">·</span>
+                                    <span class="task-meta-due">{{ strtoupper($task['due']) }}</span>
+                                @endif
+                            </div>
+                            <div class="task-body">
+                                <div>
+                                    @if(!empty($task['completed']))
+                                        <h3 class="task-title task-title-done">
+                                            <span class="task-check">✓</span>
+                                            <span class="task-strike">{{ $task['title'] ?? 'Task' }}</span>
+                                        </h3>
+                                    @else
+                                        <h3 class="task-title">{{ $task['title'] ?? 'Task' }}</h3>
+                                    @endif
+                                    <p class="task-desc">{{ $task['description'] ?? 'Continue this task from your founder workspace.' }}</p>
+                                </div>
+                                @if(empty($task['completed']))
+                                    <a class="task-cta" href="{{ route('dashboard') }}">
+                                        <span class="task-cta-spark">✦</span>
+                                        <span>{{ !empty($task['mentor_name']) ? 'Continue with AI' : 'Open in OS' }}</span>
+                                    </a>
+                                @endif
+                            </div>
+                        </article>
+                    @empty
+                        <div class="empty-state">
+                            <h2>No tasks yet</h2>
+                            <p>Start a new project and we’ll generate your launch plan here.</p>
+                        </div>
+                    @endforelse
+                </div>
+            @endif
+        </div>
+    @else
+        <x-os.prototype-shell :founder="$founder" :workspace="$workspace" active-tile="tasks">
+            <div class="workspace">
                 <div class="tasks-window" role="dialog" aria-label="Tasks">
                     <div class="tasks-window-header">
                         <span class="traffic">
@@ -92,49 +143,62 @@
                     </div>
 
                     <div class="tasks-window-body">
-                        <h1 class="tasks-hello">Welcome back {{ strtok((string) ($founder->full_name ?? 'Founder'), ' ') }},</h1>
-                        <p class="tasks-sub">Here's what's on for you for this week:</p>
-                        <div class="tasks-section-label">Tasks</div>
-
-                        @forelse($taskEntries as $task)
-                            <article class="task-card">
-                                <div class="task-meta">
-                                    <span class="task-meta-label">{{ strtoupper($task['label'] ?? 'Milestone') }}</span>
-                                    @if(!empty($task['due']))
-                                        <span class="task-meta-dot">·</span>
-                                        <span class="task-meta-due">{{ strtoupper($task['due']) }}</span>
-                                    @endif
-                                </div>
-                                <div class="task-body">
-                                    <div>
-                                        @if(!empty($task['completed']))
-                                            <h3 class="task-title task-title-done">
-                                                <span class="task-check">✓</span>
-                                                <span class="task-strike">{{ $task['title'] ?? 'Task' }}</span>
-                                            </h3>
-                                        @else
-                                            <h3 class="task-title">{{ $task['title'] ?? 'Task' }}</h3>
-                                        @endif
-                                        <p class="task-desc">{{ $task['description'] ?? 'Continue this task from your founder workspace.' }}</p>
-                                    </div>
-                                    @if(empty($task['completed']))
-                                        <a class="task-cta" href="{{ route('dashboard') }}">
-                                            <span class="task-cta-spark">✦</span>
-                                            <span>{{ !empty($task['mentor_name']) ? 'Continue with AI' : 'Open in OS' }}</span>
-                                        </a>
-                                    @endif
-                                </div>
-                            </article>
-                        @empty
-                            <div class="empty-state">
+                        @if (!$hasProject)
+                            <div class="empty-card">
+                                <div class="empty-label">Tasks</div>
                                 <h2>No tasks yet</h2>
-                                <p>Start a new project and we’ll generate your launch plan here.</p>
+                                <p>For us to generate a launch plan tailored to your business, you have to tell us more about your project.</p>
+                                <a class="new-project-btn" href="{{ route('dashboard') }}">
+                                    <span class="plus">+</span>
+                                    <span>New Project</span>
+                                </a>
                             </div>
-                        @endforelse
+                        @else
+                            <div class="tasks-stage">
+                                <h1 class="tasks-hello">Welcome back {{ strtok((string) ($founder->full_name ?? 'Founder'), ' ') }},</h1>
+                                <p class="tasks-sub">Here's what's on for you for this week:</p>
+                                <div class="tasks-section-label">Tasks</div>
+
+                                @forelse($taskEntries as $task)
+                                    <article class="task-card">
+                                        <div class="task-meta">
+                                            <span class="task-meta-label">{{ strtoupper($task['label'] ?? 'Milestone') }}</span>
+                                            @if(!empty($task['due']))
+                                                <span class="task-meta-dot">·</span>
+                                                <span class="task-meta-due">{{ strtoupper($task['due']) }}</span>
+                                            @endif
+                                        </div>
+                                        <div class="task-body">
+                                            <div>
+                                                @if(!empty($task['completed']))
+                                                    <h3 class="task-title task-title-done">
+                                                        <span class="task-check">✓</span>
+                                                        <span class="task-strike">{{ $task['title'] ?? 'Task' }}</span>
+                                                    </h3>
+                                                @else
+                                                    <h3 class="task-title">{{ $task['title'] ?? 'Task' }}</h3>
+                                                @endif
+                                                <p class="task-desc">{{ $task['description'] ?? 'Continue this task from your founder workspace.' }}</p>
+                                            </div>
+                                            @if(empty($task['completed']))
+                                                <a class="task-cta" href="{{ route('dashboard') }}">
+                                                    <span class="task-cta-spark">✦</span>
+                                                    <span>{{ !empty($task['mentor_name']) ? 'Continue with AI' : 'Open in OS' }}</span>
+                                                </a>
+                                            @endif
+                                        </div>
+                                    </article>
+                                @empty
+                                    <div class="empty-state">
+                                        <h2>No tasks yet</h2>
+                                        <p>Start a new project and we’ll generate your launch plan here.</p>
+                                    </div>
+                                @endforelse
+                            </div>
+                        @endif
                     </div>
                 </div>
-                </div>
-            @endif
-        </div>
-    </x-os.prototype-shell>
+            </div>
+        </x-os.prototype-shell>
+    @endif
 @endsection

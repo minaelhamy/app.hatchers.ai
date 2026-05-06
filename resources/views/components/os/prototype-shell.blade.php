@@ -18,6 +18,18 @@
     $statusLabel = $statusText ?: now()->format('D, M j g:i A');
     $windowApps = [
         [
+            'key' => 'tasks',
+            'label' => 'Tasks',
+            'description' => 'Step-by-step execution and priorities',
+            'url' => route('founder.tasks', ['os_embed' => 1]),
+        ],
+        [
+            'key' => 'inbox',
+            'label' => 'Inbox',
+            'description' => 'Notifications, replies, and OS updates',
+            'url' => route('founder.inbox', ['os_embed' => 1]),
+        ],
+        [
             'key' => 'account-settings',
             'label' => 'Account Settings',
             'description' => 'Username, password, and profile photo',
@@ -50,13 +62,13 @@
         [
             'key' => 'campaign-studio',
             'label' => 'Campaign Studio',
-            'description' => 'Marketing plans and campaign execution',
-            'url' => route('founder.marketing'),
+            'description' => 'Atlas campaign planning and creative execution',
+            'url' => route('founder.ai-tools.open', ['target' => '/campaign-studio', 'title' => 'Campaign Studio']),
         ],
         [
-            'key' => 'website-workspace',
-            'label' => 'Website Workspace',
-            'description' => 'Website build and publishing controls',
+            'key' => 'build-my-website',
+            'label' => 'Build My Website',
+            'description' => 'Website build, review, and publishing controls',
             'url' => route('website'),
         ],
     ];
@@ -345,7 +357,7 @@
             @endif
         </div>
         <div class="rail-bottom">
-            <a href="{{ route('founder.inbox') }}" class="rail-icon" aria-label="Inbox">{!! $icons['inbox'] !!}</a>
+            <button type="button" class="rail-icon" aria-label="Inbox" data-open-app="inbox">{!! $icons['inbox'] !!}</button>
             <details class="rail-profile">
                 <summary class="rail-profile-toggle" aria-label="Open account menu">
                     <span class="rail-avatar">
@@ -456,14 +468,14 @@
 
         <div class="content">
             <div class="tile-rail">
-                <a class="{{ $tileClass($activeTile, 'tasks') }}" href="{{ route('founder.tasks') }}">
+                <button class="{{ $tileClass($activeTile, 'tasks') }}" type="button" data-open-app="tasks" style="border:0;background:transparent;padding:0;">
                     <div class="tile-art purple">{!! $icons['list'] !!}</div>
                     <div class="tile-label">Tasks</div>
-                </a>
-                <a class="{{ $tileClass($activeTile, 'inbox') }}" href="{{ route('founder.inbox') }}">
+                </button>
+                <button class="{{ $tileClass($activeTile, 'inbox') }}" type="button" data-open-app="inbox" style="border:0;background:transparent;padding:0;">
                     <div class="tile-art grey">{!! $icons['inbox'] !!}</div>
                     <div class="tile-label">Inbox</div>
-                </a>
+                </button>
                 @if($aiToolsMode === 'overlay')
                     <button class="{{ $tileClass($activeTile, 'ai-tools') }}" type="button" id="openToolsBtn" style="border:0;background:transparent;padding:0;">
                         <div class="tile-art grey">{!! $icons['sparkles'] !!}</div>

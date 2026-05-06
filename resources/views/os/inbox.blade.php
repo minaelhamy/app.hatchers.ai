@@ -6,6 +6,7 @@
 @php
     $workspace = $dashboard['workspace'] ?? [];
     $founder = $dashboard['founder'] ?? auth()->user();
+    $osEmbedMode = request()->boolean('os_embed');
 @endphp
 
 @section('head')
@@ -63,12 +64,17 @@
             font-weight:400;
             white-space:nowrap;
         }
+        .inbox-embed {
+            padding: 24px;
+            background: #fff;
+            min-height: 100%;
+        }
     </style>
 @endsection
 
 @section('content')
-    <x-os.prototype-shell :founder="$founder" :workspace="$workspace" active-tile="inbox">
-        <div class="workspace">
+    @if ($osEmbedMode)
+        <div class="inbox-embed">
             <div class="inbox-stage">
                 <div class="inbox-heading">
                     <span class="inbox-heading-dot"></span>
@@ -81,5 +87,21 @@
                 </div>
             </div>
         </div>
-    </x-os.prototype-shell>
+    @else
+        <x-os.prototype-shell :founder="$founder" :workspace="$workspace" active-tile="inbox">
+            <div class="workspace">
+                <div class="inbox-stage">
+                    <div class="inbox-heading">
+                        <span class="inbox-heading-dot"></span>
+                        <span>Inbox</span>
+                    </div>
+                    <div class="inbox-divider"></div>
+                    <div class="inbox-empty">
+                        <h2>Inbox zero</h2>
+                        <p>Replies, notifications, and Atlas updates will land here.</p>
+                    </div>
+                </div>
+            </div>
+        </x-os.prototype-shell>
+    @endif
 @endsection
