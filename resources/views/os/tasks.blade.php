@@ -31,6 +31,37 @@
         .empty-label { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.08em; color:var(--text-muted); margin-bottom:8px; }
         .empty-card h2 { margin:0 0 10px; font-size:18px; font-weight:600; color:var(--text); }
         .empty-card p { margin:0 0 18px; font-size:13px; color:var(--text-muted); line-height:1.55; }
+        .tasks-stage {
+            width:100%;
+            max-width:1240px;
+            margin:0 auto;
+        }
+        .tasks-window {
+            width:min(920px, calc(100% - 80px));
+            margin:36px auto 0;
+            background:var(--surface);
+            border:0.5px solid var(--border);
+            border-radius:18px;
+            box-shadow:0 8px 24px rgba(30,24,16,0.08), 0 1px 2px rgba(30,24,16,0.06);
+            overflow:hidden;
+        }
+        .tasks-window-header {
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            position:relative;
+            padding:14px 20px;
+            border-bottom:0.5px solid var(--hairline);
+            background:var(--surface);
+        }
+        .tasks-window-title {
+            font-size:11px;
+            font-weight:600;
+            letter-spacing:.10em;
+            text-transform:uppercase;
+            color:var(--text-muted);
+        }
+        .tasks-window-body { padding:28px 28px 30px; }
         @media (max-width: 980px) { .tasks-hello { font-size:36px; } .task-body { flex-direction:column; } }
     </style>
 @endsection
@@ -49,17 +80,18 @@
                     </a>
                 </div>
             @else
-                <div class="workspace-window" role="dialog" aria-label="Tasks">
-                    <div class="workspace-window-header">
+                <div class="tasks-stage">
+                <div class="tasks-window" role="dialog" aria-label="Tasks">
+                    <div class="tasks-window-header">
                         <span class="traffic">
                             <span class="red"></span>
                             <span class="yellow"></span>
                             <span class="green"></span>
                         </span>
-                        <span class="workspace-window-title">TASKS</span>
+                        <span class="tasks-window-title">TASKS</span>
                     </div>
 
-                    <div class="workspace-window-body">
+                    <div class="tasks-window-body">
                         <h1 class="tasks-hello">Welcome back {{ strtok((string) ($founder->full_name ?? 'Founder'), ' ') }},</h1>
                         <p class="tasks-sub">Here's what's on for you for this week:</p>
                         <div class="tasks-section-label">Tasks</div>
@@ -100,6 +132,7 @@
                             </div>
                         @endforelse
                     </div>
+                </div>
                 </div>
             @endif
         </div>

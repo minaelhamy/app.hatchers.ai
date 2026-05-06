@@ -1180,124 +1180,19 @@
 @endsection
 
 @section('content')
-    <div class="prototype-app"
-         id="guidebookShell"
-         data-onboarding-needed="{{ $chatNeedsOnboarding ? '1' : '0' }}"
-         data-onboarding-endpoint="{{ route('assistant.chat.onboarding-complete') }}"
-         data-reset-endpoint="{{ route('assistant.chat.reset') }}"
-         data-assistant-endpoint="{{ route('assistant.chat') }}">
-
-        <aside class="rail" id="leftRail">
-            <div class="rail-top">
-                <button type="button" class="rail-icon" id="openSidebarBtn" aria-label="Open sidebar">▥</button>
-                <a href="{{ route('founder.settings') }}" class="rail-icon" aria-label="Settings">⚙</a>
-                <button type="button" class="rail-icon rail-add" id="railAiToolsBtn" aria-label="New Agent">
-                    ＋
-                    <span class="rail-tooltip">New Agent</span>
-                </button>
-            </div>
-            <div class="rail-bottom">
-                <a href="{{ route('founder.inbox') }}" class="rail-icon" aria-label="Inbox">✉</a>
-                <span class="rail-avatar" aria-label="Profile">{{ strtoupper(substr((string) ($founder->full_name ?? 'J'), 0, 1)) }}</span>
-            </div>
-        </aside>
-
-        <aside class="sidepane" id="sidepane">
-            <div class="sidepane-head">
-                <button type="button" class="sidepane-close" id="closeSidebarBtn" aria-label="Collapse sidebar">▥</button>
-            </div>
-
-            <div class="sidepane-segment">
-                <button type="button" class="seg-btn">Browse</button>
-                <button type="button" class="seg-btn is-active">Agent <span class="seg-badge">NEW</span></button>
-            </div>
-
-            <a href="{{ route('founder.settings') }}" class="sidepane-row">Customize <span class="seg-badge">NEW</span></a>
-            <button type="button" class="sidepane-row" id="sidepaneNewAgentBtn">＋ New Agent</button>
-
-            <div class="sidepane-search">
-                <span>⌕</span>
-                <input type="text" placeholder="Search chats…">
-            </div>
-
-            <div class="sidepane-section-label">Recent</div>
-            <div class="sidepane-recent">
-                @foreach($recentTaskLabels as $label)
-                    <button type="button" class="sidepane-recent-item">{{ $label }}</button>
-                @endforeach
-                @foreach($recentNotificationLabels as $label)
-                    <button type="button" class="sidepane-recent-item">{{ $label }}</button>
-                @endforeach
-                @if(empty($recentTaskLabels) && empty($recentNotificationLabels))
-                    <button type="button" class="sidepane-recent-item">{{ $projectName }}</button>
-                @endif
-            </div>
-
-            <div class="sidepane-spacer"></div>
-
-            <div class="sidepane-upgrade">
-                <div>
-                    <div class="sidepane-upgrade-title">Upgrade</div>
-                    <div class="sidepane-upgrade-sub">Unlock unlimited generations</div>
-                </div>
-                <span class="sidepane-upgrade-icon">✦</span>
-            </div>
-
-            <a href="{{ route('founder.notifications') }}" class="sidepane-row sidepane-news">What's new <span class="sidepane-news-dot"></span></a>
-
-            <div class="sidepane-user">
-                <span class="rail-avatar">{{ strtoupper(substr((string) ($founder->full_name ?? 'J'), 0, 1)) }}</span>
-                <div class="sidepane-user-info">
-                    <div class="sidepane-user-name">{{ $founder->full_name }}</div>
-                    <div class="sidepane-user-email">{{ $founder->email }}</div>
-                </div>
-                <span>⇅</span>
-            </div>
-        </aside>
-
-        <div class="main">
-            <div class="topbar">
-                <a href="{{ route('dashboard') }}" class="brand">
-                    <span class="brand-mark"></span>
-                    <span>Hatchers AI OS</span>
-                </a>
-
-                <div class="search">
-                    <span class="search-dot"></span>
-                    <input type="text" placeholder="What would you like to do?">
-                    <span class="search-kbd">⌘K</span>
-                </div>
-
-                <div class="topbar-right">
-                    <a href="{{ route('founder.notifications') }}" class="status-pill">
-                        <span class="bell-wrap">
-                            <span>🔔</span>
-                            @if(!empty($workspace['unread_notification_count']))
-                                <span class="bell-badge">{{ $workspace['unread_notification_count'] }}</span>
-                            @endif
-                        </span>
-                        <span>{{ now()->format('D, M j g:i A') }}</span>
-                    </a>
-                </div>
-            </div>
-
-            <div class="content">
-                <div class="tile-rail">
-                    <a class="tile" href="{{ route('founder.tasks') }}">
-                        <div class="tile-art purple">☷</div>
-                        <div class="tile-label">Tasks</div>
-                    </a>
-                    <a class="tile" href="{{ route('founder.inbox') }}">
-                        <div class="tile-art grey">⌂</div>
-                        <div class="tile-label">Inbox</div>
-                    </a>
-                    <button class="tile" type="button" id="openToolsBtn" style="border:0;background:transparent;padding:0;">
-                        <div class="tile-art grey">✦</div>
-                        <div class="tile-label">AI Tools</div>
-                    </button>
-                </div>
-
-                <div class="workspace">
+    <x-os.prototype-shell
+        id="guidebookShell"
+        :founder="$founder"
+        :workspace="$workspace"
+        :show-sidepane="true"
+        ai-tools-mode="overlay"
+        :recent-items="array_merge($recentTaskLabels, $recentNotificationLabels, empty($recentTaskLabels) && empty($recentNotificationLabels) ? [$projectName] : [])"
+        data-onboarding-needed="{{ $chatNeedsOnboarding ? '1' : '0' }}"
+        data-onboarding-endpoint="{{ route('assistant.chat.onboarding-complete') }}"
+        data-reset-endpoint="{{ route('assistant.chat.reset') }}"
+        data-assistant-endpoint="{{ route('assistant.chat') }}"
+    >
+        <div class="workspace">
                     <div class="workspace-header">
                         <button class="new-project-btn" id="newProjectBtn" type="button">
                             <span class="plus">+</span>
@@ -1384,29 +1279,29 @@
                             </div>
                         </div>
                     </aside>
-                </div>
-            </div>
         </div>
 
-        <div class="agent-overlay" id="toolsPanel">
-            <div class="agent-panel">
-                <button class="agent-close" type="button" aria-label="Close" id="closeToolsBtn">×</button>
-                <h1 class="agent-heading">
-                    <span class="agent-orb"></span>
-                    <span>What are we achieving today?</span>
-                </h1>
-                <div class="agent-composer">
-                    <div class="agent-composer-prompt">How can we help you today?</div>
-                    <button class="agent-composer-add" type="button" aria-label="Add">＋</button>
-                </div>
-                <div class="agent-actions">
-                    @foreach($toolLinks as $tool)
-                        <a href="{{ $tool['href'] }}" class="agent-chip">{{ $tool['label'] }}</a>
-                    @endforeach
+        <x-slot:afterMain>
+            <div class="agent-overlay" id="toolsPanel">
+                <div class="agent-panel">
+                    <button class="agent-close" type="button" aria-label="Close" id="closeToolsBtn">×</button>
+                    <h1 class="agent-heading">
+                        <span class="agent-orb"></span>
+                        <span>What are we achieving today?</span>
+                    </h1>
+                    <div class="agent-composer">
+                        <div class="agent-composer-prompt">How can we help you today?</div>
+                        <button class="agent-composer-add" type="button" aria-label="Add">＋</button>
+                    </div>
+                    <div class="agent-actions">
+                        @foreach($toolLinks as $tool)
+                            <a href="{{ $tool['href'] }}" class="agent-chip">{{ $tool['label'] }}</a>
+                        @endforeach
+                    </div>
                 </div>
             </div>
-        </div>
-    </div>
+        </x-slot:afterMain>
+    </x-os.prototype-shell>
 @endsection
 
 @section('scripts')

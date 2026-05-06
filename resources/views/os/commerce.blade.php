@@ -31,31 +31,8 @@
 @endsection
 
 @section('content')
-    <div class="prototype-app">
-        <aside class="rail">
-            <div class="rail-top">
-                <a href="{{ route('dashboard') }}" class="rail-icon" aria-label="Dashboard">▥</a>
-                <a href="{{ route('founder.settings') }}" class="rail-icon" aria-label="Settings">⚙</a>
-                <a href="{{ route('founder.ai-tools') }}" class="rail-icon rail-add" aria-label="New Agent">＋<span class="rail-tooltip">New Agent</span></a>
-            </div>
-            <div class="rail-bottom">
-                <a href="{{ route('founder.inbox') }}" class="rail-icon" aria-label="Inbox">✉</a>
-                <span class="rail-avatar">{{ strtoupper(substr((string) ($founder->full_name ?? 'J'), 0, 1)) }}</span>
-            </div>
-        </aside>
-        <div class="main">
-            <div class="topbar">
-                <a href="{{ route('dashboard') }}" class="brand"><span class="brand-mark"></span><span>Hatchers AI OS</span></a>
-                <div class="search"><span class="search-dot"></span><input type="text" placeholder="What would you like to do?"><span class="search-kbd">⌘K</span></div>
-                <a href="{{ route('founder.notifications') }}" class="status-pill"><span>🔔</span><span>{{ now()->format('D, M j g:i A') }}</span></a>
-            </div>
-            <div class="content">
-                <div class="tile-rail">
-                    <a class="tile" href="{{ route('founder.tasks') }}"><div class="tile-art purple">☷</div><div class="tile-label">Tasks</div></a>
-                    <a class="tile" href="{{ route('founder.inbox') }}"><div class="tile-art grey">⌂</div><div class="tile-label">Inbox</div></a>
-                    <a class="tile" href="{{ route('founder.ai-tools') }}"><div class="tile-art grey">✦</div><div class="tile-label">AI Tools</div></a>
-                </div>
-                <div class="workspace">
+    <x-os.prototype-shell :founder="$founder" active-tile="ai-tools">
+        <div class="workspace">
                     <div class="panel">
                         <div class="panel-header"><span class="traffic"><span class="red"></span><span class="yellow"></span><span class="green"></span></span><span class="panel-title">COMMERCE</span></div>
                         <div class="panel-body">
@@ -122,8 +99,6 @@
                             @endif
                         </div>
                     </div>
-                </div>
-            </div>
         </div>
-    </div>
+    </x-os.prototype-shell>
 @endsection

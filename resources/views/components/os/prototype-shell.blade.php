@@ -5,6 +5,9 @@
     'searchPlaceholder' => 'What would you like to do?',
     'statusText' => null,
     'showAiToolsButton' => true,
+    'showSidepane' => false,
+    'recentItems' => [],
+    'aiToolsMode' => 'link',
 ])
 
 @php
@@ -12,6 +15,17 @@
     $founderInitial = strtoupper(substr($founderName !== '' ? $founderName : 'F', 0, 1));
     $unreadCount = (int) ($workspace['unread_notification_count'] ?? 0);
     $statusLabel = $statusText ?: now()->format('D, M j g:i A');
+    $icons = [
+        'panel-left' => '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 5.5A2.5 2.5 0 0 1 5.5 3h13A2.5 2.5 0 0 1 21 5.5v13a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 18.5z"/><path d="M9 3v18"/></svg>',
+        'settings' => '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 15.5A3.5 3.5 0 1 0 12 8.5a3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1 1 0 0 0 .2 1.1l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1 1 0 0 0-1.1-.2 1 1 0 0 0-.6.9V20a2 2 0 1 1-4 0v-.1a1 1 0 0 0-.6-.9 1 1 0 0 0-1.1.2l-.1.1a2 2 0 0 1-2.8-2.8l.1-.1a1 1 0 0 0 .2-1.1 1 1 0 0 0-.9-.6H4a2 2 0 1 1 0-4h.1a1 1 0 0 0 .9-.6 1 1 0 0 0-.2-1.1l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1 1 0 0 0 1.1.2 1 1 0 0 0 .6-.9V4a2 2 0 1 1 4 0v.1a1 1 0 0 0 .6.9 1 1 0 0 0 1.1-.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1 1 0 0 0-.2 1.1 1 1 0 0 0 .9.6H20a2 2 0 1 1 0 4h-.1a1 1 0 0 0-.9.6Z"/></svg>',
+        'plus' => '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',
+        'inbox' => '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M22 12h-4l-2 3H8l-2-3H2"/><path d="M5.5 20.5h13a2 2 0 0 0 2-2v-11a2 2 0 0 0-2-2h-13a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2Z"/></svg>',
+        'search' => '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="6"/></svg>',
+        'list' => '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></svg>',
+        'sparkles' => '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9.5 4.5 11 8l3.5 1.5L11 11l-1.5 3.5L8 11l-3.5-1.5L8 8zM18 11l.8 2.2L21 14l-2.2.8L18 17l-.8-2.2L15 14l2.2-.8zM16 3l.5 1.5L18 5l-1.5.5L16 7l-.5-1.5L14 5l1.5-.5z"/></svg>',
+        'bell' => '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M10.3 21a1.7 1.7 0 0 0 3.4 0"/><path d="M4.8 17.5h14.4a1 1 0 0 0 .8-1.6l-1.7-2.3a1 1 0 0 1-.2-.6V10a6 6 0 1 0-12 0v3a1 1 0 0 1-.2.6l-1.7 2.3a1 1 0 0 0 .8 1.6Z"/></svg>',
+        'chevrons-up-down' => '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m7 15 5 5 5-5M7 9l5-5 5 5"/></svg>',
+    ];
     $tileClass = static function (?string $tile, string $name): string {
         return $tile === $name ? 'tile is-active' : 'tile';
     };
@@ -49,8 +63,9 @@
         .prototype-app { background: var(--bg); display: grid; grid-template-columns: auto 1fr; min-height: 100vh; position: relative; }
         .rail { width: 56px; border-right: 0.5px solid var(--hairline); padding: 14px 0; display: flex; flex-direction: column; align-items: center; justify-content: space-between; background: var(--bg); }
         .rail-top, .rail-bottom { display: flex; flex-direction: column; align-items: center; gap: 16px; }
-        .rail-icon { width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; color: #6B6660; cursor: pointer; border-radius: 6px; background: transparent; border: 0; padding: 0; position: relative; text-decoration: none; font-size: 16px; }
+        .rail-icon { width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; color: #6B6660; cursor: pointer; border-radius: 6px; background: transparent; border: 0; padding: 0; position: relative; text-decoration: none; }
         .rail-icon:hover { color: var(--text); background: var(--surface-2); }
+        .rail-icon svg, .tile-art svg, .status-pill svg, .sidepane-search svg, .sidepane-user-caret svg, .sidepane-upgrade-icon svg { width: 18px; height: 18px; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
         .rail-add { background: #ECE6FA; color: #5B45C9; border: 0.5px solid #C9BCF0; }
         .rail-tooltip { position: absolute; left: calc(100% + 10px); top: 50%; transform: translateY(-50%); background: #fff; border: 0.5px solid var(--border); border-radius: 8px; padding: 5px 10px; font-size: 12px; color: var(--text); white-space: nowrap; box-shadow: var(--shadow-md); opacity: 0; pointer-events: none; transition: opacity .12s ease; }
         .rail-add:hover .rail-tooltip { opacity: 1; }
@@ -71,7 +86,8 @@
         .content { flex: 1; display: grid; grid-template-columns: 140px 1fr; min-height: 0; position: relative; }
         .tile-rail { padding: 24px 16px; display: flex; flex-direction: column; gap: 24px; align-items: center; }
         .tile { width: 92px; display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer; text-decoration: none; color: inherit; }
-        .tile-art { width: 88px; height: 88px; border-radius: 18px; display: flex; align-items: center; justify-content: center; color: #fff; box-shadow: inset 0 1px 0 rgba(255,255,255,0.35), inset 0 -10px 24px rgba(0,0,0,0.12), 0 1px 2px rgba(30,24,16,0.08); position: relative; overflow: hidden; font-size: 28px; }
+        .tile-art { width: 88px; height: 88px; border-radius: 18px; display: flex; align-items: center; justify-content: center; color: #fff; box-shadow: inset 0 1px 0 rgba(255,255,255,0.35), inset 0 -10px 24px rgba(0,0,0,0.12), 0 1px 2px rgba(30,24,16,0.08); position: relative; overflow: hidden; }
+        .tile-art svg { width: 28px; height: 28px; stroke-width: 1.8; position: relative; z-index: 1; }
         .tile-art::after { content: ""; position: absolute; inset: 0; background: linear-gradient(160deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0) 45%, rgba(0,0,0,0.10) 100%); pointer-events: none; }
         .tile-art.purple { background: linear-gradient(160deg, var(--tile-purple) 0%, var(--tile-purple-2) 100%); }
         .tile-art.grey { background: linear-gradient(160deg, var(--tile-grey) 0%, var(--tile-grey-2) 100%); }
@@ -102,6 +118,7 @@
         .traffic .green { background:#62C554; }
         .workspace-window-title { font-size:11px; font-weight:600; letter-spacing:0.10em; text-transform:uppercase; color:var(--text-muted); }
         .workspace-window-body { padding:28px 28px 30px; }
+        .sidepane-user-caret, .sidepane-upgrade-icon { display:inline-flex; align-items:center; justify-content:center; }
         @media (max-width: 980px) {
             .content { grid-template-columns: 1fr; }
             .tile-rail { flex-direction: row; justify-content: center; padding: 20px; }
@@ -111,20 +128,79 @@
     </style>
 @endonce
 
-<div class="prototype-app">
-    <aside class="rail">
+<div {{ $attributes->merge(['class' => 'prototype-app']) }}>
+    <aside class="rail" id="leftRail">
         <div class="rail-top">
-            <a href="{{ route('dashboard') }}" class="rail-icon" aria-label="Dashboard">▥</a>
-            <a href="{{ route('founder.settings') }}" class="rail-icon" aria-label="Settings">⚙</a>
+            @if($showSidepane)
+                <button type="button" class="rail-icon" id="openSidebarBtn" aria-label="Open sidebar">{!! $icons['panel-left'] !!}</button>
+            @else
+                <a href="{{ route('dashboard') }}" class="rail-icon" aria-label="Dashboard">{!! $icons['panel-left'] !!}</a>
+            @endif
+            <a href="{{ route('founder.settings') }}" class="rail-icon" aria-label="Settings">{!! $icons['settings'] !!}</a>
             @if($showAiToolsButton)
-                <a href="{{ route('founder.ai-tools') }}" class="rail-icon rail-add" aria-label="New Agent">＋<span class="rail-tooltip">New Agent</span></a>
+                @if($aiToolsMode === 'overlay')
+                    <button type="button" class="rail-icon rail-add" id="railAiToolsBtn" aria-label="New Agent">{!! $icons['plus'] !!}<span class="rail-tooltip">New Agent</span></button>
+                @else
+                    <a href="{{ route('founder.ai-tools') }}" class="rail-icon rail-add" aria-label="New Agent">{!! $icons['plus'] !!}<span class="rail-tooltip">New Agent</span></a>
+                @endif
             @endif
         </div>
         <div class="rail-bottom">
-            <a href="{{ route('founder.inbox') }}" class="rail-icon" aria-label="Inbox">✉</a>
+            <a href="{{ route('founder.inbox') }}" class="rail-icon" aria-label="Inbox">{!! $icons['inbox'] !!}</a>
             <span class="rail-avatar">{{ $founderInitial }}</span>
         </div>
     </aside>
+
+    @if($showSidepane)
+        <aside class="sidepane" id="sidepane">
+            <div class="sidepane-head">
+                <button type="button" class="sidepane-close" id="closeSidebarBtn" aria-label="Collapse sidebar">{!! $icons['panel-left'] !!}</button>
+            </div>
+
+            <div class="sidepane-segment">
+                <button type="button" class="seg-btn">Browse</button>
+                <button type="button" class="seg-btn is-active">Agent <span class="seg-badge">NEW</span></button>
+            </div>
+
+            <a href="{{ route('founder.settings') }}" class="sidepane-row">Customize <span class="seg-badge">NEW</span></a>
+            <button type="button" class="sidepane-row" id="sidepaneNewAgentBtn">{!! $icons['plus'] !!} New Agent</button>
+
+            <div class="sidepane-search">
+                <span>{!! $icons['search'] !!}</span>
+                <input type="text" placeholder="Search chats…">
+            </div>
+
+            <div class="sidepane-section-label">Recent</div>
+            <div class="sidepane-recent">
+                @forelse($recentItems as $recentItem)
+                    <button type="button" class="sidepane-recent-item">{{ $recentItem }}</button>
+                @empty
+                    <button type="button" class="sidepane-recent-item">{{ $founderName }}</button>
+                @endforelse
+            </div>
+
+            <div class="sidepane-spacer"></div>
+
+            <div class="sidepane-upgrade">
+                <div>
+                    <div class="sidepane-upgrade-title">Upgrade</div>
+                    <div class="sidepane-upgrade-sub">Unlock unlimited generations</div>
+                </div>
+                <span class="sidepane-upgrade-icon">{!! $icons['sparkles'] !!}</span>
+            </div>
+
+            <a href="{{ route('founder.notifications') }}" class="sidepane-row sidepane-news">What's new <span class="sidepane-news-dot"></span></a>
+
+            <div class="sidepane-user">
+                <span class="rail-avatar">{{ $founderInitial }}</span>
+                <div class="sidepane-user-info">
+                    <div class="sidepane-user-name">{{ $founderName }}</div>
+                    <div class="sidepane-user-email">{{ $founder->email ?? '' }}</div>
+                </div>
+                <span class="sidepane-user-caret">{!! $icons['chevrons-up-down'] !!}</span>
+            </div>
+        </aside>
+    @endif
 
     <div class="main">
         <div class="topbar">
@@ -142,7 +218,7 @@
             <div class="topbar-right">
                 <a href="{{ route('founder.notifications') }}" class="status-pill">
                     <span class="bell-wrap">
-                        <span>🔔</span>
+                        {!! $icons['bell'] !!}
                         @if($unreadCount > 0)
                             <span class="bell-badge">{{ $unreadCount }}</span>
                         @endif
@@ -155,20 +231,31 @@
         <div class="content">
             <div class="tile-rail">
                 <a class="{{ $tileClass($activeTile, 'tasks') }}" href="{{ route('founder.tasks') }}">
-                    <div class="tile-art purple">☷</div>
+                    <div class="tile-art purple">{!! $icons['list'] !!}</div>
                     <div class="tile-label">Tasks</div>
                 </a>
                 <a class="{{ $tileClass($activeTile, 'inbox') }}" href="{{ route('founder.inbox') }}">
-                    <div class="tile-art grey">⌂</div>
+                    <div class="tile-art grey">{!! $icons['inbox'] !!}</div>
                     <div class="tile-label">Inbox</div>
                 </a>
-                <a class="{{ $tileClass($activeTile, 'ai-tools') }}" href="{{ route('founder.ai-tools') }}">
-                    <div class="tile-art grey">✦</div>
-                    <div class="tile-label">AI Tools</div>
-                </a>
+                @if($aiToolsMode === 'overlay')
+                    <button class="{{ $tileClass($activeTile, 'ai-tools') }}" type="button" id="openToolsBtn" style="border:0;background:transparent;padding:0;">
+                        <div class="tile-art grey">{!! $icons['sparkles'] !!}</div>
+                        <div class="tile-label">AI Tools</div>
+                    </button>
+                @else
+                    <a class="{{ $tileClass($activeTile, 'ai-tools') }}" href="{{ route('founder.ai-tools') }}">
+                        <div class="tile-art grey">{!! $icons['sparkles'] !!}</div>
+                        <div class="tile-label">AI Tools</div>
+                    </a>
+                @endif
             </div>
 
             {{ $slot }}
         </div>
     </div>
+
+    @isset($afterMain)
+        {{ $afterMain }}
+    @endisset
 </div>
