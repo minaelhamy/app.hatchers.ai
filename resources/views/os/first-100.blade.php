@@ -1,10 +1,11 @@
 @extends('os.layout')
 
-@section('page_class', 'lead-tracker-page')
+@section('page_class', request()->boolean('os_embed') ? 'lead-tracker-page tracker-embed-page' : 'lead-tracker-page')
 
 @section('head')
     <style>
         .page.lead-tracker-page { padding: 30px 32px 48px; }
+        .tracker-embed-page { padding: 0; background: var(--surface); }
         .tracker-shell { max-width:1240px; margin:0 auto; display:grid; grid-template-columns:minmax(0,1fr) 280px; gap:18px; align-items:start; }
         .tracker-main { min-width:0; }
         .tracker-main-inner { max-width:none; }
@@ -50,6 +51,7 @@
 @section('content')
     @php
         $founder = $dashboard['founder'];
+        $osEmbedMode = request()->boolean('os_embed');
         $summary = $tracker['summary'];
         $metrics = $summary['metrics'];
         $dailyPlan = $summary['daily_plan'];
@@ -73,15 +75,15 @@
         ];
     @endphp
 
-    <div class="tracker-shell">
+    <div class="tracker-shell {{ $osEmbedMode ? 'tracker-shell--embed' : '' }}">
         <main class="tracker-main">
             <div class="tracker-main-inner">
                 <h1>Lead Tracker</h1>
                 <p>Track named leads, follow-up, stages, and outreach history here. Use Tasks to decide what to do next.</p>
                 <div class="tracker-mode-nav">
-                    <a class="tracker-mode-tab {{ $trackerMode === 'pipeline' ? 'active' : '' }}" href="{{ route('founder.first-100', array_filter(['mode' => 'pipeline'])) }}">Leads</a>
-                    <a class="tracker-mode-tab {{ $trackerMode === 'scripts' ? 'active' : '' }}" href="{{ route('founder.first-100', array_filter(['mode' => 'scripts'])) }}">Scripts</a>
-                    <a class="tracker-mode-tab {{ $trackerMode === 'offline' ? 'active' : '' }}" href="{{ route('founder.first-100', array_filter(['mode' => 'offline'])) }}">Offline</a>
+                    <a class="tracker-mode-tab {{ $trackerMode === 'pipeline' ? 'active' : '' }}" href="{{ route('founder.first-100', array_filter(['mode' => 'pipeline', 'os_embed' => $osEmbedMode ? 1 : null])) }}">Leads</a>
+                    <a class="tracker-mode-tab {{ $trackerMode === 'scripts' ? 'active' : '' }}" href="{{ route('founder.first-100', array_filter(['mode' => 'scripts', 'os_embed' => $osEmbedMode ? 1 : null])) }}">Scripts</a>
+                    <a class="tracker-mode-tab {{ $trackerMode === 'offline' ? 'active' : '' }}" href="{{ route('founder.first-100', array_filter(['mode' => 'offline', 'os_embed' => $osEmbedMode ? 1 : null])) }}">Offline</a>
                 </div>
                 <div class="tracker-helper">{{ $trackerModeHelp[$trackerMode] }}</div>
 

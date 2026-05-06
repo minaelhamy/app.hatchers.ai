@@ -7,6 +7,7 @@
     $founder = $dashboard['founder'];
     $workspace = $dashboard['workspace'];
     $notificationGroups = $workspace['notification_groups'] ?? ['new' => [], 'earlier' => []];
+    $osEmbedMode = request()->boolean('os_embed');
 @endphp
 
 @section('head')
@@ -44,60 +45,74 @@
         .feed-icon { width:40px; height:40px; border-radius:999px; display:grid; place-items:center; color:#fff; font-weight:700; flex-shrink:0; background:linear-gradient(135deg, #8e1c74, #ff2c35); }
         .feed-title { font-size:16px; font-weight:600; line-height:1.35; }
         .feed-time { color:var(--text-muted); margin-top:4px; font-size:13px; }
+        .notifications-embed {
+            padding: 20px 22px 24px;
+            background: var(--surface);
+            min-height: 100%;
+        }
     </style>
 @endsection
 
 @section('content')
-    <x-os.prototype-shell :founder="$founder" :workspace="$workspace" active-tile="inbox">
-        <div class="workspace">
-            <div class="notifications-stage">
-                <div class="notifications-heading">
-                    <span class="notifications-heading-dot"></span>
-                    <span>Notifications</span>
+    @php ob_start(); @endphp
+    <div class="{{ $osEmbedMode ? 'notifications-embed' : 'workspace' }}">
+        <div class="notifications-stage">
+            <div class="notifications-heading">
+                <span class="notifications-heading-dot"></span>
+                <span>Notifications</span>
+            </div>
+            <div class="notifications-divider"></div>
+            <div class="workspace-window-body" style="padding:0;">
+                <div class="feed-filter">
+                    <span class="feed-pill active">All</span>
+                    <span class="feed-pill">Unread</span>
                 </div>
-                <div class="notifications-divider"></div>
-                <div class="workspace-window-body" style="padding:0;">
-                    <div class="feed-filter">
-                        <span class="feed-pill active">All</span>
-                        <span class="feed-pill">Unread</span>
-                    </div>
 
-                    <div class="section-label">New</div>
-                    <div class="feed-list">
-                        @forelse($notificationGroups['new'] as $notification)
-                            <div class="feed-item">
-                                <div class="feed-icon">{{ strtoupper(substr((string) ($notification['kind'] ?? 'n'), 0, 1)) }}</div>
-                                <div>
-                                    <div class="feed-title">{{ $notification['title'] }}</div>
-                                    <div class="feed-time">{{ $notification['age_label'] }}</div>
-                                </div>
+                <div class="section-label">New</div>
+                <div class="feed-list">
+                    @forelse($notificationGroups['new'] as $notification)
+                        <div class="feed-item">
+                            <div class="feed-icon">{{ strtoupper(substr((string) ($notification['kind'] ?? 'n'), 0, 1)) }}</div>
+                            <div>
+                                <div class="feed-title">{{ $notification['title'] }}</div>
+                                <div class="feed-time">{{ $notification['age_label'] }}</div>
                             </div>
-                        @empty
-                            <div class="empty-state">
-                                <h2>No new notifications right now.</h2>
-                                <p>You’re up to date.</p>
-                            </div>
-                        @endforelse
-                    </div>
-
-                    <div class="section-label">Earlier</div>
-                    <div class="feed-list">
-                        @forelse($notificationGroups['earlier'] as $notification)
-                            <div class="feed-item">
-                                <div class="feed-icon">{{ strtoupper(substr((string) ($notification['kind'] ?? 'n'), 0, 1)) }}</div>
-                                <div>
-                                    <div class="feed-title">{{ $notification['title'] }}</div>
-                                    <div class="feed-time">{{ $notification['age_label'] }}</div>
-                                </div>
-                            </div>
-                        @empty
-                            <div class="empty-state">
-                                <h2>No earlier notifications yet.</h2>
-                                <p>As more OS activity lands, it will appear here.</p>
-                            </div>
-                            @endforelse
                         </div>
+                    @empty
+                        <div class="empty-state">
+                            <h2>No new notifications right now.</h2>
+                            <p>You’re up to date.</p>
+                        </div>
+                    @endforelse
+                </div>
+
+                <div class="section-label">Earlier</div>
+                <div class="feed-list">
+                    @forelse($notificationGroups['earlier'] as $notification)
+                        <div class="feed-item">
+                            <div class="feed-icon">{{ strtoupper(substr((string) ($notification['kind'] ?? 'n'), 0, 1)) }}</div>
+                            <div>
+                                <div class="feed-title">{{ $notification['title'] }}</div>
+                                <div class="feed-time">{{ $notification['age_label'] }}</div>
+                            </div>
+                        </div>
+                    @empty
+                        <div class="empty-state">
+                            <h2>No earlier notifications yet.</h2>
+                            <p>As more OS activity lands, it will appear here.</p>
+                        </div>
+                    @endforelse
+                </div>
             </div>
         </div>
-    </x-os.prototype-shell>
+    </div>
+    @php $notificationsContent = ob_get_clean(); @endphp
+
+    @if ($osEmbedMode)
+        {!! $notificationsContent !!}
+    @else
+        <x-os.prototype-shell :founder="$founder" :workspace="$workspace" active-tile="inbox">
+            {!! $notificationsContent !!}
+        </x-os.prototype-shell>
+    @endif
 @endsection

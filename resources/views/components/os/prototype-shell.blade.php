@@ -36,6 +36,42 @@
             'url' => route('founder.settings', ['step' => 'account', 'os_embed' => 1]),
         ],
         [
+            'key' => 'search',
+            'label' => 'Search',
+            'description' => 'Find tasks, campaigns, offers, and workspace content',
+            'url' => route('founder.search', ['os_embed' => 1]),
+        ],
+        [
+            'key' => 'notifications',
+            'label' => 'Notifications',
+            'description' => 'Unread updates, inbox activity, and OS status changes',
+            'url' => route('founder.notifications', ['os_embed' => 1]),
+        ],
+        [
+            'key' => 'lead-tracker',
+            'label' => 'Lead Tracker',
+            'description' => 'Pipeline, scripts, follow-up queues, and offline lead capture',
+            'url' => route('founder.first-100', ['os_embed' => 1]),
+        ],
+        [
+            'key' => 'marketing',
+            'label' => 'Marketing',
+            'description' => 'Campaign planning, content queue, and publishing direction',
+            'url' => route('founder.marketing', ['os_embed' => 1]),
+        ],
+        [
+            'key' => 'analytics',
+            'label' => 'Analytics',
+            'description' => 'Execution, growth, and channel performance metrics',
+            'url' => route('founder.analytics', ['os_embed' => 1]),
+        ],
+        [
+            'key' => 'commerce',
+            'label' => 'Commerce',
+            'description' => 'Offers, operations, bookings, orders, and wallet overview',
+            'url' => route('founder.commerce', ['os_embed' => 1]),
+        ],
+        [
             'key' => 'servio',
             'label' => 'Servio',
             'description' => 'Website and service operations',
@@ -69,7 +105,7 @@
             'key' => 'build-my-website',
             'label' => 'Build My Website',
             'description' => 'Website build, review, and publishing controls',
-            'url' => route('website'),
+            'url' => route('website', ['os_embed' => 1]),
         ],
     ];
     $icons = [
@@ -421,7 +457,7 @@
                 <span class="sidepane-upgrade-icon">{!! $icons['sparkles'] !!}</span>
             </div>
 
-            <a href="{{ route('founder.notifications') }}" class="sidepane-row sidepane-news">What's new <span class="sidepane-news-dot"></span></a>
+            <button type="button" class="sidepane-row sidepane-news" data-open-app="notifications">What's new <span class="sidepane-news-dot"></span></button>
 
             <div class="sidepane-user">
                 <span class="rail-avatar">
@@ -447,14 +483,14 @@
                 <span>Hatchers AI OS</span>
             </a>
 
-            <div class="search">
+            <div class="search" data-open-app="search" role="button" tabindex="0" aria-label="Open search">
                 <span class="search-dot"></span>
-                <input type="text" placeholder="{{ $searchPlaceholder }}">
+                <input type="text" placeholder="{{ $searchPlaceholder }}" readonly>
                 <span class="search-kbd">⌘K</span>
             </div>
 
             <div class="topbar-right">
-                <a href="{{ route('founder.notifications') }}" class="status-pill">
+                <button type="button" class="status-pill" data-open-app="notifications" style="border:0;">
                     <span class="bell-wrap">
                         {!! $icons['bell'] !!}
                         @if($unreadCount > 0)
@@ -462,7 +498,7 @@
                         @endif
                     </span>
                     <span>{{ $statusLabel }}</span>
-                </a>
+                </button>
             </div>
         </div>
 
@@ -717,6 +753,12 @@
 
         shell.querySelectorAll('[data-open-app]').forEach((button) => {
             button.addEventListener('click', () => openApp(button.getAttribute('data-open-app')));
+            button.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    openApp(button.getAttribute('data-open-app'));
+                }
+            });
         });
 
         document.getElementById('openToolsBtn')?.addEventListener('click', () => openApp('app-launcher'));
