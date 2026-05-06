@@ -1,331 +1,124 @@
 @extends('os.layout')
 
 @section('hide_topbar', '1')
-@section('page_class', 'founder-home-page')
+@section('page_class', 'prototype-dashboard-page')
+
+@php
+    $founder = $dashboard['founder'] ?? auth()->user();
+    $company = $dashboard['company'] ?? null;
+    $workspace = $dashboard['workspace'] ?? [];
+    $toolLinks = [
+        ['label' => 'Tasks', 'href' => route('founder.tasks')],
+        ['label' => 'Inbox', 'href' => route('founder.inbox')],
+        ['label' => 'Website', 'href' => route('website')],
+        ['label' => 'Marketing', 'href' => route('founder.marketing')],
+        ['label' => 'Commerce', 'href' => route('founder.commerce')],
+        ['label' => 'Analytics', 'href' => route('founder.analytics')],
+        ['label' => 'Settings', 'href' => route('founder.settings')],
+        ['label' => 'Media Library', 'href' => route('founder.media-library')],
+    ];
+@endphp
 
 @section('head')
     <style>
-        .page.founder-home-page { padding: 0; }
-        .tools-shell { min-height: 100vh; display:grid; grid-template-columns:220px minmax(0,1fr) 220px; background:#f8f5ee; }
-        .tools-sidebar, .tools-rightbar { background: rgba(255,252,247,0.8); border-color: var(--line); border-style: solid; border-width:0 1px 0 0; min-height:100vh; display:flex; flex-direction:column; }
-        .tools-rightbar { border-width:0 0 0 1px; background: rgba(255,251,246,0.9); }
-        .tools-sidebar-inner, .tools-rightbar-inner { padding:22px 18px; }
-        .tools-brand { display:inline-block; margin-bottom:24px; }
-        .tools-brand img { width:168px; height:auto; display:block; }
-        .tools-nav { display:grid; gap:6px; }
-        .tools-nav-item { display:flex; align-items:center; gap:10px; padding:12px 14px; border-radius:14px; text-decoration:none; color:var(--ink); font-size:0.98rem; }
-        .tools-nav-item.active { background:#ece6db; }
-        .tools-nav-icon { width:18px; text-align:center; color:var(--muted); }
-        .tools-sidebar-footer { margin-top:auto; padding:18px; border-top:1px solid var(--line); display:flex; align-items:center; justify-content:space-between; gap:12px; }
-        .tools-user { display:flex; align-items:center; gap:10px; }
-        .tools-avatar { width:30px; height:30px; border-radius:999px; background:#b0a999; color:#fff; display:grid; place-items:center; font-weight:700; font-size:0.92rem; flex-shrink:0; }
-        .tools-main { padding:26px 28px 24px; }
-        .tools-main-inner { max-width:760px; margin:0 auto; }
-        .tools-main h1 { font-size: clamp(2rem, 3vw, 3rem); letter-spacing:-0.02em; margin-bottom:6px; }
-        .tools-main p { color:var(--muted); margin-bottom:24px; }
-        .tools-section { margin-bottom:22px; }
-        .tools-section h2 { font-size:1.08rem; margin-bottom:12px; }
-        .tools-grid { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:12px; }
-        .tool-card { background: rgba(255,255,255,0.92); border:1px solid rgba(220,207,191,0.65); border-radius:18px; padding:18px 18px 16px; box-shadow:0 10px 28px rgba(52,41,26,0.04); }
-        .tool-card-title { font-size:1rem; font-weight:700; margin-bottom:6px; }
-        .tool-card-copy { color:var(--muted); font-size:0.95rem; line-height:1.45; }
-        .tool-card-row { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
-        .tool-card-icon { width:34px; height:34px; border-radius:10px; border:1px solid rgba(222,60,109,0.24); color:#e02961; display:grid; place-items:center; flex-shrink:0; }
-        .tool-card-cta { display:inline-block; margin-top:14px; padding:10px 14px; border-radius:10px; text-decoration:none; background:linear-gradient(90deg,#8e1c74,#ff2c35); color:white; font-weight:600; }
-        .tool-card-secondary { display:inline-block; margin-top:14px; padding:10px 14px; border-radius:10px; text-decoration:none; background:#f0ece4; color:#5d554a; font-weight:600; }
-        .tools-highlight { background: rgba(255,255,255,0.92); border:1px solid rgba(220,207,191,0.65); border-radius:18px; padding:18px 20px; box-shadow:0 10px 28px rgba(52,41,26,0.04); }
-        .highlight-label { font-size:0.82rem; text-transform:uppercase; letter-spacing:0.06em; color:var(--rose); margin-bottom:8px; }
-        .highlight-copy { color:var(--muted); line-height:1.5; margin-top:4px; }
-        .highlight-badge { display:inline-block; margin-top:12px; padding:8px 14px; border-radius:10px; background:#f0ece4; color:#7a7267; font-size:0.95rem; }
-        .tools-rightbar h3 { font-size:0.83rem; letter-spacing:0.06em; text-transform:uppercase; color:var(--muted); margin-bottom:12px; }
-        .mini-note, .rail-item { background: rgba(255,255,255,0.92); border:1px solid rgba(220,207,191,0.65); border-radius:14px; padding:12px 14px; }
-        .rail-list { display:grid; gap:10px; margin-top:14px; }
-        @media (max-width:1240px) { .tools-shell { grid-template-columns:220px 1fr; } .tools-rightbar { display:none; } }
-        @media (max-width:900px) { .tools-shell { grid-template-columns:1fr; } .tools-sidebar { min-height:auto; border-right:0; border-bottom:1px solid var(--line); } .tools-sidebar-footer { display:none; } .tools-main { padding:20px 16px 24px; } .tools-grid { grid-template-columns:1fr; } }
+        .page.prototype-dashboard-page {
+            --bg: #F9F8F6; --surface: #FBFAF7; --surface-2: #F4F1EC; --border: rgba(30, 24, 16, 0.10); --hairline: rgba(30, 24, 16, 0.08); --text: #1B1A17; --text-muted: #6B6660; --text-subtle: #A39E96; --accent-pink: #F2546B; --tile-purple: #C8B8D6; --tile-purple-2: #A99BBC; --tile-grey: #B8B0A6; --tile-grey-2: #8E867C; --shadow-sm: 0 1px 0 rgba(30,24,16,0.04); --shadow-md: 0 1px 2px rgba(30,24,16,0.06), 0 0 0 0.5px rgba(30,24,16,0.06);
+            min-height: 100vh; padding: 0; background: var(--bg); font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: var(--text);
+        }
+        .page.prototype-dashboard-page * { box-sizing: border-box; }
+        .prototype-app { background: var(--bg); display: grid; grid-template-columns: auto 1fr; min-height: 100vh; }
+        .rail { width:56px; border-right:0.5px solid var(--hairline); padding:14px 0; display:flex; flex-direction:column; align-items:center; justify-content:space-between; background:var(--bg); }
+        .rail-top,.rail-bottom { display:flex; flex-direction:column; align-items:center; gap:16px; }
+        .rail-icon { width:28px; height:28px; display:inline-flex; align-items:center; justify-content:center; color:#6B6660; border-radius:6px; text-decoration:none; background:transparent; font-size:16px; }
+        .rail-icon:hover { color:var(--text); background:var(--surface-2); }
+        .rail-add { background:#ECE6FA; color:#5B45C9; border:0.5px solid #C9BCF0; position:relative; }
+        .rail-tooltip { position:absolute; left:calc(100% + 10px); top:50%; transform:translateY(-50%); background:#fff; border:0.5px solid var(--border); border-radius:8px; padding:5px 10px; font-size:12px; color:var(--text); white-space:nowrap; box-shadow:var(--shadow-md); opacity:0; pointer-events:none; }
+        .rail-add:hover .rail-tooltip { opacity:1; }
+        .rail-avatar { width:28px; height:28px; border-radius:8px; background:linear-gradient(160deg, #7C5BE0, #5B3FC9); color:#fff; font-size:12px; font-weight:600; display:inline-flex; align-items:center; justify-content:center; }
+        .main { display:flex; flex-direction:column; min-width:0; }
+        .topbar { display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:16px; padding:14px 20px; border-bottom:0.5px solid var(--hairline); background:var(--bg); }
+        .brand { display:inline-flex; align-items:center; gap:10px; padding:6px 12px 6px 8px; background:var(--surface); border:0.5px solid var(--border); border-radius:999px; box-shadow:var(--shadow-sm); font-weight:600; font-size:13px; color:var(--text); text-decoration:none; }
+        .brand-mark { width:18px; height:18px; border-radius:5px; background:var(--accent-pink); }
+        .search { display:flex; align-items:center; gap:10px; height:36px; padding:0 14px; background:var(--surface); border:0.5px solid var(--border); border-radius:999px; box-shadow:var(--shadow-sm); max-width:560px; width:100%; justify-self:start; margin-left:4px; }
+        .search-dot { width:6px; height:6px; border-radius:50%; background:#1B1A17; }
+        .search input { flex:1; border:0; outline:0; background:transparent; font:inherit; color:var(--text); font-size:13px; }
+        .search input::placeholder { color:var(--text-subtle); }
+        .search-kbd { font-size:11px; color:var(--text-subtle); border:0.5px solid var(--border); border-radius:6px; padding:2px 7px; line-height:1; }
+        .status-pill { display:inline-flex; align-items:center; gap:10px; padding:6px 14px 6px 10px; background:var(--surface); border:0.5px solid var(--border); border-radius:999px; box-shadow:var(--shadow-sm); font-size:12.5px; color:var(--text); text-decoration:none; }
+        .bell-wrap { position:relative; width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center; }
+        .bell-badge { position:absolute; top:-2px; right:-2px; min-width:14px; height:14px; padding:0 3px; border-radius:999px; background:var(--accent-pink); color:#fff; font-size:9px; font-weight:600; display:inline-flex; align-items:center; justify-content:center; line-height:1; border:1.5px solid var(--surface); }
+        .content { flex:1; display:grid; grid-template-columns:140px 1fr; min-height:0; position:relative; }
+        .tile-rail { padding:24px 16px; display:flex; flex-direction:column; gap:24px; align-items:center; }
+        .tile { width:92px; display:flex; flex-direction:column; align-items:center; gap:8px; text-decoration:none; color:inherit; }
+        .tile-art { width:88px; height:88px; border-radius:18px; display:flex; align-items:center; justify-content:center; color:#fff; box-shadow:inset 0 1px 0 rgba(255,255,255,0.35), inset 0 -10px 24px rgba(0,0,0,0.12), 0 1px 2px rgba(30,24,16,0.08); position:relative; overflow:hidden; font-size:28px; }
+        .tile-art::after { content:""; position:absolute; inset:0; background:linear-gradient(160deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0) 45%, rgba(0,0,0,0.10) 100%); }
+        .tile-art.purple { background:linear-gradient(160deg, var(--tile-purple) 0%, var(--tile-purple-2) 100%); }
+        .tile-art.grey { background:linear-gradient(160deg, var(--tile-grey) 0%, var(--tile-grey-2) 100%); }
+        .tile-label { font-size:12px; color:var(--text); font-weight:500; text-align:center; }
+        .workspace { padding:28px 40px 60px; display:flex; flex-direction:column; min-height:100%; position:relative; }
+        .agent-panel { width:min(760px, calc(100% - 40px)); margin:36px auto 0; background:var(--surface); border:0.5px solid var(--border); border-radius:24px; box-shadow:0 32px 64px rgba(30,24,16,0.18), 0 6px 20px rgba(30,24,16,0.08); padding:32px 32px 28px; position:relative; }
+        .agent-heading { margin:0 0 22px; display:flex; align-items:center; gap:12px; font-size:34px; line-height:1.05; letter-spacing:-0.03em; font-weight:650; }
+        .agent-orb { width:14px; height:14px; border-radius:50%; background:var(--accent-pink); box-shadow:0 0 0 8px rgba(242,84,107,0.12); }
+        .agent-composer { border:0.5px solid var(--border); background:#fff; border-radius:18px; min-height:120px; padding:20px; display:flex; align-items:flex-start; justify-content:space-between; gap:16px; box-shadow:var(--shadow-sm); }
+        .agent-composer-prompt { color:var(--text-subtle); font-size:20px; line-height:1.35; }
+        .agent-composer-add { width:36px; height:36px; border-radius:50%; border:0.5px solid var(--border); background:var(--surface); color:var(--text-muted); font-size:22px; line-height:1; cursor:pointer; }
+        .agent-actions { margin-top:18px; display:flex; flex-wrap:wrap; gap:10px; }
+        .agent-chip { padding:10px 14px; background:#fff; border:0.5px solid var(--border); border-radius:999px; font-size:13px; font-weight:500; color:var(--text); text-decoration:none; box-shadow:var(--shadow-sm); }
+        .agent-subcopy { margin:14px 0 0; color:var(--text-muted); font-size:13px; line-height:1.55; max-width:580px; }
+        @media (max-width: 980px) { .content { grid-template-columns:1fr; } .tile-rail { flex-direction:row; justify-content:center; padding:20px; } .workspace { padding:20px 20px 60px; } .agent-panel { width: calc(100% - 10px); margin-top: 12px; padding: 22px 20px 22px; } .agent-heading { font-size: 28px; } .agent-composer-prompt { font-size: 18px; } }
     </style>
 @endsection
 
 @section('content')
-    @php
-        $founder = $dashboard['founder'];
-        $workspace = $dashboard['workspace'] ?? [];
-        $launchCards = $launchCards ?? [];
-        $aiTools = $workspace['ai_tools'] ?? [];
-        $company = $dashboard['company'] ?? null;
-        $primaryGoal = $dashboard['atlas']['primary_growth_goal'] ?? '';
-        $recentCampaigns = $dashboard['atlas']['recent_campaigns'] ?? [];
-        $atlasWorkspace = $atlasWorkspace ?? [];
-        $atlasConversations = $atlasWorkspace['conversations'] ?? [];
-        $atlasRecentCampaigns = $atlasWorkspace['recent_campaigns'] ?? $recentCampaigns;
-        $atlasArchivedCampaigns = $atlasWorkspace['archived_campaigns'] ?? [];
-        $atlasMediaOutputs = $atlasWorkspace['media_outputs'] ?? [];
-        $moduleCards = $dashboard['module_cards'] ?? [];
-        $logoUrl = !empty($company?->company_logo_path) ? asset('storage/' . ltrim((string) $company->company_logo_path, '/')) : null;
-    @endphp
-
-    <div class="tools-shell">
-        <aside class="tools-sidebar">
-            @include('os.partials.founder-sidebar', [
-                'founder' => $founder,
-                'businessModel' => $founder->company->business_model ?? 'hybrid',
-                'activeKey' => 'ai-tools',
-                'navClass' => 'tools-nav',
-                'itemClass' => 'tools-nav-item',
-                'iconClass' => 'tools-nav-icon',
-                'innerClass' => 'tools-sidebar-inner',
-                'brandClass' => 'tools-brand',
-                'footerClass' => 'tools-sidebar-footer',
-                'userClass' => 'tools-user',
-                'avatarClass' => 'tools-avatar',
-            ])
-        </aside>
-
-        <main class="tools-main">
-            <div class="tools-main-inner">
-                @include('os.partials.guidebook-workspace-topbar', [
-                    'founder' => $founder,
-                    'company' => $company,
-                    'workspace' => $workspace,
-                    'projectName' => $company?->company_name ?? 'Founder workspace',
-                    'sectionLabel' => 'AI Studio',
-                    'searchPlaceholder' => 'Open Brand Studio, continue agent work, or jump into campaign creation...',
-                ])
-                <h1>AI Studio</h1>
-                <p>Use one OS workspace for brand direction, campaign work, and AI help without switching products.</p>
-
-                <section class="tools-section">
-                    <div class="tools-highlight">
-                        <div class="highlight-label">Recommended next move</div>
-                        <div style="font-size:1.2rem;font-weight:700;">{{ $primaryGoal !== '' ? $primaryGoal : 'Use AI to move your next founder sprint forward.' }}</div>
-                        <div class="highlight-copy">Start here when you want to shape your company story, launch a campaign, review generated work, or ask the OS for help with your next move.</div>
-                        <div class="highlight-badge">Ask AI anything about your business...</div>
-                    </div>
-                </section>
-
-                <section class="tools-section">
-                    <h2>Core Studios</h2>
-                    <div class="tools-grid">
-                        <div class="tool-card">
-                            <div class="tool-card-row">
-                                <div>
-                                    <div class="tool-card-title">Brand Studio</div>
-                                    <div class="tool-card-copy">Upload your logo, sharpen your ICP, define your brand voice, and keep your company intelligence in one place.</div>
-                                </div>
-                                <div class="tool-card-icon">◌</div>
-                            </div>
-                            @if ($logoUrl)
-                                <div style="margin-top:12px;">
-                                    <img src="{{ $logoUrl }}" alt="{{ $company?->company_name ?: 'Company logo' }}" style="width:88px;height:auto;border-radius:14px;border:1px solid var(--line);display:block;">
-                                </div>
-                            @endif
-                            <a class="tool-card-cta" href="{{ route('founder.settings') }}">Open Brand Studio</a>
-                        </div>
-                        <div class="tool-card">
-                            <div class="tool-card-row">
-                                <div>
-                                    <div class="tool-card-title">Campaign Studio</div>
-                                    <div class="tool-card-copy">Browse the real Atlas campaign list, open campaign detail, and continue campaign work without leaving the OS shell.</div>
-                                </div>
-                                <div class="tool-card-icon">✦</div>
-                            </div>
-                            <a class="tool-card-cta" href="{{ route('founder.marketing') }}">Open Campaign Studio</a>
-                        </div>
-                        <div class="tool-card">
-                            <div class="tool-card-row">
-                                <div>
-                                    <div class="tool-card-title">AI Agents</div>
-                                    <div class="tool-card-copy">See real Atlas conversation threads, reopen any thread, and continue agent work inside Hatchers AI OS.</div>
-                                </div>
-                                <div class="tool-card-icon">◇</div>
-                            </div>
-                            <a class="tool-card-secondary" href="{{ route('founder.ai-tools.open', ['target' => '/ai-chat', 'title' => 'Atlas Agents']) }}">Open Atlas Agents</a>
-                        </div>
-                        <div class="tool-card">
-                            <div class="tool-card-row">
-                                <div>
-                                    <div class="tool-card-title">Media Library</div>
-                                    <div class="tool-card-copy">Review generated Atlas media outputs and documents alongside OS-managed assets.</div>
-                                </div>
-                                <div class="tool-card-icon">▥</div>
-                            </div>
-                            <a class="tool-card-secondary" href="{{ route('founder.media-library') }}">Open Media Library</a>
-                        </div>
-                    </div>
-                </section>
-
-                <section class="tools-section">
-                    <h2>Atlas Conversations</h2>
-                    <div class="tools-grid">
-                        @forelse (array_slice($atlasConversations, 0, 6) as $conversation)
-                            @php
-                                $conversationId = (string) ($conversation['id'] ?? '');
-                                $chatTarget = '/ai-chat';
-                                if ($conversationId !== '' && $conversationId !== 'default') {
-                                    $chatTarget = '/ai-chat';
-                                }
-                            @endphp
-                            <div class="tool-card">
-                                <div class="tool-card-title">{{ $conversation['title'] ?? 'Conversation' }}</div>
-                                <div class="tool-card-copy">{{ $conversation['last_message'] ?? 'Continue this Atlas thread from inside the OS.' }}</div>
-                                <div class="highlight-badge">{{ !empty($conversation['updated_at']) ? \Illuminate\Support\Carbon::parse($conversation['updated_at'])->diffForHumans() : 'Updated recently' }}</div>
-                                <a class="tool-card-cta" href="{{ route('founder.ai-tools.open', ['target' => $chatTarget, 'title' => 'Atlas Agents']) }}">Continue conversation</a>
-                            </div>
-                        @empty
-                            <div class="tool-card">
-                                <div class="tool-card-title">No Atlas conversations yet</div>
-                                <div class="tool-card-copy">Start your first agent thread and it will appear here for quick continuation inside the OS.</div>
-                                <a class="tool-card-cta" href="{{ route('founder.ai-tools.open', ['target' => '/ai-chat', 'title' => 'Atlas Agents']) }}">Start Atlas chat</a>
-                            </div>
-                        @endforelse
-                    </div>
-                </section>
-
-                <section class="tools-section">
-                    <h2>Atlas Campaigns</h2>
-                    <div class="tools-grid">
-                        @forelse (array_slice($atlasRecentCampaigns, 0, 6) as $campaign)
-                            @php
-                                $targetPath = (string) ($campaign['target_path'] ?? '/ai-images/campaign');
-                            @endphp
-                            <div class="tool-card">
-                                <div class="tool-card-title">{{ $campaign['title'] ?? 'Campaign' }}</div>
-                                <div class="tool-card-copy">{{ $campaign['description'] ?? 'Open this campaign in Atlas Campaign Studio.' }}</div>
-                                <div class="highlight-badge">{{ (int) ($campaign['generated_posts_count'] ?? 0) }} linked posts</div>
-                                <a class="tool-card-cta" href="{{ route('founder.ai-tools.open', ['target' => $targetPath, 'title' => 'Campaign Studio']) }}">Open campaign</a>
-                            </div>
-                        @empty
-                            <div class="tool-card">
-                                <div class="tool-card-title">No campaigns yet</div>
-                                <div class="tool-card-copy">Create your first Atlas campaign and it will show up here with a direct OS launch back into the real workspace.</div>
-                                <a class="tool-card-cta" href="{{ route('founder.ai-tools.open', ['target' => '/ai-images/campaign', 'title' => 'Campaign Studio']) }}">Open Campaign Studio</a>
-                            </div>
-                        @endforelse
-                    </div>
-                </section>
-
-                <section class="tools-section">
-                    <h2>Atlas Media Outputs</h2>
-                    <div class="tools-grid">
-                        @forelse (array_slice($atlasMediaOutputs, 0, 4) as $asset)
-                            <div class="tool-card">
-                                <div class="tool-card-row">
-                                    <div>
-                                        <div class="tool-card-title">{{ $asset['title'] ?? 'Media output' }}</div>
-                                        <div class="tool-card-copy">{{ ucfirst($asset['post_type'] ?? 'post') }}{{ !empty($asset['campaign_title']) ? ' for ' . $asset['campaign_title'] : '' }}</div>
-                                    </div>
-                                    <div class="tool-card-icon">▥</div>
-                                </div>
-                                @if (!empty($asset['preview_image']))
-                                    <div style="margin-top:12px;">
-                                        <img src="{{ $asset['preview_image'] }}" alt="{{ $asset['title'] ?? 'Media output' }}" style="width:100%;max-height:180px;object-fit:cover;border-radius:14px;border:1px solid var(--line);display:block;">
-                                    </div>
-                                @endif
-                                <a class="tool-card-secondary" href="{{ route('founder.media-library') }}">Review in Media Library</a>
-                            </div>
-                        @empty
-                            <div class="tool-card">
-                                <div class="tool-card-title">No generated media yet</div>
-                                <div class="tool-card-copy">Atlas image and campaign outputs will appear here as soon as you generate them.</div>
-                                <a class="tool-card-secondary" href="{{ route('founder.ai-tools.open', ['target' => '/all-images', 'title' => 'Atlas Media']) }}">Open Atlas media</a>
-                            </div>
-                        @endforelse
-                    </div>
-                </section>
-
-                <section class="tools-section">
-                    <h2>Platform Workspaces</h2>
-                    <div class="tools-grid">
-                        <div class="tool-card">
-                            <div class="tool-card-title">Unified Search</div>
-                            <div class="tool-card-copy">Search tasks, lessons, campaigns, offers, and activity from one OS surface.</div>
-                            <a class="tool-card-cta" href="{{ route('founder.search') }}">Open Search</a>
-                        </div>
-                        <div class="tool-card">
-                            <div class="tool-card-title">Analytics</div>
-                            <div class="tool-card-copy">Review execution, growth, and marketing performance in one reporting workspace.</div>
-                            <a class="tool-card-cta" href="{{ route('founder.analytics') }}">Open Analytics</a>
-                        </div>
-                        <div class="tool-card">
-                            <div class="tool-card-title">Media Library</div>
-                            <div class="tool-card-copy">Keep campaign drafts, content assets, and offer copy together inside the OS.</div>
-                            <a class="tool-card-cta" href="{{ route('founder.media-library') }}">Open Media Library</a>
-                        </div>
-                        <div class="tool-card">
-                            <div class="tool-card-title">Automations</div>
-                            <div class="tool-card-copy">Define saved cross-tool rules so the OS can become the long-term workflow layer.</div>
-                            <a class="tool-card-cta" href="{{ route('founder.automations') }}">Open Automations</a>
-                        </div>
-                    </div>
-                </section>
-
-                <section class="tools-section">
-                    <h2>OS Modules</h2>
-                    <div class="tools-grid">
-                        @foreach ($launchCards as $launch)
-                            <div class="tool-card">
-                                <div class="tool-card-row">
-                                    <div>
-                                        <div class="tool-card-title">{{ $launch['label'] }}</div>
-                                        <div class="tool-card-copy">{{ $launch['description'] }}</div>
-                                    </div>
-                                    <div class="tool-card-icon">{{ strtoupper(substr($launch['module'], 0, 1)) }}</div>
-                                </div>
-                                <a class="tool-card-cta" href="/dashboard/founder">Open in OS</a>
-                            </div>
-                        @endforeach
-                    </div>
-                </section>
-
-                <section class="tools-section">
-                    <h2>Readiness Snapshot</h2>
-                    <div class="tools-grid">
-                        @foreach (array_slice($moduleCards, 0, 4) as $module)
-                            <div class="tool-card">
-                                <div class="tool-card-title">{{ $module['module'] }}</div>
-                                <div class="tool-card-copy">{{ $module['description'] }}</div>
-                                <div class="highlight-badge">{{ $module['readiness_score'] }}% readiness</div>
-                            </div>
-                        @endforeach
-                    </div>
-                </section>
+    <div class="prototype-app">
+        <aside class="rail">
+            <div class="rail-top">
+                <a href="{{ route('dashboard') }}" class="rail-icon" aria-label="Dashboard">▥</a>
+                <a href="{{ route('founder.settings') }}" class="rail-icon" aria-label="Settings">⚙</a>
+                <a href="{{ route('founder.ai-tools') }}" class="rail-icon rail-add" aria-label="New Agent">＋<span class="rail-tooltip">New Agent</span></a>
             </div>
-        </main>
-
-        <aside class="tools-rightbar">
-            <div class="tools-rightbar-inner">
-                <h3>Recent Campaigns</h3>
-                <div class="rail-list">
-                    @forelse (array_slice($atlasRecentCampaigns, 0, 3) as $campaign)
-                        <div class="rail-item">
-                            <div style="font-weight:600;">{{ $campaign['title'] ?? 'Campaign' }}</div>
-                            <div style="margin-top:4px;color:var(--muted);">{{ $campaign['description'] ?? 'Saved in Campaign Studio.' }}</div>
-                        </div>
-                    @empty
-                        <div class="rail-item">
-                            <div style="font-weight:600;">No campaigns yet</div>
-                            <div style="margin-top:4px;color:var(--muted);">Your campaign work will appear here as you start using Campaign Studio.</div>
-                        </div>
-                    @endforelse
-                </div>
-
-                <h3 style="margin-top:22px;">Archived Campaigns</h3>
-                <div class="rail-list">
-                    @forelse (array_slice($atlasArchivedCampaigns, 0, 2) as $campaign)
-                        <div class="rail-item">
-                            <div style="font-weight:600;">{{ $campaign['title'] ?? 'Campaign' }}</div>
-                            <div style="margin-top:4px;color:var(--muted);">{{ (int) ($campaign['generated_posts_count'] ?? 0) }} linked posts</div>
-                        </div>
-                    @empty
-                        <div class="rail-item">
-                            <div style="font-weight:600;">No archived campaigns</div>
-                            <div style="margin-top:4px;color:var(--muted);">Archived Atlas campaigns will surface here when you start cycling through campaigns.</div>
-                        </div>
-                    @endforelse
-                </div>
-
-                <h3 style="margin-top:22px;">Use This Page For</h3>
-                <div class="mini-note">Start here when you need brand context, Atlas campaign history, chat continuation, or generated media. This page is now the OS-native launch surface for real Atlas work.</div>
+            <div class="rail-bottom">
+                <a href="{{ route('founder.inbox') }}" class="rail-icon" aria-label="Inbox">✉</a>
+                <span class="rail-avatar">{{ strtoupper(substr((string) ($founder->full_name ?? 'J'), 0, 1)) }}</span>
             </div>
         </aside>
+
+        <div class="main">
+            <div class="topbar">
+                <a href="{{ route('dashboard') }}" class="brand"><span class="brand-mark"></span><span>Hatchers AI OS</span></a>
+                <div class="search"><span class="search-dot"></span><input type="text" placeholder="What would you like to do?"><span class="search-kbd">⌘K</span></div>
+                <a href="{{ route('founder.notifications') }}" class="status-pill">
+                    <span class="bell-wrap"><span>🔔</span>@if(!empty($workspace['unread_notification_count']))<span class="bell-badge">{{ $workspace['unread_notification_count'] }}</span>@endif</span>
+                    <span>{{ now()->format('D, M j g:i A') }}</span>
+                </a>
+            </div>
+
+            <div class="content">
+                <div class="tile-rail">
+                    <a class="tile" href="{{ route('founder.tasks') }}"><div class="tile-art purple">☷</div><div class="tile-label">Tasks</div></a>
+                    <a class="tile" href="{{ route('founder.inbox') }}"><div class="tile-art grey">⌂</div><div class="tile-label">Inbox</div></a>
+                    <a class="tile" href="{{ route('founder.ai-tools') }}"><div class="tile-art grey">✦</div><div class="tile-label">AI Tools</div></a>
+                </div>
+
+                <div class="workspace">
+                    <div class="agent-panel">
+                        <h1 class="agent-heading">
+                            <span class="agent-orb"></span>
+                            <span>What are we achieving today?</span>
+                        </h1>
+                        <div class="agent-composer">
+                            <div class="agent-composer-prompt">How can we help you today?</div>
+                            <button class="agent-composer-add" type="button" aria-label="Add">＋</button>
+                        </div>
+                        <p class="agent-subcopy">Open the exact Hatchers tools you need from one prototype-style AI surface instead of bouncing through the older workspace views.</p>
+                        <div class="agent-actions">
+                            @foreach($toolLinks as $tool)
+                                <a href="{{ $tool['href'] }}" class="agent-chip">{{ $tool['label'] }}</a>
+                            @endforeach
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 @endsection
