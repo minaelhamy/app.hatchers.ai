@@ -6604,10 +6604,11 @@ class OsShellController extends Controller
         $username = $this->uniqueFounderUsernameFromSeed($emailLocal);
         $displayName = $this->placeholderFounderNameFromEmail((string) $validated['email']);
         $companyName = $this->placeholderCompanyNameFromEmail((string) $validated['email']);
+        $defaultBusinessModel = 'service';
         $defaultBlueprint = $this->upsertVerticalBlueprint($this->defaultVerticalBlueprintCodeForBusinessModel('service'));
 
         try {
-            DB::transaction(function () use ($validated, $plan, $username, $displayName, $companyName, $defaultBlueprint) {
+            DB::transaction(function () use ($validated, $plan, $username, $displayName, $companyName, $defaultBlueprint, $defaultBusinessModel) {
                 $founder = Founder::create(
                     [
                         'username' => $username,
@@ -6627,7 +6628,7 @@ class OsShellController extends Controller
                     ['founder_id' => $founder->id],
                     [
                         'company_name' => $companyName,
-                        'business_model' => 'service',
+                        'business_model' => $defaultBusinessModel,
                         'vertical_blueprint_id' => $defaultBlueprint->id,
                         'industry' => '',
                         'stage' => 'idea',
@@ -6661,7 +6662,7 @@ class OsShellController extends Controller
                 CommercialSummary::updateOrCreate(
                     ['founder_id' => $founder->id],
                     [
-                        'business_model' => $validated['business_model'],
+                        'business_model' => $defaultBusinessModel,
                         'summary_updated_at' => now(),
                     ]
                 );
@@ -6691,7 +6692,9 @@ class OsShellController extends Controller
                 );
             });
         } catch (Throwable $exception) {
+            $reference = 'SG-' . now()->format('YmdHis');
             Log::error('Founder signup failed unexpectedly.', [
+                'reference' => $reference,
                 'email' => $validated['email'] ?? '',
                 'username' => $username ?? '',
                 'message' => $exception->getMessage(),
@@ -6699,7 +6702,7 @@ class OsShellController extends Controller
 
             return back()
                 ->withInput()
-                ->withErrors(['signup' => 'Hatchers AI could not complete signup right now. Please review the form and try again.']);
+                ->withErrors(['signup' => $this->founderSignupFailureMessage($exception, $reference)]);
         }
 
         $founder = Founder::query()->with('company')->where('email', $validated['email'])->first();
@@ -10090,6 +10093,29 @@ class OsShellController extends Controller
         ]));
 
         return $parts !== [] ? implode(' · ', $parts) : 'Market inferred from founder signup';
+    }
+
+    private function founderSignupFailureMessage(Throwable $exception, string $reference): string
+    {
+        $message = Str::lower(trim($exception->getMessage()));
+
+        if (Str::contains($message, ['duplicate', 'unique', 'already exists', 'integrity constraint'])) {
+            return 'We could not create this founder account because that email or username is already in use. Please try a different email address. Ref: ' . $reference;
+        }
+
+        if (Str::contains($message, ['verification', 'mail', 'smtp'])) {
+            return 'Your founder account could not finish setup because the verification email step failed. Please try again in a moment. Ref: ' . $reference;
+        }
+
+        if (Str::contains($message, ['column', 'field', 'cannot be null', 'undefined array key'])) {
+            return 'Your founder account could not finish setup because some required setup data was missing on our side. Please try again now that we have refreshed the signup flow. Ref: ' . $reference;
+        }
+
+        if (Str::contains($message, ['timeout', 'connection', 'network', 'http'])) {
+            return 'Your founder account could not finish setup because one of our background services did not respond in time. Please try again in a moment. Ref: ' . $reference;
+        }
+
+        return 'Hatchers AI could not complete signup right now because a workspace setup step failed on our side. Please try again, and if it happens again share this reference with us: ' . $reference;
     }
 
     private function sanitizeFounderSignupList(mixed $values): array
