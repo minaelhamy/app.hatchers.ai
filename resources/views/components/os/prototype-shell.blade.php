@@ -18,58 +18,10 @@
     $statusLabel = $statusText ?: now()->format('D, M j g:i A');
     $windowApps = [
         [
-            'key' => 'tasks',
-            'label' => 'Tasks',
-            'description' => 'Step-by-step execution and priorities',
-            'url' => route('founder.tasks', ['os_embed' => 1]),
-        ],
-        [
-            'key' => 'inbox',
-            'label' => 'Inbox',
-            'description' => 'Notifications, replies, and OS updates',
-            'url' => route('founder.inbox', ['os_embed' => 1]),
-        ],
-        [
             'key' => 'account-settings',
             'label' => 'Account Settings',
             'description' => 'Username, password, and profile photo',
             'url' => route('founder.settings', ['step' => 'account', 'os_embed' => 1]),
-        ],
-        [
-            'key' => 'search',
-            'label' => 'Search',
-            'description' => 'Find tasks, campaigns, offers, and workspace content',
-            'url' => route('founder.search', ['os_embed' => 1]),
-        ],
-        [
-            'key' => 'notifications',
-            'label' => 'Notifications',
-            'description' => 'Unread updates, inbox activity, and OS status changes',
-            'url' => route('founder.notifications', ['os_embed' => 1]),
-        ],
-        [
-            'key' => 'lead-tracker',
-            'label' => 'Lead Tracker',
-            'description' => 'Pipeline, scripts, follow-up queues, and offline lead capture',
-            'url' => route('founder.first-100', ['os_embed' => 1]),
-        ],
-        [
-            'key' => 'marketing',
-            'label' => 'Marketing',
-            'description' => 'Campaign planning, content queue, and publishing direction',
-            'url' => route('founder.marketing', ['os_embed' => 1]),
-        ],
-        [
-            'key' => 'analytics',
-            'label' => 'Analytics',
-            'description' => 'Execution, growth, and channel performance metrics',
-            'url' => route('founder.analytics', ['os_embed' => 1]),
-        ],
-        [
-            'key' => 'commerce',
-            'label' => 'Commerce',
-            'description' => 'Offers, operations, bookings, orders, and wallet overview',
-            'url' => route('founder.commerce', ['os_embed' => 1]),
         ],
         [
             'key' => 'servio',
@@ -84,22 +36,10 @@
             'url' => route('workspace.launch', ['module' => 'bazaar']),
         ],
         [
-            'key' => 'atlas-agents',
-            'label' => 'Atlas Agents',
-            'description' => 'Agent tools and prompt workflows',
-            'url' => route('founder.ai-tools.open', ['target' => '/ai-chat-bots', 'title' => 'Atlas Agents']),
-        ],
-        [
-            'key' => 'atlas-chat',
-            'label' => 'Atlas Chat',
-            'description' => 'Atlas conversational workspace',
-            'url' => route('founder.ai-tools.open', ['target' => '/ai-chat', 'title' => 'Atlas Chat']),
-        ],
-        [
             'key' => 'campaign-studio',
             'label' => 'Campaign Studio',
             'description' => 'Atlas campaign planning and creative execution',
-            'url' => route('founder.ai-tools.open', ['target' => '/campaign-studio', 'title' => 'Campaign Studio']),
+            'url' => route('workspace.launch', ['module' => 'atlas', 'target' => '/campaign-studio']),
         ],
         [
             'key' => 'build-my-website',
@@ -305,7 +245,6 @@
             max-width: calc(100vw - 140px);
             height: auto;
             min-height: 0;
-            resize: none;
         }
         .os-window-launcher .os-window-body {
             padding: 18px;
