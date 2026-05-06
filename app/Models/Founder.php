@@ -21,6 +21,7 @@ class Founder extends Authenticatable
         'permissions_json',
         'auth_source',
         'full_name',
+        'avatar_path',
         'phone',
         'country',
         'timezone',

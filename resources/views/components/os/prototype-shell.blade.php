@@ -13,6 +13,7 @@
 @php
     $founderName = trim((string) ($founder->full_name ?? 'Founder'));
     $founderInitial = strtoupper(substr($founderName !== '' ? $founderName : 'F', 0, 1));
+    $founderAvatarUrl = !empty($founder?->avatar_path) ? asset('storage/' . ltrim((string) $founder->avatar_path, '/')) : null;
     $unreadCount = (int) ($workspace['unread_notification_count'] ?? 0);
     $statusLabel = $statusText ?: now()->format('D, M j g:i A');
     $icons = [
@@ -69,7 +70,19 @@
         .rail-add { background: #ECE6FA; color: #5B45C9; border: 0.5px solid #C9BCF0; }
         .rail-tooltip { position: absolute; left: calc(100% + 10px); top: 50%; transform: translateY(-50%); background: #fff; border: 0.5px solid var(--border); border-radius: 8px; padding: 5px 10px; font-size: 12px; color: var(--text); white-space: nowrap; box-shadow: var(--shadow-md); opacity: 0; pointer-events: none; transition: opacity .12s ease; }
         .rail-add:hover .rail-tooltip { opacity: 1; }
-        .rail-avatar { width: 28px; height: 28px; border-radius: 8px; background: linear-gradient(160deg, #7C5BE0, #5B3FC9); color: #fff; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; }
+        .rail-profile { position: relative; }
+        .rail-profile[open] { z-index: 40; }
+        .rail-profile summary { list-style: none; }
+        .rail-profile summary::-webkit-details-marker { display: none; }
+        .rail-profile-toggle { border: 0; background: transparent; padding: 0; cursor: pointer; }
+        .rail-avatar { width: 28px; height: 28px; border-radius: 8px; background: linear-gradient(160deg, #7C5BE0, #5B3FC9); color: #fff; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; overflow: hidden; box-shadow: 0 1px 2px rgba(30,24,16,0.12); }
+        .rail-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .rail-profile-menu { position: absolute; left: calc(100% + 10px); bottom: 0; min-width: 220px; background: #fff; border: 0.5px solid var(--border); border-radius: 14px; box-shadow: var(--shadow-lg); padding: 10px; display: grid; gap: 8px; }
+        .rail-profile-head { display: grid; gap: 2px; padding: 6px 8px 8px; border-bottom: 0.5px solid var(--hairline); }
+        .rail-profile-name { font-size: 13px; font-weight: 700; color: var(--text); }
+        .rail-profile-email { font-size: 11.5px; color: var(--text-muted); word-break: break-word; }
+        .rail-profile-link, .rail-profile-submit { width: 100%; display: inline-flex; align-items: center; justify-content: flex-start; padding: 10px 12px; border-radius: 10px; text-decoration: none; color: var(--text); font-size: 12.5px; font-weight: 600; background: transparent; border: 0; cursor: pointer; font-family: inherit; }
+        .rail-profile-link:hover, .rail-profile-submit:hover { background: var(--surface-2); }
         .main { display: flex; flex-direction: column; min-width: 0; }
         .topbar { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 16px; padding: 14px 20px; border-bottom: 0.5px solid var(--hairline); background: var(--bg); }
         .brand { display: inline-flex; align-items: center; gap: 10px; padding: 6px 12px 6px 8px; background: var(--surface); border: 0.5px solid var(--border); border-radius: 999px; box-shadow: var(--shadow-sm); font-weight: 600; font-size: 13px; color: var(--text); white-space: nowrap; text-decoration: none; }
@@ -147,7 +160,28 @@
         </div>
         <div class="rail-bottom">
             <a href="{{ route('founder.inbox') }}" class="rail-icon" aria-label="Inbox">{!! $icons['inbox'] !!}</a>
-            <span class="rail-avatar">{{ $founderInitial }}</span>
+            <details class="rail-profile">
+                <summary class="rail-profile-toggle" aria-label="Open account menu">
+                    <span class="rail-avatar">
+                        @if ($founderAvatarUrl)
+                            <img src="{{ $founderAvatarUrl }}" alt="{{ $founderName }}">
+                        @else
+                            {{ $founderInitial }}
+                        @endif
+                    </span>
+                </summary>
+                <div class="rail-profile-menu">
+                    <div class="rail-profile-head">
+                        <div class="rail-profile-name">{{ $founderName }}</div>
+                        <div class="rail-profile-email">{{ $founder->email ?? '' }}</div>
+                    </div>
+                    <a href="{{ route('founder.settings', ['step' => 'account']) }}" class="rail-profile-link">Account settings</a>
+                    <form method="POST" action="{{ route('logout') }}">
+                        @csrf
+                        <button type="submit" class="rail-profile-submit">Log out</button>
+                    </form>
+                </div>
+            </details>
         </div>
     </aside>
 
@@ -192,7 +226,13 @@
             <a href="{{ route('founder.notifications') }}" class="sidepane-row sidepane-news">What's new <span class="sidepane-news-dot"></span></a>
 
             <div class="sidepane-user">
-                <span class="rail-avatar">{{ $founderInitial }}</span>
+                <span class="rail-avatar">
+                    @if ($founderAvatarUrl)
+                        <img src="{{ $founderAvatarUrl }}" alt="{{ $founderName }}">
+                    @else
+                        {{ $founderInitial }}
+                    @endif
+                </span>
                 <div class="sidepane-user-info">
                     <div class="sidepane-user-name">{{ $founderName }}</div>
                     <div class="sidepane-user-email">{{ $founder->email ?? '' }}</div>

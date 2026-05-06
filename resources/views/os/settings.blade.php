@@ -375,6 +375,7 @@
         $currentStep = $wizard['current_step'] ?? null;
         $currentStepKey = $wizard['current_step_key'] ?? 'basics';
         $logoUrl = !empty($company?->company_logo_path) ? asset('storage/' . ltrim((string) $company->company_logo_path, '/')) : null;
+        $avatarUrl = !empty($founder?->avatar_path) ? asset('storage/' . ltrim((string) $founder->avatar_path, '/')) : null;
         $osEmbedMode = request()->boolean('os_embed');
     @endphp
 
@@ -427,6 +428,70 @@
                 @if (session('error'))
                     <div class="intelligence-banner">{{ session('error') }}</div>
                 @endif
+
+                <section class="step-card" style="padding-bottom:20px;">
+                    <div class="step-card-top" style="margin-bottom:14px;">
+                        <div>
+                            <div class="step-card-kicker">Account</div>
+                            <h2 style="font-size:clamp(1.35rem,2.6vw,2rem);">Manage your founder account.</h2>
+                            <p>Update your username, change your password, and upload a profile photo that appears in the OS avatar menu.</p>
+                        </div>
+                    </div>
+
+                    <form method="POST" action="{{ route('founder.settings.update') }}" enctype="multipart/form-data">
+                        @csrf
+                        <input type="hidden" name="current_step" value="account">
+                        @if ($osEmbedMode)
+                            <input type="hidden" name="os_embed" value="1">
+                        @endif
+
+                        <div class="wizard-grid">
+                            <div class="wizard-field">
+                                <label for="account-email">Email</label>
+                                <input id="account-email" type="email" value="{{ $founder->email }}" disabled>
+                            </div>
+                            <div class="wizard-field">
+                                <label for="account-username">Username</label>
+                                <input id="account-username" name="username" type="text" value="{{ old('username', $founder->username) }}" required>
+                                @error('username')<div class="field-error">{{ $message }}</div>@enderror
+                            </div>
+                            <div class="wizard-field full">
+                                <label for="profile-avatar">Profile picture</label>
+                                <input id="profile-avatar" name="profile_avatar" type="file" accept="image/*">
+                                @error('profile_avatar')<div class="field-error">{{ $message }}</div>@enderror
+                                @if ($avatarUrl)
+                                    <div class="wizard-file-preview">
+                                        <img src="{{ $avatarUrl }}" alt="{{ $founder->full_name ?: 'Founder profile photo' }}">
+                                        <span>Current profile picture</span>
+                                    </div>
+                                @endif
+                            </div>
+                            <div class="wizard-field">
+                                <label for="current-password">Current password</label>
+                                <input id="current-password" name="current_password" type="password" autocomplete="current-password">
+                                @error('current_password')<div class="field-error">{{ $message }}</div>@enderror
+                            </div>
+                            <div class="wizard-field">
+                                <label for="new-password">New password</label>
+                                <input id="new-password" name="new_password" type="password" autocomplete="new-password">
+                                @error('new_password')<div class="field-error">{{ $message }}</div>@enderror
+                            </div>
+                            <div class="wizard-field">
+                                <label for="new-password-confirmation">Confirm new password</label>
+                                <input id="new-password-confirmation" name="new_password_confirmation" type="password" autocomplete="new-password">
+                            </div>
+                        </div>
+
+                        <div class="wizard-actions">
+                            <div class="wizard-actions-left">
+                                <div class="wizard-edit-note">Leave the password fields empty if you only want to update your username or profile picture.</div>
+                            </div>
+                            <div class="wizard-actions-right">
+                                <button type="submit" class="wizard-button">Save account settings</button>
+                            </div>
+                        </div>
+                    </form>
+                </section>
 
                 <section class="intelligence-layout">
                     <aside class="intelligence-card">

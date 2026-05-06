@@ -3211,6 +3211,12 @@ class OsShellController extends Controller
         $step = (string) $request->input('current_step', 'basics');
         $embedMode = $request->boolean('os_embed');
         $stepRules = [
+            'account' => [
+                'username' => ['required', 'string', 'min:3', 'max:255', 'regex:/^[A-Za-z0-9._-]+$/', Rule::unique('founders', 'username')->ignore($user->id)],
+                'profile_avatar' => ['nullable', 'image', 'max:4096'],
+                'current_password' => ['nullable', 'string'],
+                'new_password' => ['nullable', 'string', 'min:8', 'confirmed'],
+            ],
             'basics' => [
                 'full_name' => ['required', 'string', 'max:255'],
                 'phone' => ['nullable', 'string', 'max:50'],
@@ -3253,6 +3259,46 @@ class OsShellController extends Controller
         $validated = $request->validate(array_merge([
             'current_step' => ['required', Rule::in(array_keys($stepRules))],
         ], $stepRules[$step]));
+
+        if ($step === 'account') {
+            $avatarPath = (string) ($user->avatar_path ?? '');
+            if ($request->hasFile('profile_avatar')) {
+                if ($avatarPath !== '' && Storage::disk('public')->exists($avatarPath)) {
+                    Storage::disk('public')->delete($avatarPath);
+                }
+                $avatarPath = (string) $request->file('profile_avatar')->store('founder-avatars', 'public');
+            }
+
+            if (!empty($validated['new_password'])) {
+                if (empty($validated['current_password']) || !Hash::check((string) $validated['current_password'], (string) $user->password)) {
+                    return redirect()
+                        ->route('founder.settings', array_filter([
+                            'step' => 'account',
+                            'os_embed' => $embedMode ? 1 : null,
+                        ]))
+                        ->withInput($request->except(['current_password', 'new_password', 'new_password_confirmation']))
+                        ->with('error', 'Please enter your current password correctly before setting a new one.');
+                }
+            }
+
+            $user->forceFill([
+                'username' => (string) $validated['username'],
+                'avatar_path' => $avatarPath !== '' ? $avatarPath : null,
+            ]);
+
+            if (!empty($validated['new_password'])) {
+                $user->password = Hash::make((string) $validated['new_password']);
+            }
+
+            $user->save();
+
+            return redirect()
+                ->route('founder.settings', array_filter([
+                    'step' => 'account',
+                    'os_embed' => $embedMode ? 1 : null,
+                ]))
+                ->with('success', 'Your account settings have been updated.');
+        }
 
         if ($step === 'basics') {
             $user->forceFill([
