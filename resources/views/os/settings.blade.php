@@ -377,9 +377,10 @@
         $logoUrl = !empty($company?->company_logo_path) ? asset('storage/' . ltrim((string) $company->company_logo_path, '/')) : null;
         $avatarUrl = !empty($founder?->avatar_path) ? asset('storage/' . ltrim((string) $founder->avatar_path, '/')) : null;
         $osEmbedMode = request()->boolean('os_embed');
+        $prototypeSettingsMode = true;
     @endphp
 
-    @if ($osEmbedMode)
+    @if ($prototypeSettingsMode)
         <style>
             .page.founder-home-page { background: #fff; }
             .intelligence-shell {
@@ -400,6 +401,13 @@
                 max-width: none;
                 margin: 0;
                 display: block;
+            }
+            .intelligence-kicker,
+            .intelligence-copy,
+            .intelligence-progress,
+            .intelligence-banner.success,
+            .intelligence-banner {
+                display: none;
             }
             .intelligence-layout {
                 display: block;
@@ -444,7 +452,7 @@
 
         <main class="intelligence-main">
             <div class="intelligence-wrap">
-                @unless ($osEmbedMode)
+                @unless ($prototypeSettingsMode)
                     @include('os.partials.guidebook-workspace-topbar', [
                         'founder' => $founder,
                         'company' => $company,

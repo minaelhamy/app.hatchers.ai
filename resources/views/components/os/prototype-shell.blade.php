@@ -335,7 +335,7 @@
             @else
                 <a href="{{ route('dashboard') }}" class="rail-icon" aria-label="Dashboard">{!! $icons['panel-left'] !!}</a>
             @endif
-            <a href="{{ route('founder.settings') }}" class="rail-icon" aria-label="Settings">{!! $icons['settings'] !!}</a>
+            <button type="button" class="rail-icon" aria-label="Settings" data-open-app="account-settings">{!! $icons['settings'] !!}</button>
             @if($showAiToolsButton)
                 @if($aiToolsMode === 'overlay')
                     <button type="button" class="rail-icon rail-add" id="railAiToolsBtn" aria-label="New Agent">{!! $icons['plus'] !!}<span class="rail-tooltip">New Agent</span></button>
@@ -382,7 +382,7 @@
                 <button type="button" class="seg-btn is-active">Agent <span class="seg-badge">NEW</span></button>
             </div>
 
-            <a href="{{ route('founder.settings') }}" class="sidepane-row">Customize <span class="seg-badge">NEW</span></a>
+            <button type="button" class="sidepane-row" data-open-app="account-settings">Customize <span class="seg-badge">NEW</span></button>
             <button type="button" class="sidepane-row" id="sidepaneNewAgentBtn">{!! $icons['plus'] !!} New Agent</button>
 
             <div class="sidepane-search">
@@ -494,7 +494,7 @@
     (() => {
         if (window.HatchersOsDesktop) return;
 
-        const shell = document.currentScript?.closest('.prototype-app');
+        const shell = document.querySelector('.prototype-app');
         const layer = document.getElementById('osWindowLayer');
         const dock = document.getElementById('osWindowDock');
         const apps = JSON.parse(document.getElementById('osWindowApps')?.textContent || '[]');
