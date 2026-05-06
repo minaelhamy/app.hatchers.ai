@@ -56,6 +56,14 @@
 
         <main class="workspace-main">
             <div class="workspace-main-inner">
+                @include('os.partials.guidebook-workspace-topbar', [
+                    'founder' => $founder,
+                    'company' => $founder->company,
+                    'workspace' => $workspace,
+                    'projectName' => $founder->company->company_name ?? 'Founder workspace',
+                    'sectionLabel' => 'Inbox',
+                    'searchPlaceholder' => 'Scan founder alerts, launch updates, and the next best actions...',
+                ])
                 <section class="hero">
                     <div class="eyebrow">Inbox</div>
                     <h1>Your OS inbox.</h1>

@@ -397,6 +397,14 @@
 
         <main class="intelligence-main">
             <div class="intelligence-wrap">
+                @include('os.partials.guidebook-workspace-topbar', [
+                    'founder' => $founder,
+                    'company' => $company,
+                    'workspace' => $dashboard['workspace'] ?? [],
+                    'projectName' => $company?->company_name ?? 'Founder workspace',
+                    'sectionLabel' => 'Brand Studio',
+                    'searchPlaceholder' => 'Sharpen positioning, review intelligence, and guide what Hatchers builds next...',
+                ])
                 <section class="intelligence-hero">
                     <div class="intelligence-kicker">Company Intelligence</div>
                     <h1>Build the business core once, then let the whole OS use it.</h1>

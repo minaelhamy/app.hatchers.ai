@@ -103,6 +103,14 @@
 
         <main class="marketing-main">
             <div class="marketing-main-inner">
+                @include('os.partials.guidebook-workspace-topbar', [
+                    'founder' => $founder,
+                    'company' => $founder->company,
+                    'workspace' => $dashboard['workspace'] ?? [],
+                    'projectName' => $founder->company->company_name ?? 'Founder workspace',
+                    'sectionLabel' => 'Marketing',
+                    'searchPlaceholder' => 'Draft campaigns, queue content, and keep launch messaging aligned...',
+                ])
                 <h1>Marketing</h1>
                 <p>Manage campaigns, content generation, and publishing from one OS workspace.</p>
 

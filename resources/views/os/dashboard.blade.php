@@ -1,1273 +1,1068 @@
 @extends('os.layout')
 
 @section('hide_topbar', '1')
-@section('page_class', 'founder-home-page')
+@section('page_class', 'guidebook-dashboard-page')
+
+@php
+    $workspace = $dashboard['workspace'] ?? [];
+    $notifications = $workspace['notifications'] ?? [];
+    $taskEntries = $launchPlanState['tasks'] ?? [];
+    $launchMilestones = $launchPlanState['milestones'] ?? [];
+    $quickPrompt = $workspace['quick_prompt'] ?? 'Ask Hatchers what to build next...';
+    $founder = $dashboard['founder'] ?? auth()->user();
+    $company = $dashboard['company'] ?? null;
+    $chatNeedsOnboarding = (bool) ($chatOnboardingState['needs_onboarding'] ?? false);
+    $projectName = trim((string) ($chatOnboardingState['project_name'] ?? ($company?->company_name ?? 'New project')));
+    $topActions = [
+        ['label' => 'Tasks', 'href' => route('founder.tasks'), 'description' => 'Step-by-step execution'],
+        ['label' => 'Inbox', 'href' => route('founder.inbox'), 'description' => 'Messages and responses'],
+        ['label' => 'Website', 'href' => route('website'), 'description' => 'Build and publish'],
+        ['label' => 'Marketing', 'href' => route('founder.marketing'), 'description' => 'Campaigns and content'],
+        ['label' => 'Commerce', 'href' => route('founder.commerce'), 'description' => 'Orders, bookings, wallet'],
+        ['label' => 'AI Studio', 'href' => route('founder.ai-tools'), 'description' => 'Atlas and AI tools'],
+        ['label' => 'Analytics', 'href' => route('founder.analytics'), 'description' => 'See what is working'],
+        ['label' => 'Settings', 'href' => route('founder.settings'), 'description' => 'Business intelligence'],
+    ];
+@endphp
 
 @section('head')
     <style>
-        .page.founder-home-page {
+        .page.guidebook-dashboard-page {
+            min-height: 100vh;
             padding: 0;
             font-family: "Inter", "Avenir Next", "Segoe UI", sans-serif;
+            background: #ece7e0;
         }
 
-        .os-desktop-scene {
-            position: relative;
+        .gb-shell {
             min-height: 100vh;
-            padding: 28px 30px 48px;
-            background:
-                radial-gradient(circle at 78% 14%, rgba(230, 184, 188, 0.28), transparent 0 16%),
-                linear-gradient(165deg, #ddd2c8 0%, #c8b8b0 100%);
-            overflow: hidden;
-        }
-
-        .os-desktop-scene::before {
-            content: "";
-            position: absolute;
-            inset: 0;
-            background-image:
-                linear-gradient(rgba(255, 255, 255, 0.11) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(255, 255, 255, 0.11) 1px, transparent 1px);
-            background-size: 88px 88px;
-            opacity: 0.35;
-            pointer-events: none;
-        }
-
-        .os-desktop-frame {
-            position: relative;
-            min-height: calc(100vh - 84px);
-            border-radius: 22px;
-            border: 1px solid rgba(209, 198, 187, 0.82);
-            background:
-                radial-gradient(circle at 78% 18%, rgba(234, 197, 201, 0.24), transparent 0 18%),
-                linear-gradient(180deg, rgba(243, 236, 229, 0.92), rgba(234, 223, 214, 0.94));
-            box-shadow:
-                0 16px 40px rgba(71, 52, 31, 0.08),
-                inset 0 1px 0 rgba(255, 255, 255, 0.56),
-                inset 0 -60px 90px rgba(255, 255, 255, 0.08);
-            overflow: hidden;
-        }
-
-        .os-desktop-frame::after {
-            content: "";
-            position: absolute;
-            inset: 0;
-            background:
-                radial-gradient(circle at 18% 20%, rgba(255, 255, 255, 0.14), transparent 0 22%),
-                radial-gradient(circle at 84% 84%, rgba(196, 169, 150, 0.12), transparent 0 18%);
-            pointer-events: none;
-        }
-
-        .os-desktop-bar {
-            position: relative;
-            z-index: 2;
             display: grid;
-            grid-template-columns: 1fr auto;
-            gap: 16px;
-            align-items: center;
-            padding: 12px 18px 9px;
+            grid-template-columns: 86px minmax(0, 1fr);
+            background:
+                radial-gradient(circle at 12% 18%, rgba(255,255,255,0.52), transparent 0 18%),
+                linear-gradient(180deg, #f4efe8 0%, #e7ded4 100%);
         }
 
-        .os-desktop-bar::after {
-            content: "";
-            position: absolute;
-            left: 20px;
-            right: 20px;
-            bottom: 0;
-            height: 1px;
-            background: linear-gradient(90deg, rgba(214, 200, 185, 0.05), rgba(214, 200, 185, 0.44), rgba(214, 200, 185, 0.05));
+        .gb-rail {
+            padding: 18px 12px;
+            border-right: 1px solid rgba(96, 82, 72, 0.12);
+            background: rgba(28, 24, 21, 0.96);
+            display: grid;
+            align-content: start;
+            gap: 14px;
         }
 
-        .os-desktop-bar-left {
-            display: flex;
-            align-items: center;
-            gap: 12px;
+        .gb-rail-mark {
+            width: 42px;
+            height: 42px;
+            border-radius: 14px;
+            background: linear-gradient(135deg, #f13b74, #f26444);
+            box-shadow: 0 18px 34px rgba(241, 59, 116, 0.26);
+            justify-self: center;
+        }
+
+        .gb-rail-link,
+        .gb-rail-chat {
+            width: 56px;
+            height: 56px;
+            border-radius: 18px;
+            border: 1px solid rgba(255,255,255,0.08);
+            background: rgba(255,255,255,0.04);
+            color: rgba(255,255,255,0.82);
+            display: grid;
+            place-items: center;
+            text-decoration: none;
+            transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease;
+            justify-self: center;
+            cursor: pointer;
+        }
+
+        .gb-rail-link:hover,
+        .gb-rail-chat:hover,
+        .gb-rail-link.is-active {
+            transform: translateY(-1px);
+            background: rgba(255,255,255,0.1);
+            border-color: rgba(255,255,255,0.16);
+        }
+
+        .gb-main {
+            display: grid;
+            grid-template-rows: auto 1fr;
             min-width: 0;
         }
 
-        .os-desktop-brand {
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
-            text-decoration: none;
-            color: rgba(55, 44, 38, 0.92);
-            font-family: "Inter Tight", "Inter", "Avenir Next", sans-serif;
-            font-weight: 600;
-            letter-spacing: -0.01em;
-            flex-shrink: 0;
-        }
-
-        .os-desktop-brand-mark {
-            width: 20px;
-            height: 20px;
-            border-radius: 6px;
-            background: linear-gradient(135deg, #e11d74, #ef4444);
-            box-shadow: 0 8px 22px rgba(225, 29, 116, 0.25);
-            flex-shrink: 0;
-        }
-
-        .os-desktop-brand-name {
-            font-size: 0.9rem;
-        }
-
-        .os-desktop-search {
+        .gb-topbar {
             display: flex;
             align-items: center;
-            gap: 10px;
-            width: min(610px, 100%);
-            min-height: 38px;
-            padding: 6px 12px;
-            border-radius: 999px;
-            border: 1px solid rgba(246, 240, 234, 0.92);
-            background: rgba(255, 248, 243, 0.74);
-            box-shadow:
-                inset 0 1px 0 rgba(255, 255, 255, 0.82),
-                0 4px 12px rgba(80, 58, 40, 0.05);
-            color: rgba(94, 82, 75, 0.7);
-            backdrop-filter: blur(10px);
+            justify-content: space-between;
+            gap: 20px;
+            padding: 20px 28px;
+            border-bottom: 1px solid rgba(106, 88, 74, 0.1);
+            background: rgba(255, 251, 247, 0.8);
+            backdrop-filter: blur(14px);
+            position: sticky;
+            top: 0;
+            z-index: 10;
         }
 
-        .os-desktop-search:hover {
-            background: rgba(255, 250, 246, 0.8);
-        }
-
-        .os-desktop-search svg {
-            width: 16px;
-            height: 16px;
-            opacity: 0.7;
-            flex-shrink: 0;
-        }
-
-        .os-desktop-search-text {
+        .gb-search {
             flex: 1;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            font-size: 0.84rem;
-            letter-spacing: -0.01em;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            max-width: 820px;
+            min-height: 54px;
+            padding: 0 18px;
+            border-radius: 999px;
+            border: 1px solid rgba(118, 101, 90, 0.12);
+            background: rgba(255,255,255,0.85);
+            color: rgba(89, 74, 63, 0.64);
+            box-shadow: 0 14px 40px rgba(60, 46, 36, 0.06);
         }
 
-        .os-desktop-shortcut {
-            padding: 3px 8px;
-            border-radius: 8px;
-            border: 1px solid rgba(219, 208, 198, 0.72);
-            background: rgba(255, 255, 255, 0.34);
-            font-size: 0.7rem;
-            color: rgba(118, 104, 93, 0.72);
+        .gb-search-kbd {
+            padding: 6px 10px;
+            border-radius: 12px;
+            border: 1px solid rgba(118, 101, 90, 0.12);
+            background: rgba(245, 238, 231, 0.85);
+            font-size: 0.76rem;
+            color: rgba(101, 83, 70, 0.7);
         }
 
-        .os-desktop-bar-right {
+        .gb-topbar-right {
             display: inline-flex;
             align-items: center;
-            gap: 10px;
-            justify-self: end;
+            gap: 12px;
         }
 
-        .os-desktop-time {
-            font-size: 0.82rem;
-            font-weight: 500;
-            color: rgba(70, 57, 48, 0.8);
-            white-space: nowrap;
-            letter-spacing: -0.01em;
+        .gb-bell,
+        .gb-user {
+            position: relative;
+            min-height: 54px;
+            border-radius: 999px;
+            border: 1px solid rgba(118, 101, 90, 0.12);
+            background: rgba(255,255,255,0.85);
+            box-shadow: 0 14px 40px rgba(60, 46, 36, 0.06);
         }
 
-        .os-desktop-logout-form {
-            margin: 0;
+        .gb-bell {
+            width: 54px;
+            display: grid;
+            place-items: center;
+            text-decoration: none;
+            color: #40362f;
         }
 
-        .os-desktop-logout {
+        .gb-bell-badge {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            min-width: 18px;
+            height: 18px;
+            padding: 0 4px;
+            border-radius: 999px;
+            background: linear-gradient(135deg, #f26444, #f13b74);
+            color: #fff;
+            font-size: 0.68rem;
+            font-weight: 800;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .gb-user {
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            padding: 0 18px 0 10px;
+            color: #201915;
+        }
+
+        .gb-user-avatar {
+            width: 34px;
+            height: 34px;
+            border-radius: 999px;
+            background: linear-gradient(135deg, #f2dcc4, #d2b28b);
+        }
+
+        .gb-body {
+            padding: 28px;
+            display: grid;
+            gap: 24px;
+            align-content: start;
+        }
+
+        .gb-hero {
+            border-radius: 36px;
+            padding: 32px;
+            background: rgba(255, 251, 247, 0.84);
+            border: 1px solid rgba(118, 101, 90, 0.12);
+            box-shadow: 0 28px 64px rgba(67, 51, 40, 0.08);
+        }
+
+        .gb-hero-meta {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 18px;
+            margin-bottom: 18px;
+            flex-wrap: wrap;
+        }
+
+        .gb-chip {
             display: inline-flex;
             align-items: center;
             gap: 8px;
-            min-height: 36px;
-            padding: 0 12px;
+            padding: 10px 14px;
             border-radius: 999px;
-            border: 1px solid rgba(228, 216, 204, 0.95);
-            background: rgba(255, 251, 247, 0.62);
-            box-shadow:
-                inset 0 1px 0 rgba(255, 255, 255, 0.84),
-                0 8px 18px rgba(80, 58, 40, 0.06);
-            color: rgba(73, 58, 49, 0.86);
-            font: inherit;
-            font-size: 0.78rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: transform 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+            background: rgba(245, 239, 231, 0.95);
+            border: 1px solid rgba(118, 101, 90, 0.12);
+            font-size: 0.82rem;
+            color: rgba(96, 79, 68, 0.84);
         }
 
-        .os-desktop-notifications {
-            position: relative;
-            width: 38px;
-            height: 38px;
+        .gb-chip::before {
+            content: "";
+            width: 8px;
+            height: 8px;
             border-radius: 999px;
-            border: 1px solid rgba(228, 216, 204, 0.95);
-            background: rgba(255, 251, 247, 0.62);
-            box-shadow:
-                inset 0 1px 0 rgba(255, 255, 255, 0.84),
-                0 8px 18px rgba(80, 58, 40, 0.06);
+            background: linear-gradient(135deg, #f13b74, #f26444);
+        }
+
+        .gb-heading {
+            margin: 0;
+            font-family: "Inter Tight", "Inter", sans-serif;
+            font-size: clamp(2.4rem, 4vw, 4.8rem);
+            line-height: 0.92;
+            letter-spacing: -0.06em;
+            color: #171310;
+            max-width: 880px;
+        }
+
+        .gb-subcopy {
+            margin: 16px 0 0;
+            max-width: 760px;
+            font-size: 1.06rem;
+            line-height: 1.6;
+            color: rgba(79, 65, 56, 0.82);
+        }
+
+        .gb-hero-actions {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-top: 24px;
+        }
+
+        .gb-btn {
             display: inline-flex;
             align-items: center;
-            justify-content: center;
-            color: rgba(73, 58, 49, 0.86);
-            text-decoration: none;
-            transition: transform 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
-        }
-
-        .os-desktop-notifications:hover {
-            transform: translateY(-1px);
-            background: rgba(255, 253, 250, 0.78);
-            box-shadow:
-                inset 0 1px 0 rgba(255, 255, 255, 0.9),
-                0 12px 22px rgba(80, 58, 40, 0.1);
-        }
-
-        .os-desktop-notifications svg {
-            width: 15px;
-            height: 15px;
-            stroke: currentColor;
-            fill: none;
-            stroke-width: 1.8;
-            stroke-linecap: round;
-            stroke-linejoin: round;
-        }
-
-        .os-desktop-notifications-badge {
-            position: absolute;
-            top: -3px;
-            right: -2px;
-            min-width: 16px;
-            height: 16px;
-            padding: 0 4px;
-            border-radius: 999px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            background: linear-gradient(135deg, #ef4444, #f97316);
-            color: #fff;
-            font-size: 0.62rem;
-            font-weight: 800;
-            line-height: 1;
-            box-shadow: 0 8px 14px rgba(214, 69, 38, 0.24);
-        }
-
-        .os-notification-dropdown {
-            position: absolute;
-            top: calc(100% + 12px);
-            right: 52px;
-            width: min(360px, calc(100vw - 40px));
-            border-radius: 22px;
-            border: 1px solid rgba(226, 214, 201, 0.96);
-            background: rgba(255, 252, 248, 0.95);
-            box-shadow:
-                0 28px 60px rgba(55, 41, 24, 0.16),
-                inset 0 1px 0 rgba(255, 255, 255, 0.92);
-            backdrop-filter: blur(18px);
-            padding: 12px;
-            display: none;
-            z-index: 15;
-        }
-
-        .os-notification-dropdown.is-open {
-            display: grid;
             gap: 10px;
+            min-height: 52px;
+            padding: 0 18px;
+            border-radius: 18px;
+            border: 1px solid rgba(118, 101, 90, 0.14);
+            background: rgba(255,255,255,0.92);
+            color: #201915;
+            text-decoration: none;
+            font-weight: 700;
+            cursor: pointer;
         }
 
-        .os-notification-dropdown-header {
+        .gb-btn.primary {
+            background: #111;
+            color: #fff;
+            border-color: #111;
+        }
+
+        .gb-grid {
+            display: grid;
+            grid-template-columns: 1.3fr 1fr 1fr;
+            gap: 20px;
+        }
+
+        .gb-card {
+            border-radius: 28px;
+            border: 1px solid rgba(118, 101, 90, 0.12);
+            background: rgba(255, 251, 247, 0.86);
+            box-shadow: 0 22px 48px rgba(67, 51, 40, 0.07);
+            padding: 22px;
+            min-width: 0;
+        }
+
+        .gb-card h3 {
+            margin: 0 0 12px;
+            font-size: 1.1rem;
+            letter-spacing: -0.02em;
+        }
+
+        .gb-task-list,
+        .gb-plan-list,
+        .gb-tool-list,
+        .gb-notification-list {
+            display: grid;
+            gap: 12px;
+        }
+
+        .gb-task-item,
+        .gb-plan-item,
+        .gb-tool-item,
+        .gb-notification-item {
+            border-radius: 20px;
+            border: 1px solid rgba(118, 101, 90, 0.12);
+            background: rgba(255,255,255,0.9);
+            padding: 14px 15px;
+        }
+
+        .gb-task-item strong,
+        .gb-plan-item strong,
+        .gb-tool-item strong,
+        .gb-notification-item strong {
+            display: block;
+            margin-bottom: 4px;
+            color: #18120f;
+            letter-spacing: -0.02em;
+        }
+
+        .gb-muted {
+            color: rgba(90, 75, 65, 0.74);
+            line-height: 1.45;
+            font-size: 0.92rem;
+        }
+
+        .gb-inline-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 10px;
+            font-weight: 700;
+            text-decoration: none;
+            color: #151110;
+        }
+
+        .gb-launch-wrap {
+            display: grid;
+            grid-template-columns: 1.15fr .85fr;
+            gap: 20px;
+        }
+
+        .gb-launch-metric {
+            font-size: 0.85rem;
+            color: rgba(90, 75, 65, 0.74);
+            margin-top: 10px;
+        }
+
+        .gb-chat-fab {
+            position: fixed;
+            right: 32px;
+            bottom: 28px;
+            width: 64px;
+            height: 64px;
+            border-radius: 22px;
+            border: 1px solid rgba(17,17,17,0.12);
+            background: linear-gradient(135deg, #1a1715, #2f2620);
+            color: #fff;
+            display: grid;
+            place-items: center;
+            box-shadow: 0 28px 64px rgba(33, 23, 18, 0.28);
+            cursor: pointer;
+            z-index: 30;
+        }
+
+        .gb-chat-card,
+        .gb-chat-panel,
+        .gb-tools-panel {
+            position: fixed;
+            right: 32px;
+            bottom: 104px;
+            z-index: 29;
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(14px) scale(0.98);
+            transition: opacity 0.22s ease, transform 0.22s ease;
+        }
+
+        .gb-chat-card.is-open,
+        .gb-chat-panel.is-open,
+        .gb-tools-panel.is-open {
+            opacity: 1;
+            pointer-events: auto;
+            transform: translateY(0) scale(1);
+        }
+
+        .gb-chat-card {
+            width: 320px;
+            border-radius: 26px;
+            border: 1px solid rgba(118, 101, 90, 0.12);
+            background: rgba(255, 251, 247, 0.96);
+            box-shadow: 0 28px 64px rgba(33, 23, 18, 0.18);
+            padding: 18px;
+        }
+
+        .gb-chat-panel {
+            width: min(480px, calc(100vw - 130px));
+            height: min(720px, calc(100vh - 130px));
+            border-radius: 30px;
+            border: 1px solid rgba(118, 101, 90, 0.12);
+            background: rgba(255, 251, 247, 0.98);
+            box-shadow: 0 32px 70px rgba(33, 23, 18, 0.24);
+            overflow: hidden;
+            display: grid;
+            grid-template-rows: auto 1fr auto;
+        }
+
+        .gb-tools-panel {
+            width: min(420px, calc(100vw - 130px));
+            max-height: min(680px, calc(100vh - 120px));
+            overflow: auto;
+            border-radius: 28px;
+            border: 1px solid rgba(118, 101, 90, 0.12);
+            background: rgba(255, 251, 247, 0.98);
+            box-shadow: 0 32px 70px rgba(33, 23, 18, 0.24);
+            padding: 18px;
+        }
+
+        .gb-chat-head,
+        .gb-tools-head {
             display: flex;
             align-items: center;
             justify-content: space-between;
             gap: 12px;
-            padding: 4px 4px 2px;
+            padding: 18px 18px 16px;
+            border-bottom: 1px solid rgba(118, 101, 90, 0.1);
         }
 
-        .os-notification-dropdown-title {
-            font-size: 0.74rem;
-            text-transform: uppercase;
-            letter-spacing: 0.14em;
-            color: rgba(113, 95, 81, 0.7);
+        .gb-chat-stream {
+            overflow: auto;
+            padding: 18px;
+            display: grid;
+            gap: 12px;
+            align-content: start;
+            background: linear-gradient(180deg, rgba(251,247,243,0.96), rgba(244,236,227,0.9));
         }
 
-        .os-notification-dropdown-count {
-            font-size: 0.72rem;
-            color: rgba(113, 95, 81, 0.75);
-        }
-
-        .os-notification-dropdown-list {
+        .gb-msg-ai,
+        .gb-msg-user {
             display: grid;
             gap: 8px;
-            max-height: min(420px, calc(100vh - 220px));
-            overflow-y: auto;
-            padding-right: 2px;
         }
 
-        .os-notification-item {
-            width: 100%;
-            border: 1px solid rgba(226, 214, 201, 0.94);
-            background: rgba(255, 255, 255, 0.86);
-            border-radius: 18px;
-            padding: 11px 12px;
-            display: grid;
-            grid-template-columns: 36px minmax(0, 1fr);
-            gap: 10px;
-            align-items: start;
-            text-align: left;
-            cursor: pointer;
-            transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+        .gb-msg-user {
+            justify-items: end;
         }
 
-        .os-notification-item:hover {
-            transform: translateY(-1px);
-            border-color: rgba(204, 188, 171, 0.98);
-            box-shadow: 0 12px 24px rgba(66, 51, 39, 0.08);
+        .gb-bubble-ai,
+        .gb-bubble-user {
+            max-width: 88%;
+            border-radius: 20px;
+            padding: 14px 16px;
+            line-height: 1.55;
+            font-size: 0.94rem;
         }
 
-        .os-notification-item-icon {
-            width: 36px;
-            height: 36px;
-            border-radius: 999px;
-            display: grid;
-            place-items: center;
+        .gb-bubble-ai {
+            background: rgba(255,255,255,0.9);
+            border: 1px solid rgba(118, 101, 90, 0.1);
+            color: #211915;
+        }
+
+        .gb-bubble-user {
+            background: #111;
             color: #fff;
-            font-size: 0.72rem;
-            font-weight: 800;
-            letter-spacing: 0.04em;
-            background: linear-gradient(135deg, #8e1c74, #ff2c35);
         }
 
-        .os-notification-item-icon.task {
-            background: linear-gradient(135deg, #7f6f9e, #6d618d);
-        }
-
-        .os-notification-item-icon.mentor,
-        .os-notification-item-icon.lms {
-            background: linear-gradient(135deg, #7391c9, #5e7ab2);
-        }
-
-        .os-notification-item-icon.servio {
-            background: linear-gradient(135deg, #7ea19a, #668a83);
-        }
-
-        .os-notification-item-icon.bazaar {
-            background: linear-gradient(135deg, #b69c78, #a18b69);
-        }
-
-        .os-notification-item-title {
-            font-size: 0.8rem;
-            line-height: 1.4;
-            font-weight: 700;
-            color: rgba(42, 33, 27, 0.92);
-        }
-
-        .os-notification-item-meta {
-            display: block;
-            margin-top: 4px;
-            font-size: 0.72rem;
-            color: rgba(111, 94, 80, 0.76);
-            line-height: 1.45;
-        }
-
-        .os-notification-empty {
-            border: 1px solid rgba(226, 214, 201, 0.94);
-            background: rgba(255, 255, 255, 0.8);
-            border-radius: 18px;
-            padding: 16px;
-            font-size: 0.78rem;
-            color: rgba(111, 94, 80, 0.78);
-            line-height: 1.5;
-        }
-
-        .os-desktop-logout:hover {
-            transform: translateY(-1px);
-            background: rgba(255, 253, 250, 0.78);
-            box-shadow:
-                inset 0 1px 0 rgba(255, 255, 255, 0.9),
-                0 12px 22px rgba(80, 58, 40, 0.1);
-        }
-
-        .os-desktop-logout svg {
-            width: 16px;
-            height: 16px;
-            stroke: currentColor;
-            fill: none;
-            stroke-width: 1.8;
-            stroke-linecap: round;
-            stroke-linejoin: round;
-        }
-
-        .os-desktop-icons {
-            position: relative;
-            z-index: 2;
+        .gb-chat-actions,
+        .gb-choice-list {
             display: grid;
-            grid-template-columns: repeat(4, 116px);
-            gap: 24px 28px;
-            padding: 56px 0 92px 52px;
-            align-content: start;
-        }
-
-        .os-desktop-icon {
-            display: grid;
-            justify-items: center;
             gap: 10px;
-            text-decoration: none;
-            color: rgba(51, 40, 35, 0.92);
-            user-select: none;
+            margin-top: 10px;
+        }
+
+        .gb-choice {
+            width: 100%;
+            text-align: left;
+            padding: 13px 14px;
+            border-radius: 18px;
+            border: 1px solid rgba(118, 101, 90, 0.12);
+            background: rgba(255,255,255,0.94);
+            color: #181210;
             cursor: pointer;
-            transition: transform 0.18s ease;
+            font: inherit;
         }
 
-        .os-desktop-icon.is-disabled {
-            cursor: default;
-            opacity: 0.78;
+        .gb-chat-input-wrap {
+            padding: 14px 18px 18px;
+            border-top: 1px solid rgba(118, 101, 90, 0.1);
+            background: rgba(255, 251, 247, 0.98);
         }
 
-        .os-desktop-icon.dragging {
-            opacity: 0.45;
-            transform: scale(0.97);
-        }
-
-        .os-desktop-icon.drop-target .os-desktop-icon-tile {
-            transform: translateY(-3px);
-            box-shadow:
-                0 18px 34px rgba(70, 54, 42, 0.18),
-                0 0 0 2px rgba(255, 255, 255, 0.35);
-        }
-
-        .os-desktop-icon-tile {
-            width: 82px;
-            height: 82px;
-            border-radius: 20px;
-            display: grid;
-            place-items: center;
-            position: relative;
-            border: 1px solid rgba(255, 255, 255, 0.12);
-            box-shadow:
-                0 14px 28px rgba(61, 46, 28, 0.12),
-                inset 0 1px 0 rgba(255, 255, 255, 0.12);
-            transition: transform 0.18s ease, box-shadow 0.18s ease;
-            overflow: hidden;
-        }
-
-        .os-desktop-icon-tile::before {
-            content: "";
-            position: absolute;
-            inset: 1px;
-            border-radius: inherit;
-            background: linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.02));
-            opacity: 0.85;
-            pointer-events: none;
-        }
-
-        .os-desktop-icon-tile::after {
-            content: "";
-            position: absolute;
-            top: 8px;
-            left: 12px;
-            right: 12px;
-            height: 14px;
-            border-radius: 999px;
-            background: rgba(255, 255, 255, 0.12);
-            filter: blur(8px);
-            pointer-events: none;
-        }
-
-        .os-desktop-icon:hover .os-desktop-icon-tile {
-            transform: translateY(-2px);
-            box-shadow: 0 18px 34px rgba(61, 46, 28, 0.16);
-        }
-
-        .os-desktop-icon:hover {
-            transform: translateY(-1px);
-        }
-
-        .os-desktop-icon.is-disabled:hover,
-        .os-desktop-icon.is-disabled:hover .os-desktop-icon-tile {
-            transform: none;
-        }
-
-        .os-desktop-icon.is-disabled .os-desktop-icon-tile {
-            box-shadow:
-                0 10px 20px rgba(61, 46, 28, 0.08),
-                inset 0 1px 0 rgba(255, 255, 255, 0.12);
-            filter: saturate(0.9);
-        }
-
-        .os-desktop-icon-label {
-            font-size: 0.8rem;
-            font-weight: 500;
-            letter-spacing: -0.01em;
-            text-align: center;
-            line-height: 1.16;
-            max-width: 96px;
-            color: rgba(60, 47, 39, 0.88);
-        }
-
-        .os-desktop-icon svg {
-            width: 34px;
-            height: 34px;
-            stroke: #fff;
-            fill: none;
-            stroke-width: 1.8;
-            stroke-linecap: round;
-            stroke-linejoin: round;
-            position: relative;
-            z-index: 1;
-        }
-
-        .os-icon-learning { background: linear-gradient(180deg, #7d8dbc, #6977a1); }
-        .os-icon-inbox { background: linear-gradient(180deg, #9aa0af, #7f8597); }
-        .os-icon-brand { background: linear-gradient(180deg, #707382, #5f6272); }
-        .os-icon-ai { background: linear-gradient(180deg, #ed4177, #df4d53); }
-        .os-icon-activity { background: linear-gradient(180deg, #a992a1, #948195); }
-        .os-icon-commerce { background: linear-gradient(180deg, #b69c78, #a18b69); }
-        .os-icon-media { background: linear-gradient(180deg, #8ba0b8, #7489a2); }
-        .os-icon-website { background: linear-gradient(180deg, #8f9d8d, #798976); }
-        .os-icon-tasks { background: linear-gradient(180deg, #9a8ca4, #877a93); }
-        .os-icon-growth { background: linear-gradient(180deg, #ef77b0, #da5d94); }
-        .os-icon-marketing { background: linear-gradient(180deg, #f08f63, #db7250); }
-        .os-icon-search { background: linear-gradient(180deg, #8495a6, #6f8091); }
-        .os-icon-automation { background: linear-gradient(180deg, #7ea19a, #668a83); }
-        .os-icon-analytics { background: linear-gradient(180deg, #7f93be, #657dad); }
-        .os-icon-wallet { background: linear-gradient(180deg, #c2a067, #ad8d5c); }
-        .os-icon-orders { background: linear-gradient(180deg, #c48e6f, #ae7658); }
-        .os-icon-bookings { background: linear-gradient(180deg, #9a85bf, #846ca9); }
-
-        .os-desktop-footnote {
-            position: absolute;
-            right: 34px;
-            bottom: 28px;
-            z-index: 2;
-            color: rgba(106, 90, 82, 0.5);
-            font-size: 0.72rem;
-            letter-spacing: 0.05em;
-            text-transform: lowercase;
-        }
-
-        .os-desktop-icon.is-heartbeating .os-desktop-icon-tile {
-            animation: os-heartbeat-tile 1.7s ease-in-out infinite;
-        }
-
-        .os-desktop-icon.is-heartbeating .os-desktop-icon-label {
-            animation: os-heartbeat-label 1.7s ease-in-out infinite;
-        }
-
-        @keyframes os-heartbeat-tile {
-            0%, 100% {
-                transform: scale(1);
-                box-shadow:
-                    0 14px 28px rgba(61, 46, 28, 0.12),
-                    inset 0 1px 0 rgba(255, 255, 255, 0.12);
-            }
-            28% {
-                transform: scale(1.035);
-                box-shadow:
-                    0 20px 36px rgba(61, 46, 28, 0.18),
-                    0 0 0 8px rgba(255, 255, 255, 0.12),
-                    inset 0 1px 0 rgba(255, 255, 255, 0.12);
-            }
-            46% {
-                transform: scale(0.995);
-            }
-            62% {
-                transform: scale(1.02);
-            }
-        }
-
-        @keyframes os-heartbeat-label {
-            0%, 100% { color: rgba(60, 47, 39, 0.88); }
-            28% { color: rgba(31, 23, 18, 0.98); }
-        }
-
-        .os-desktop-dock {
-            position: absolute;
-            left: 50%;
-            bottom: 18px;
-            transform: translateX(-50%);
-            z-index: 9;
+        .gb-chat-input {
             display: flex;
-            align-items: center;
             gap: 10px;
-            padding: 10px 14px;
-            border-radius: 20px;
-            background: rgba(255, 248, 242, 0.46);
-            border: 1px solid rgba(238, 228, 219, 0.95);
-            box-shadow:
-                0 18px 34px rgba(66, 51, 39, 0.12),
-                inset 0 1px 0 rgba(255, 255, 255, 0.72);
-            backdrop-filter: blur(18px);
+            align-items: center;
+            min-height: 62px;
+            border-radius: 22px;
+            border: 1px solid rgba(118, 101, 90, 0.12);
+            background: rgba(255,255,255,0.95);
+            padding: 10px 12px 10px 16px;
         }
 
-        .os-desktop-dock:empty {
-            display: none;
+        .gb-chat-input textarea {
+            flex: 1;
+            min-height: 22px;
+            max-height: 140px;
+            resize: none;
+            border: 0;
+            outline: none;
+            background: transparent;
+            font: inherit;
+            color: #181210;
         }
 
-        .os-desktop-dock-item {
-            width: 52px;
-            height: 52px;
-            border-radius: 18px;
-            border: 1px solid rgba(229, 219, 208, 0.9);
-            background: rgba(255, 255, 255, 0.42);
-            box-shadow: 0 10px 18px rgba(66, 51, 39, 0.08);
-            display: grid;
-            place-items: center;
+        .gb-send {
+            min-width: 46px;
+            height: 46px;
+            border-radius: 14px;
+            border: 0;
+            background: #111;
+            color: #fff;
             cursor: pointer;
-            position: relative;
-            transition: transform 0.18s ease, box-shadow 0.18s ease;
-            padding: 0;
         }
 
-        .os-desktop-dock-item:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 14px 22px rgba(66, 51, 39, 0.14);
+        .gb-hidden {
+            display: none !important;
         }
 
-        .os-desktop-dock-item.active {
-            transform: translateY(-3px);
-            box-shadow: 0 18px 28px rgba(66, 51, 39, 0.18);
+        .gb-status {
+            padding: 12px 14px;
+            border-radius: 16px;
+            background: rgba(245, 238, 231, 0.96);
+            border: 1px solid rgba(118, 101, 90, 0.12);
+            color: rgba(90, 75, 65, 0.84);
+            font-size: 0.9rem;
         }
 
-        .os-desktop-dock-item.minimized::after,
-        .os-desktop-dock-item.active::after {
-            content: "";
-            position: absolute;
-            bottom: -8px;
-            left: 50%;
-            width: 8px;
-            height: 8px;
-            margin-left: -4px;
-            border-radius: 999px;
-            background: rgba(81, 65, 55, 0.6);
-        }
-
-        .os-dock-icon-tile {
-            width: 38px;
-            height: 38px;
-            border-radius: 13px;
-            display: grid;
-            place-items: center;
-            position: relative;
-            overflow: hidden;
-            box-shadow:
-                inset 0 1px 0 rgba(255, 255, 255, 0.14),
-                0 8px 16px rgba(62, 47, 36, 0.16);
-        }
-
-        .os-dock-icon-tile::before {
-            content: "";
-            position: absolute;
-            inset: 1px;
-            border-radius: inherit;
-            background: linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.03));
-            pointer-events: none;
-        }
-
-        .os-desktop-dock-item svg {
-            width: 20px;
-            height: 20px;
-            stroke: #fff;
-            fill: none;
-            stroke-width: 1.8;
-            stroke-linecap: round;
-            stroke-linejoin: round;
-        }
-
-        @media (max-width: 900px) {
-            .os-desktop-scene {
-                padding: 18px;
+        @media (max-width: 1180px) {
+            .gb-grid,
+            .gb-launch-wrap {
+                grid-template-columns: 1fr;
             }
+        }
 
-            .os-desktop-frame {
-                min-height: calc(100vh - 36px);
-                border-radius: 18px;
-            }
-
-            .os-desktop-bar {
+        @media (max-width: 860px) {
+            .gb-shell {
                 grid-template-columns: 1fr;
             }
 
-            .os-desktop-bar-left {
-                flex-wrap: wrap;
+            .gb-rail {
+                display: none;
             }
 
-            .os-desktop-icons {
-                grid-template-columns: repeat(2, minmax(0, 1fr));
-                gap: 24px 18px;
-                padding: 36px 20px 72px;
+            .gb-topbar,
+            .gb-body {
+                padding-left: 18px;
+                padding-right: 18px;
+            }
+
+            .gb-chat-panel,
+            .gb-tools-panel {
+                right: 16px;
+                bottom: 90px;
+                width: calc(100vw - 32px);
+            }
+
+            .gb-chat-fab {
+                right: 16px;
+                bottom: 16px;
             }
         }
     </style>
 @endsection
 
-@section('scripts')
-    <script>
-        (() => {
-            const desktop = document.querySelector('[data-os-desktop-home]');
-            if (!desktop) return;
-
-            const founderId = @json((string) ($dashboard['founder']->id ?? 'guest'));
-            const todayKey = @json(now()->timezone(config('app.timezone'))->format('Y-m-d'));
-            const openedStorageKey = `hatchers-os-opened-icons-${founderId}`;
-            const tasksBeatKey = `hatchers-os-tasks-heartbeat-${founderId}`;
-
-            const readJson = (key) => {
-                try {
-                    return JSON.parse(window.localStorage.getItem(key) || '{}');
-                } catch (error) {
-                    return {};
-                }
-            };
-
-            const writeJson = (key, value) => {
-                try {
-                    window.localStorage.setItem(key, JSON.stringify(value));
-                } catch (error) {
-                    // Ignore storage failures.
-                }
-            };
-
-            const markOpened = (iconKey) => {
-                if (!iconKey) return;
-                const openedState = readJson(openedStorageKey);
-                openedState[iconKey] = todayKey;
-                writeJson(openedStorageKey, openedState);
-            };
-
-            const openedState = readJson(openedStorageKey);
-            const tasksState = readJson(tasksBeatKey);
-
-            desktop.querySelectorAll('.os-desktop-icon[data-launcher-key]').forEach((icon) => {
-                const iconKey = icon.dataset.launcherKey || '';
-                const needsHeartbeat = icon.dataset.launcherHeartbeat === '1';
-                const needsDailyHeartbeat = icon.dataset.launcherDailyHeartbeat === '1';
-                const isDisabled = icon.dataset.launcherDisabled === '1';
-
-                if (needsHeartbeat && openedState[iconKey] !== todayKey) {
-                    icon.classList.add('is-heartbeating');
-                }
-
-                if (needsDailyHeartbeat && tasksState[todayKey] !== true) {
-                    icon.classList.add('is-heartbeating');
-                }
-
-                icon.addEventListener('click', (event) => {
-                    if (isDisabled) {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        return;
-                    }
-
-                    markOpened(iconKey);
-                    icon.classList.remove('is-heartbeating');
-
-                    if (needsDailyHeartbeat) {
-                        const nextTasksState = readJson(tasksBeatKey);
-                        nextTasksState[todayKey] = true;
-                        writeJson(tasksBeatKey, nextTasksState);
-                    }
-                });
-            });
-
-            const notificationToggle = desktop.querySelector('[data-notification-toggle]');
-            const notificationDropdown = desktop.querySelector('[data-notification-dropdown]');
-
-            notificationToggle?.addEventListener('click', (event) => {
-                event.stopPropagation();
-                notificationDropdown?.classList.toggle('is-open');
-            });
-
-            notificationDropdown?.addEventListener('click', (event) => {
-                const button = event.target.closest('[data-notification-open]');
-                if (!button) return;
-                const key = button.getAttribute('data-notification-open') || '';
-                notificationDropdown.classList.remove('is-open');
-                if (key) {
-                    window.dispatchEvent(new CustomEvent('hatchers:open-app', {
-                        detail: { key },
-                    }));
-                }
-            });
-
-            window.addEventListener('click', (event) => {
-                if (!notificationDropdown?.classList.contains('is-open')) return;
-                if (notificationDropdown.contains(event.target) || notificationToggle?.contains(event.target)) return;
-                notificationDropdown.classList.remove('is-open');
-            });
-        })();
-    </script>
-@endsection
-
 @section('content')
-    @php
-        $workspace = $dashboard['workspace'] ?? [];
-        $launchCards = collect($launchCards ?? [])->keyBy(fn ($card) => strtolower((string) ($card['module'] ?? '')));
-        $desktopOpen = request('open', '');
-        $desktopNow = now()->timezone(config('app.timezone'));
-        $desktopClock = $desktopNow->format('D, M j   g:i A');
-        $desktopDateKey = $desktopNow->format('Y-m-d');
-        $businessModel = strtolower((string) ($dashboard['company']->business_model ?? 'hybrid'));
-        $supportsProducts = in_array($businessModel, ['product', 'hybrid'], true);
-        $supportsServices = in_array($businessModel, ['service', 'hybrid'], true);
-        $companyIntelligenceWizard = $companyIntelligenceWizard ?? ['is_complete' => true];
-        $companyIntelligenceComplete = (bool) ($companyIntelligenceWizard['is_complete'] ?? true);
-        $unreadNotificationCount = (int) ($workspace['unread_notification_count'] ?? 0);
-        $notificationItems = collect(array_merge(
-            $workspace['notification_groups']['new'] ?? [],
-            $workspace['notification_groups']['earlier'] ?? []
-        ))->take(6)->map(function (array $item): array {
-            $kind = strtolower((string) ($item['kind'] ?? 'default'));
-            $appKey = trim((string) ($item['app_key'] ?? ''));
-            if ($appKey === '') {
-                $appKey = match ($kind) {
-                    'mentor', 'lms' => 'learning-plan',
-                    'task' => 'tasks',
-                    'atlas' => 'atlas-brand-studio',
-                    'bazaar' => 'bazaar-engine',
-                    'servio' => 'servio-engine',
-                    'website', 'website_building', 'website_ready' => 'build-website',
-                    default => 'inbox',
-                };
-            }
+    <div class="gb-shell"
+         id="guidebookShell"
+         data-onboarding-needed="{{ $chatNeedsOnboarding ? '1' : '0' }}"
+         data-onboarding-endpoint="{{ route('assistant.chat.onboarding-complete') }}"
+         data-reset-endpoint="{{ route('assistant.chat.reset') }}"
+         data-assistant-endpoint="{{ route('assistant.chat') }}">
+        <aside class="gb-rail">
+            <div class="gb-rail-mark"></div>
+            <a href="{{ route('dashboard') }}" class="gb-rail-link is-active" title="Home">⌂</a>
+            <a href="{{ route('founder.tasks') }}" class="gb-rail-link" title="Tasks">✓</a>
+            <a href="{{ route('founder.inbox') }}" class="gb-rail-link" title="Inbox">✉</a>
+            <button type="button" class="gb-rail-chat" id="railAiToolsBtn" title="AI Tools">✦</button>
+        </aside>
 
-            return [
-                'title' => (string) ($item['title'] ?? 'Update'),
-                'meta' => trim(implode(' · ', array_filter([
-                    (string) ($item['meta'] ?? ''),
-                    (string) ($item['age_label'] ?? ''),
-                ]))),
-                'kind' => $kind,
-                'app_key' => $appKey,
-                'badge' => strtoupper(substr($kind !== '' ? $kind : 'i', 0, 1)),
-            ];
-        })->values()->all();
-        $desktopApps = [
-            [
-                'key' => 'lms-engine',
-                'label' => 'LMS',
-                'route' => (string) ($launchCards->get('lms')['url'] ?? route('founder.learning-plan')),
-                'class' => 'os-icon-learning',
-                'icon' => 'cap',
-                'external' => !empty($launchCards->get('lms')['url']),
-            ],
-            [
-                'key' => 'bazaar-engine',
-                'label' => 'Bazaar',
-                'route' => (string) ($launchCards->get('bazaar')['url'] ?? route('founder.commerce')),
-                'class' => 'os-icon-commerce',
-                'icon' => 'bag',
-                'external' => !empty($launchCards->get('bazaar')['url']),
-            ],
-            [
-                'key' => 'servio-engine',
-                'label' => 'Servio',
-                'route' => (string) ($launchCards->get('servio')['url'] ?? route('website')),
-                'class' => 'os-icon-website',
-                'icon' => 'window',
-                'external' => !empty($launchCards->get('servio')['url']),
-                'openInBrowser' => true,
-            ],
-            [
-                'key' => 'learning-plan',
-                'label' => 'Learning Hub',
-                'route' => route('founder.learning-plan'),
-                'class' => 'os-icon-learning',
-                'icon' => 'cap',
-                'external' => false,
-            ],
-            [
-                'key' => 'inbox',
-                'label' => 'Inbox',
-                'route' => route('founder.inbox'),
-                'class' => 'os-icon-inbox',
-                'icon' => 'tray',
-                'external' => false,
-            ],
-            [
-                'key' => 'settings',
-                'label' => 'Company Intelligence',
-                'route' => route('founder.settings', ['step' => 'basics']),
-                'class' => 'os-icon-automation',
-                'icon' => 'gear',
-                'external' => false,
-                'heartbeat' => !$companyIntelligenceComplete,
-            ],
-            [
-                'key' => 'build-website',
-                'label' => 'Build My Website',
-                'route' => route('website', ['stage' => 'build']),
-                'class' => 'os-icon-website',
-                'icon' => 'window',
-                'external' => false,
-            ],
-            [
-                'key' => 'atlas-brand-studio',
-                'label' => 'Brand Studio',
-                'route' => route('founder.settings'),
-                'class' => 'os-icon-brand',
-                'icon' => 'spark',
-                'external' => false,
-            ],
-            [
-                'key' => 'atlas-campaign-studio',
-                'label' => 'Campaign Studio',
-                'route' => route('workspace.launch', ['module' => 'atlas', 'target' => '/ai-images']),
-                'class' => 'os-icon-marketing',
-                'icon' => 'image',
-                'external' => true,
-            ],
-            [
-                'key' => 'atlas-agents',
-                'label' => 'Atlas Agents',
-                'route' => route('workspace.launch', ['module' => 'atlas', 'target' => '/ai-chat-bots']),
-                'class' => 'os-icon-ai',
-                'icon' => 'user',
-                'external' => true,
-            ],
-            [
-                'key' => 'media-library',
-                'label' => 'Media Library',
-                'route' => route('founder.media-library'),
-                'class' => 'os-icon-media',
-                'icon' => 'image',
-                'external' => false,
-            ],
-            [
-                'key' => 'tasks',
-                'label' => 'Tasks',
-                'route' => route('founder.tasks'),
-                'class' => 'os-icon-tasks',
-                'icon' => 'checklist',
-                'external' => false,
-                'daily_heartbeat' => true,
-            ],
-            [
-                'key' => 'first-100',
-                'label' => 'Lead Tracker',
-                'route' => route('founder.first-100'),
-                'class' => 'os-icon-growth',
-                'icon' => 'target',
-                'external' => false,
-            ],
-            [
-                'key' => 'search',
-                'label' => 'Search',
-                'route' => route('founder.search'),
-                'class' => 'os-icon-search',
-                'icon' => 'search',
-                'external' => false,
-            ],
-            [
-                'key' => 'automations',
-                'label' => 'Automations (Coming Soon)',
-                'route' => 'javascript:void(0)',
-                'class' => 'os-icon-automation',
-                'icon' => 'gear',
-                'external' => false,
-                'disabled' => true,
-            ],
-            [
-                'key' => 'affiliate-network',
-                'label' => 'Affiliate Network (Coming Soon)',
-                'route' => 'javascript:void(0)',
-                'class' => 'os-icon-growth',
-                'icon' => 'target',
-                'external' => false,
-                'disabled' => true,
-            ],
-            [
-                'key' => 'offer-engineering',
-                'label' => 'Offer Engineering (Coming Soon)',
-                'route' => 'javascript:void(0)',
-                'class' => 'os-icon-brand',
-                'icon' => 'spark',
-                'external' => false,
-                'disabled' => true,
-            ],
-            [
-                'key' => 'analytics',
-                'label' => 'Analytics',
-                'route' => route('founder.analytics'),
-                'class' => 'os-icon-analytics',
-                'icon' => 'chart',
-                'external' => false,
-            ],
-            [
-                'key' => 'wallet',
-                'label' => 'Wallet',
-                'route' => route('founder.commerce.wallet'),
-                'class' => 'os-icon-wallet',
-                'icon' => 'wallet',
-                'external' => false,
-            ],
-        ];
-
-        if ($supportsProducts) {
-            $desktopApps[] = [
-                'key' => 'orders',
-                'label' => 'Orders',
-                'route' => route('founder.commerce.orders'),
-                'class' => 'os-icon-orders',
-                'icon' => 'box',
-                'external' => false,
-            ];
-        }
-
-    @endphp
-
-    <div class="os-desktop-scene" data-os-desktop-home data-os-open="{{ e((string) $desktopOpen) }}">
-        <div class="os-desktop-frame">
-            <div class="os-desktop-bar">
-                <div class="os-desktop-bar-left">
-                    <a class="os-desktop-brand" href="/dashboard/founder">
-                        <span class="os-desktop-brand-mark"></span>
-                        <span class="os-desktop-brand-name">Hatchers AI OS</span>
-                    </a>
-                    <div class="os-desktop-search">
-                        <svg viewBox="0 0 24 24" aria-hidden="true">
-                            <circle cx="11" cy="11" r="6.5"></circle>
-                            <path d="M16 16L21 21"></path>
-                        </svg>
-                        <span class="os-desktop-search-text">What would you like to do?</span>
-                        <span class="os-desktop-shortcut">⌘K</span>
-                    </div>
+        <div class="gb-main">
+            <div class="gb-topbar">
+                <div class="gb-search">
+                    <span>What would you like to do?</span>
+                    <span class="gb-search-kbd">⌘K</span>
                 </div>
-                <div class="os-desktop-bar-right">
-                    <button class="os-desktop-notifications" type="button" aria-label="Notifications" data-notification-toggle>
-                        <svg viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M12 4C9.8 4 8 5.8 8 8V10.1C8 11 7.7 11.8 7.1 12.5L5.8 14C5.2 14.6 5.6 15.5 6.4 15.5H17.6C18.4 15.5 18.8 14.6 18.2 14L16.9 12.5C16.3 11.8 16 11 16 10.1V8C16 5.8 14.2 4 12 4Z"></path>
-                            <path d="M10 18C10.4 19.1 11.1 19.6 12 19.6C12.9 19.6 13.6 19.1 14 18"></path>
-                        </svg>
-                        @if ($unreadNotificationCount > 0)
-                            <span class="os-desktop-notifications-badge">{{ $unreadNotificationCount > 9 ? '9+' : $unreadNotificationCount }}</span>
+                <div class="gb-topbar-right">
+                    <a href="{{ route('founder.notifications') }}" class="gb-bell" aria-label="Notifications">
+                        <span>🔔</span>
+                        @if(!empty($workspace['unread_notification_count']))
+                            <span class="gb-bell-badge">{{ $workspace['unread_notification_count'] }}</span>
                         @endif
-                    </button>
-                    <div class="os-notification-dropdown" data-notification-dropdown>
-                        <div class="os-notification-dropdown-header">
-                            <div class="os-notification-dropdown-title">Notifications</div>
-                            <div class="os-notification-dropdown-count">{{ $unreadNotificationCount }} active</div>
-                        </div>
-                        <div class="os-notification-dropdown-list">
-                            @forelse ($notificationItems as $notification)
-                                <button
-                                    type="button"
-                                    class="os-notification-item"
-                                    data-notification-open="{{ $notification['app_key'] }}"
-                                >
-                                    <span class="os-notification-item-icon {{ $notification['kind'] }}">{{ $notification['badge'] }}</span>
-                                    <span>
-                                        <span class="os-notification-item-title">{{ $notification['title'] }}</span>
-                                        <span class="os-notification-item-meta">{{ $notification['meta'] !== '' ? $notification['meta'] : 'Open in workspace' }}</span>
-                                    </span>
-                                </button>
-                            @empty
-                                <div class="os-notification-empty">No new notifications right now. When something needs attention, it will appear here.</div>
-                            @endforelse
+                    </a>
+                    <div class="gb-user">
+                        <span class="gb-user-avatar"></span>
+                        <div>
+                            <strong style="display:block;">{{ $founder->full_name }}</strong>
+                            <span class="gb-muted">{{ now()->format('D, M j g:i A') }}</span>
                         </div>
                     </div>
-                    <div class="os-desktop-time">{{ $desktopClock }}</div>
-                    <form class="os-desktop-logout-form" method="POST" action="/logout">
+                    <form method="POST" action="{{ route('logout') }}">
                         @csrf
-                        <button class="os-desktop-logout" type="submit" aria-label="Log out">
-                            <svg viewBox="0 0 24 24" aria-hidden="true">
-                                <path d="M10 17L15 12L10 7"></path>
-                                <path d="M15 12H4"></path>
-                                <path d="M20 20H12"></path>
-                                <path d="M20 4H12"></path>
-                            </svg>
-                            <span>Logout</span>
-                        </button>
+                        <button type="submit" class="gb-btn">Logout</button>
                     </form>
                 </div>
             </div>
 
-            @if (session('info') || session('success') || session('error'))
-                <div style="padding: 0 18px 12px; position: relative; z-index: 2;">
-                    <div style="border-radius: 18px; border: 1px solid rgba(220, 207, 191, 0.86); background: rgba(255, 251, 247, 0.76); box-shadow: 0 12px 24px rgba(71, 52, 31, 0.05); padding: 12px 14px; color: rgba(72, 58, 49, 0.88); font-size: 0.88rem;">
-                        {{ session('error') ?? session('success') ?? session('info') }}
+            <main class="gb-body">
+                <section class="gb-hero">
+                    <div class="gb-hero-meta">
+                        <span class="gb-chip">{{ $chatNeedsOnboarding ? 'Setup in progress' : 'Launch workspace' }}</span>
+                        <span class="gb-chip">{{ $projectName !== '' ? $projectName : 'New project' }}</span>
                     </div>
-                </div>
-            @endif
-
-            <div class="os-desktop-icons" data-os-launcher data-storage-key="hatchers-os-desktop-order-{{ $dashboard['founder']->id ?? 'guest' }}">
-                @foreach ($desktopApps as $app)
-                    <a
-                        class="os-desktop-icon {{ !empty($app['disabled']) ? 'is-disabled' : '' }}"
-                        href="{{ $app['route'] }}"
-                        draggable="true"
-                        data-launcher-key="{{ $app['key'] }}"
-                        data-launcher-label="{{ $app['label'] }}"
-                        @if (empty($app['disabled']))
-                            data-launcher-route="{{ $app['route'] }}"
+                    <h1 class="gb-heading">
+                        @if($chatNeedsOnboarding)
+                            Let’s shape this business through chat and turn it into a real launch plan.
+                        @else
+                            {{ $launchPlanState['title'] ?? 'Your Hatchers launch workspace is ready.' }}
                         @endif
-                        data-launcher-class="{{ $app['class'] }}"
-                        data-launcher-icon="{{ $app['icon'] }}"
-                        data-launcher-external="{{ !empty($app['external']) ? '1' : '0' }}"
-                        data-launcher-heartbeat="{{ !empty($app['heartbeat']) ? '1' : '0' }}"
-                        data-launcher-daily-heartbeat="{{ !empty($app['daily_heartbeat']) ? '1' : '0' }}"
-                        data-launcher-disabled="{{ !empty($app['disabled']) ? '1' : '0' }}"
-                        aria-disabled="{{ !empty($app['disabled']) ? 'true' : 'false' }}"
-                    >
-                        <span class="os-desktop-icon-tile {{ $app['class'] }}">
-                            @switch($app['icon'])
-                                @case('cap')
-                                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                                        <path d="M3 9L12 4L21 9L12 14L3 9Z"></path>
-                                        <path d="M7 11V16L12 19L17 16V11"></path>
-                                    </svg>
-                                    @break
-                                @case('tray')
-                                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                                        <path d="M4 9H20L18 17H6L4 9Z"></path>
-                                        <path d="M9 13H15"></path>
-                                    </svg>
-                                    @break
-                                @case('sun')
-                                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                                        <circle cx="12" cy="12" r="3.2"></circle>
-                                        <path d="M12 4V2"></path>
-                                        <path d="M12 22V20"></path>
-                                        <path d="M4 12H2"></path>
-                                        <path d="M22 12H20"></path>
-                                        <path d="M6.3 6.3L4.9 4.9"></path>
-                                        <path d="M19.1 19.1L17.7 17.7"></path>
-                                        <path d="M17.7 6.3L19.1 4.9"></path>
-                                        <path d="M4.9 19.1L6.3 17.7"></path>
-                                    </svg>
-                                    @break
-                                @case('spark')
-                                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                                        <path d="M12 3L13.8 8.2L19 10L13.8 11.8L12 17L10.2 11.8L5 10L10.2 8.2L12 3Z"></path>
-                                        <path d="M18.5 3.5L19.2 5.3L21 6L19.2 6.7L18.5 8.5L17.8 6.7L16 6L17.8 5.3L18.5 3.5Z"></path>
-                                    </svg>
-                                    @break
-                                @case('globe')
-                                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                                        <circle cx="12" cy="12" r="8"></circle>
-                                        <path d="M4 12H20"></path>
-                                        <path d="M12 4C14.8 6.7 14.8 17.3 12 20"></path>
-                                        <path d="M12 4C9.2 6.7 9.2 17.3 12 20"></path>
-                                    </svg>
-                                    @break
-                                @case('calendar')
-                                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                                        <rect x="4" y="6" width="16" height="14" rx="2"></rect>
-                                        <path d="M8 3V8"></path>
-                                        <path d="M16 3V8"></path>
-                                        <path d="M4 10H20"></path>
-                                    </svg>
-                                    @break
-                                @case('calendar-check')
-                                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                                        <rect x="4" y="6" width="16" height="14" rx="2"></rect>
-                                        <path d="M8 3V8"></path>
-                                        <path d="M16 3V8"></path>
-                                        <path d="M4 10H20"></path>
-                                        <path d="M9 15L11.2 17.2L15.5 12.9"></path>
-                                    </svg>
-                                    @break
-                                @case('bag')
-                                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                                        <path d="M6 9H18L17 19H7L6 9Z"></path>
-                                        <path d="M9 9V7C9 5.3 10.3 4 12 4C13.7 4 15 5.3 15 7V9"></path>
-                                    </svg>
-                                    @break
-                                @case('file')
-                                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                                        <path d="M8 3H15L20 8V21H8C6.9 21 6 20.1 6 19V5C6 3.9 6.9 3 8 3Z"></path>
-                                        <path d="M15 3V8H20"></path>
-                                    </svg>
-                                    @break
-                                @case('image')
-                                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                                        <rect x="4" y="5" width="16" height="14" rx="2"></rect>
-                                        <circle cx="9" cy="10" r="1.5"></circle>
-                                        <path d="M7 17L11.5 12.5L14.5 15.5L17 13L20 17"></path>
-                                    </svg>
-                                    @break
-                                @case('gear')
-                                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                                        <circle cx="12" cy="12" r="3"></circle>
-                                        <path d="M19.4 15A1.7 1.7 0 0 0 19.7 16.8L19.8 17C20.1 17.6 20 18.3 19.5 18.7L18.7 19.5C18.3 20 17.6 20.1 17 19.8L16.8 19.7A1.7 1.7 0 0 0 15 19.4C14.4 19.6 14 20.2 14 20.8V21C14 21.6 13.6 22 13 22H11C10.4 22 10 21.6 10 21V20.8C10 20.2 9.6 19.6 9 19.4A1.7 1.7 0 0 0 7.2 19.7L7 19.8C6.4 20.1 5.7 20 5.3 19.5L4.5 18.7C4 18.3 3.9 17.6 4.2 17L4.3 16.8A1.7 1.7 0 0 0 4 15C3.8 14.4 3.2 14 2.6 14H2.4C1.8 14 1.4 13.6 1.4 13V11C1.4 10.4 1.8 10 2.4 10H2.6C3.2 10 3.8 9.6 4 9A1.7 1.7 0 0 0 3.7 7.2L3.6 7C3.3 6.4 3.4 5.7 3.9 5.3L4.7 4.5C5.1 4 5.8 3.9 6.4 4.2L6.6 4.3A1.7 1.7 0 0 0 8.4 4C9 3.8 9.4 3.2 9.4 2.6V2.4C9.4 1.8 9.8 1.4 10.4 1.4H12.4C13 1.4 13.4 1.8 13.4 2.4V2.6C13.4 3.2 13.8 3.8 14.4 4A1.7 1.7 0 0 0 16.2 3.7L16.4 3.6C17 3.3 17.7 3.4 18.1 3.9L18.9 4.7C19.4 5.1 19.5 5.8 19.2 6.4L19.1 6.6A1.7 1.7 0 0 0 19.4 8.4C19.6 9 20.2 9.4 20.8 9.4H21C21.6 9.4 22 9.8 22 10.4V12.4C22 13 21.6 13.4 21 13.4H20.8C20.2 13.4 19.6 13.8 19.4 14.4Z"></path>
-                                    </svg>
-                                    @break
-                                @case('window')
-                                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                                        <rect x="4" y="5" width="16" height="14" rx="2"></rect>
-                                        <path d="M4 9H20"></path>
-                                        <path d="M8 7H8.01"></path>
-                                        <path d="M11 7H11.01"></path>
-                                    </svg>
-                                    @break
-                                @case('checklist')
-                                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                                        <path d="M9 7H18"></path>
-                                        <path d="M9 12H18"></path>
-                                        <path d="M9 17H18"></path>
-                                        <path d="M5 7L6.2 8.2L8 6.4"></path>
-                                        <path d="M5 12L6.2 13.2L8 11.4"></path>
-                                        <path d="M5 17L6.2 18.2L8 16.4"></path>
-                                    </svg>
-                                    @break
-                                @case('target')
-                                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                                        <circle cx="12" cy="12" r="7"></circle>
-                                        <circle cx="12" cy="12" r="3.5"></circle>
-                                        <path d="M12 2V5"></path>
-                                        <path d="M22 12H19"></path>
-                                    </svg>
-                                    @break
-                                @case('megaphone')
-                                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                                        <path d="M4 12V9.5C4 8.7 4.7 8 5.5 8H8L16 5V19L8 16H5.5C4.7 16 4 15.3 4 14.5V12Z"></path>
-                                        <path d="M8 16L9.5 20"></path>
-                                        <path d="M18.5 9.5C19.5 10.2 20 11 20 12C20 13 19.5 13.8 18.5 14.5"></path>
-                                    </svg>
-                                    @break
-                                @case('search')
-                                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                                        <circle cx="11" cy="11" r="6"></circle>
-                                        <path d="M20 20L16.5 16.5"></path>
-                                    </svg>
-                                    @break
-                                @case('chart')
-                                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                                        <path d="M5 19V10"></path>
-                                        <path d="M12 19V6"></path>
-                                        <path d="M19 19V13"></path>
-                                        <path d="M4 19H20"></path>
-                                    </svg>
-                                    @break
-                                @case('wallet')
-                                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                                        <path d="M5 7.5C5 6.7 5.7 6 6.5 6H17.5C18.3 6 19 6.7 19 7.5V9H14.5C13.1 9 12 10.1 12 11.5C12 12.9 13.1 14 14.5 14H19V16.5C19 17.3 18.3 18 17.5 18H6.5C5.7 18 5 17.3 5 16.5V7.5Z"></path>
-                                        <path d="M19 9V14H14.5C13.7 14 13 13.3 13 12.5V10.5C13 9.7 13.7 9 14.5 9H19Z"></path>
-                                    </svg>
-                                    @break
-                                @case('box')
-                                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                                        <path d="M4 8L12 4L20 8L12 12L4 8Z"></path>
-                                        <path d="M4 8V16L12 20L20 16V8"></path>
-                                        <path d="M12 12V20"></path>
-                                    </svg>
-                                    @break
-                                @case('pulse')
-                                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                                        <path d="M3 12H7L9.5 7L13.5 17L16 12H21"></path>
-                                    </svg>
-                                    @break
-                                @case('user')
-                                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                                        <circle cx="12" cy="8" r="3.3"></circle>
-                                        <path d="M6 20C6.8 16.9 9 15.3 12 15.3C15 15.3 17.2 16.9 18 20"></path>
-                                    </svg>
-                                    @break
-                            @endswitch
-                        </span>
-                        <span class="os-desktop-icon-label">{{ $app['label'] }}</span>
+                    </h1>
+                    <p class="gb-subcopy">
+                        @if($chatNeedsOnboarding)
+                            Hatchers will collect the core business context, infer the rest, then build the milestones, tasks, and website direction using the same playbook structure as the guidebook prototype.
+                        @else
+                            {{ $launchPlanState['summary'] ?? 'Your company intelligence, launch plan, and first tasks are now aligned inside Hatchers OS.' }}
+                        @endif
+                    </p>
+                    <div class="gb-hero-actions">
+                        <button type="button" class="gb-btn primary" id="newProjectBtn">
+                            {{ $chatNeedsOnboarding ? 'Start founder chat' : 'Refine launch plan' }}
+                        </button>
+                        <a href="{{ route('website') }}" class="gb-btn">Build My Website</a>
+                        <button type="button" class="gb-btn" id="openToolsBtn">AI Tools</button>
+                    </div>
+                </section>
+
+                <section class="gb-grid">
+                    <article class="gb-card">
+                        <h3>Tasks</h3>
+                        <div class="gb-task-list">
+                            @forelse(array_slice($taskEntries, 0, 4) as $task)
+                                <div class="gb-task-item">
+                                    <strong>{{ $task['title'] }}</strong>
+                                    <div class="gb-muted">{{ $task['description'] }}</div>
+                                    @if(!empty($task['milestone']))
+                                        <div class="gb-launch-metric">{{ $task['milestone'] }} · {{ $task['north_star_metric'] }}</div>
+                                    @endif
+                                    <a href="{{ $task['cta_url'] ?: route('founder.tasks') }}" class="gb-inline-link">{{ $task['cta_label'] ?: 'Open' }} →</a>
+                                </div>
+                            @empty
+                                <div class="gb-status">Once the onboarding chat is complete, Hatchers will write your first detailed execution tasks here.</div>
+                            @endforelse
+                        </div>
+                    </article>
+
+                    <article class="gb-card">
+                        <h3>Inbox</h3>
+                        <div class="gb-notification-list">
+                            @forelse(array_slice($notifications, 0, 4) as $item)
+                                <div class="gb-notification-item">
+                                    <strong>{{ $item['title'] ?? 'Update from Hatchers' }}</strong>
+                                    <div class="gb-muted">{{ $item['body'] ?? $item['description'] ?? 'Your OS activity will appear here.' }}</div>
+                                </div>
+                            @empty
+                                <div class="gb-status">No inbox updates yet. Hatchers will surface execution notes, system updates, and guidance here.</div>
+                            @endforelse
+                        </div>
+                    </article>
+
+                    <article class="gb-card">
+                        <h3>AI Tools</h3>
+                        <div class="gb-tool-list">
+                            @foreach(array_slice($topActions, 0, 4) as $tool)
+                                <div class="gb-tool-item">
+                                    <strong>{{ $tool['label'] }}</strong>
+                                    <div class="gb-muted">{{ $tool['description'] }}</div>
+                                </div>
+                            @endforeach
+                        </div>
+                        <button type="button" class="gb-btn" style="margin-top:16px;" id="openToolsBtnSecondary">Open all AI tools</button>
+                    </article>
+                </section>
+
+                <section class="gb-launch-wrap">
+                    <article class="gb-card">
+                        <h3>Launch plan</h3>
+                        <div class="gb-plan-list">
+                            @forelse($launchMilestones as $milestone)
+                                <div class="gb-plan-item">
+                                    <strong>{{ $milestone['title'] ?? 'Milestone' }}</strong>
+                                    <div class="gb-muted">{{ $milestone['objective'] ?? '' }}</div>
+                                    <div class="gb-launch-metric">{{ $milestone['north_star_metric'] ?? '' }} · {{ $milestone['estimated_hours'] ?? 0 }} hrs</div>
+                                </div>
+                            @empty
+                                <div class="gb-status">No launch plan yet. Start the founder chat and Hatchers will build a milestone-based plan with realistic pacing.</div>
+                            @endforelse
+                        </div>
+                    </article>
+
+                    <article class="gb-card">
+                        <h3>Plan pacing</h3>
+                        @if(!empty($launchPlanState['pace']))
+                            <div class="gb-status">Hours per week: {{ $launchPlanState['pace']['hours_per_week'] ?? 0 }}</div>
+                            <div class="gb-status" style="margin-top:10px;">Effective weekly capacity: {{ $launchPlanState['pace']['effective_hours_per_week'] ?? 0 }} hrs</div>
+                            <div class="gb-status" style="margin-top:10px;">Estimated total effort: {{ $launchPlanState['pace']['estimated_total_hours'] ?? 0 }} hrs</div>
+                            <div class="gb-status" style="margin-top:10px;">Estimated duration: {{ $launchPlanState['pace']['estimated_weeks'] ?? 0 }} weeks</div>
+                        @else
+                            <div class="gb-status">Hatchers will estimate workload and stretch the plan over time based on the founder’s realistic weekly capacity.</div>
+                        @endif
+
+                        @if(!empty($launchPlanState['north_star_metrics']))
+                            <h3 style="margin-top:18px;">North-star metrics</h3>
+                            <div class="gb-plan-list">
+                                @foreach($launchPlanState['north_star_metrics'] as $metric)
+                                    <div class="gb-plan-item">
+                                        <strong>{{ $metric }}</strong>
+                                        <div class="gb-muted">Each milestone is anchored to a real outcome, not a vanity metric.</div>
+                                    </div>
+                                @endforeach
+                            </div>
+                        @endif
+                    </article>
+                </section>
+            </main>
+        </div>
+
+        <button type="button" class="gb-chat-fab" id="chatFab" aria-label="Open chat">✦</button>
+
+        <div class="gb-chat-card" id="chatCard">
+            <strong style="display:block; margin-bottom:6px;">Hatchers AI</strong>
+            <div class="gb-muted">Open the chat to shape your launch plan, ask for guidance, or build the next piece of the business.</div>
+        </div>
+
+        <section class="gb-chat-panel" id="chatPanel" aria-live="polite">
+            <div class="gb-chat-head">
+                <div>
+                    <strong style="display:block;">Hatchers AI</strong>
+                    <span class="gb-muted" id="chatPanelLabel">{{ $chatNeedsOnboarding ? 'Founder onboarding' : 'Launch copilot' }}</span>
+                </div>
+                <button type="button" class="gb-btn" id="closeChatBtn">Close</button>
+            </div>
+            <div class="gb-chat-stream" id="chatStream"></div>
+            <div class="gb-chat-input-wrap">
+                <div class="gb-chat-input">
+                    <textarea id="chatInput" placeholder="{{ $quickPrompt }}"></textarea>
+                    <button type="button" class="gb-send" id="chatSendBtn">→</button>
+                </div>
+            </div>
+        </section>
+
+        <aside class="gb-tools-panel" id="toolsPanel">
+            <div class="gb-tools-head">
+                <div>
+                    <strong style="display:block;">AI Tools</strong>
+                    <span class="gb-muted">Everything Hatchers can launch, automate, or help you build.</span>
+                </div>
+                <button type="button" class="gb-btn" id="closeToolsBtn">Close</button>
+            </div>
+
+            <div class="gb-tool-list">
+                @foreach($topActions as $tool)
+                    <a href="{{ $tool['href'] }}" class="gb-tool-item" style="text-decoration:none;">
+                        <strong>{{ $tool['label'] }}</strong>
+                        <div class="gb-muted">{{ $tool['description'] }}</div>
+                    </a>
+                @endforeach
+
+                @foreach($launchCards as $card)
+                    <a href="{{ $card['url'] }}" class="gb-tool-item" style="text-decoration:none;" target="_blank" rel="noopener">
+                        <strong>{{ $card['label'] }}</strong>
+                        <div class="gb-muted">{{ $card['description'] }}</div>
                     </a>
                 @endforeach
             </div>
-
-            <div class="os-desktop-footnote">Tap an icon to open · drag to rearrange</div>
-            <div class="os-desktop-dock" data-os-desktop-dock></div>
-            <div class="os-window-host" data-os-window-host></div>
-        </div>
+        </aside>
     </div>
+@endsection
+
+@section('scripts')
+    <script>
+        (() => {
+            const shell = document.getElementById('guidebookShell');
+            if (!shell) return;
+
+            const onboardingNeeded = shell.dataset.onboardingNeeded === '1';
+            const onboardingEndpoint = shell.dataset.onboardingEndpoint;
+            const assistantEndpoint = shell.dataset.assistantEndpoint;
+            const chatFab = document.getElementById('chatFab');
+            const chatCard = document.getElementById('chatCard');
+            const chatPanel = document.getElementById('chatPanel');
+            const closeChatBtn = document.getElementById('closeChatBtn');
+            const chatStream = document.getElementById('chatStream');
+            const chatInput = document.getElementById('chatInput');
+            const chatSendBtn = document.getElementById('chatSendBtn');
+            const openToolsBtn = document.getElementById('openToolsBtn');
+            const openToolsBtnSecondary = document.getElementById('openToolsBtnSecondary');
+            const railAiToolsBtn = document.getElementById('railAiToolsBtn');
+            const toolsPanel = document.getElementById('toolsPanel');
+            const closeToolsBtn = document.getElementById('closeToolsBtn');
+            const newProjectBtn = document.getElementById('newProjectBtn');
+            const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
+            let chatState = 'closed';
+            let onboarding = {
+                answers: {},
+                currentStep: onboardingNeeded ? 'q1' : 'freeform',
+                processing: false,
+            };
+
+            const steps = {
+                q1: {
+                    prompt: 'What do you do, and who do you help?',
+                    help: 'Say it simply, like you would explain it to a friend.',
+                    next: 'q2',
+                },
+                q2: {
+                    prompt: 'Who is the one person most likely to pay you right now?',
+                    help: 'Describe the best customer to target first, not everyone eventually.',
+                    next: 'q3',
+                },
+                q3: {
+                    prompt: 'What problem do you solve for them, and what happens if they do not fix it?',
+                    help: 'Focus on the real commercial pain, not just the topic.',
+                    next: 'q4',
+                },
+                q4: {
+                    prompt: 'What might they use instead of you, even if it is not a direct competitor?',
+                    help: 'A platform, a freelancer, doing nothing, or another workaround all count.',
+                    next: 'budget',
+                    optional: true,
+                },
+                budget: {
+                    prompt: 'Do you want to grow organically, or are you open to using a budget for paid acquisition?',
+                    choices: [
+                        { value: 'organic', label: 'Organic only' },
+                        { value: 'paid', label: 'Open to paid' },
+                        { value: 'unsure', label: 'Not sure yet' },
+                    ],
+                    next: 'time',
+                },
+                time: {
+                    prompt: 'How much time can you realistically put into this each week?',
+                    choices: [
+                        { value: 'low', label: 'Less than 2 hours' },
+                        { value: 'mid', label: '3 to 5 hours' },
+                        { value: 'high', label: '5+ hours' },
+                    ],
+                    next: 'complete',
+                },
+            };
+
+            function setChatState(state) {
+                chatState = state;
+                chatCard.classList.toggle('is-open', state === 'card');
+                chatPanel.classList.toggle('is-open', state === 'panel');
+            }
+
+            function setToolsOpen(open) {
+                toolsPanel.classList.toggle('is-open', open);
+            }
+
+            function appendBubble(role, html) {
+                const wrap = document.createElement('div');
+                wrap.className = role === 'user' ? 'gb-msg-user' : 'gb-msg-ai';
+                const bubble = document.createElement('div');
+                bubble.className = role === 'user' ? 'gb-bubble-user' : 'gb-bubble-ai';
+                bubble.innerHTML = html;
+                wrap.appendChild(bubble);
+                chatStream.appendChild(wrap);
+                chatStream.scrollTop = chatStream.scrollHeight;
+                return bubble;
+            }
+
+            function showChoiceStep(stepKey) {
+                const step = steps[stepKey];
+                appendBubble('ai', `<strong>${step.prompt}</strong>`);
+                const wrap = document.createElement('div');
+                wrap.className = 'gb-msg-ai';
+                const bubble = document.createElement('div');
+                bubble.className = 'gb-bubble-ai';
+                const list = document.createElement('div');
+                list.className = 'gb-choice-list';
+
+                step.choices.forEach((choice) => {
+                    const button = document.createElement('button');
+                    button.type = 'button';
+                    button.className = 'gb-choice';
+                    button.textContent = choice.label;
+                    button.addEventListener('click', () => {
+                        if (onboarding.processing) return;
+                        onboarding.answers[stepKey === 'budget' ? 'budget_strategy' : 'time_commitment'] = choice.value;
+                        appendBubble('user', choice.label);
+                        bubble.remove();
+                        moveToStep(step.next);
+                    });
+                    list.appendChild(button);
+                });
+
+                bubble.appendChild(list);
+                wrap.appendChild(bubble);
+                chatStream.appendChild(wrap);
+                chatStream.scrollTop = chatStream.scrollHeight;
+            }
+
+            function askFreeformStep(stepKey) {
+                const step = steps[stepKey];
+                const help = step.help ? `<div class="gb-muted" style="margin-top:6px;">${step.help}</div>` : '';
+                const bubble = appendBubble('ai', `<strong>${step.prompt}</strong>${help}`);
+                if (step.optional) {
+                    const actions = document.createElement('div');
+                    actions.className = 'gb-chat-actions';
+                    const skipButton = document.createElement('button');
+                    skipButton.type = 'button';
+                    skipButton.className = 'gb-choice';
+                    skipButton.textContent = 'Skip this question';
+                    skipButton.addEventListener('click', () => {
+                        onboarding.answers[stepKey] = '';
+                        appendBubble('user', '(Skipped)');
+                        actions.remove();
+                        moveToStep(step.next);
+                    });
+                    actions.appendChild(skipButton);
+                    bubble.appendChild(actions);
+                }
+                chatInput.placeholder = step.optional ? 'You can answer or skip this one…' : 'Type your answer…';
+                chatInput.focus();
+                onboarding.currentStep = stepKey;
+            }
+
+            function moveToStep(stepKey) {
+                if (stepKey === 'complete') {
+                    submitOnboarding();
+                    return;
+                }
+
+                if (steps[stepKey]?.choices) {
+                    onboarding.currentStep = stepKey;
+                    showChoiceStep(stepKey);
+                    return;
+                }
+
+                askFreeformStep(stepKey);
+            }
+
+            async function submitOnboarding() {
+                onboarding.processing = true;
+                appendBubble('ai', '<strong>Building your launch plan…</strong><div class="gb-muted" style="margin-top:6px;">Hatchers is deducing your company intelligence, choosing the launch path, and writing your first milestones and tasks.</div>');
+
+                try {
+                    const response = await fetch(onboardingEndpoint, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': csrf,
+                        },
+                        body: JSON.stringify(onboarding.answers),
+                    });
+
+                    const payload = await response.json();
+                    if (!response.ok || !payload.success) {
+                        throw new Error(payload.error || 'Hatchers could not finish the onboarding flow.');
+                    }
+
+                    appendBubble('ai', `<strong>Launch plan ready.</strong><div class="gb-muted" style="margin-top:6px;">${payload.reply}</div>`);
+                    setTimeout(() => window.location.reload(), 1200);
+                } catch (error) {
+                    onboarding.processing = false;
+                    appendBubble('ai', `<strong>We hit a setup problem.</strong><div class="gb-muted" style="margin-top:6px;">${error.message}</div>`);
+                }
+            }
+
+            async function sendFreeformChat() {
+                if (onboarding.processing) return;
+                const value = chatInput.value.trim();
+                if (!value) return;
+                chatInput.value = '';
+
+                if (onboardingNeeded && steps[onboarding.currentStep]) {
+                    onboarding.answers[onboarding.currentStep] = value;
+                    appendBubble('user', value);
+                    moveToStep(steps[onboarding.currentStep].next);
+                    return;
+                }
+
+                appendBubble('user', value);
+                try {
+                    const response = await fetch(assistantEndpoint, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': csrf,
+                        },
+                        body: JSON.stringify({
+                            message: value,
+                            current_page: 'guidebook_dashboard',
+                        }),
+                    });
+                    const payload = await response.json();
+                    if (!response.ok || !payload.success) {
+                        throw new Error(payload.error || 'Hatchers could not respond right now.');
+                    }
+                    appendBubble('ai', payload.reply);
+                } catch (error) {
+                    appendBubble('ai', `<strong>We could not answer that right now.</strong><div class="gb-muted" style="margin-top:6px;">${error.message}</div>`);
+                }
+            }
+
+            function startOnboardingFlow() {
+                setChatState('panel');
+                chatStream.innerHTML = '';
+                onboarding.answers = {};
+                onboarding.currentStep = 'q1';
+                onboarding.processing = false;
+                appendBubble('ai', '<strong>Let’s build your launch plan.</strong><div class="gb-muted" style="margin-top:6px;">I will ask a few focused questions, infer the rest, and turn that into milestones, tasks, and the right website path.</div>');
+                askFreeformStep('q1');
+            }
+
+            chatFab.addEventListener('click', () => {
+                if (chatState === 'closed') setChatState('card');
+                else if (chatState === 'card') setChatState('panel');
+                else setChatState('closed');
+            });
+
+            chatCard.addEventListener('click', () => setChatState('panel'));
+            closeChatBtn.addEventListener('click', () => setChatState('closed'));
+            openToolsBtn?.addEventListener('click', () => setToolsOpen(true));
+            openToolsBtnSecondary?.addEventListener('click', () => setToolsOpen(true));
+            railAiToolsBtn?.addEventListener('click', () => setToolsOpen(true));
+            closeToolsBtn?.addEventListener('click', () => setToolsOpen(false));
+            newProjectBtn?.addEventListener('click', startOnboardingFlow);
+            chatSendBtn.addEventListener('click', sendFreeformChat);
+            chatInput.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter' && !event.shiftKey) {
+                    event.preventDefault();
+                    sendFreeformChat();
+                }
+            });
+
+            if (onboardingNeeded) {
+                setTimeout(() => {
+                    setChatState('card');
+                    startOnboardingFlow();
+                }, 280);
+            } else {
+                chatStream.innerHTML = '';
+                appendBubble('ai', '<strong>Your launch workspace is live.</strong><div class="gb-muted" style="margin-top:6px;">Ask Hatchers to refine the offer, improve the website, or break the next milestone into clearer tasks.</div>');
+            }
+        })();
+    </script>
 @endsection

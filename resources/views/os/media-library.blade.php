@@ -60,6 +60,14 @@
 
         <main class="media-main">
             <div class="media-main-inner">
+                @include('os.partials.guidebook-workspace-topbar', [
+                    'founder' => $founder,
+                    'company' => $founder->company,
+                    'workspace' => $dashboard['workspace'] ?? [],
+                    'projectName' => $founder->company->company_name ?? 'Founder workspace',
+                    'sectionLabel' => 'Media Library',
+                    'searchPlaceholder' => 'Find images, campaign outputs, documents, and website visuals in one place...',
+                ])
                 <h1>Media Library</h1>
                 <p>Review Atlas-generated images, campaign outputs, documents, and website visuals from one OS-native library.</p>
 

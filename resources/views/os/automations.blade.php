@@ -53,6 +53,14 @@
 
         <main class="workspace-main">
             <div class="workspace-main-inner">
+                @include('os.partials.guidebook-workspace-topbar', [
+                    'founder' => $founder,
+                    'company' => $founder->company,
+                    'workspace' => $dashboard['workspace'] ?? [],
+                    'projectName' => $founder->company->company_name ?? 'Founder workspace',
+                    'sectionLabel' => 'Automations',
+                    'searchPlaceholder' => 'Search rules, repeated work, and the next processes worth automating...',
+                ])
         <section class="hero">
             <div class="eyebrow">Automations</div>
             <h1>Saved cross-tool rules for your OS.</h1>

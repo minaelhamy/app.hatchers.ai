@@ -151,6 +151,7 @@ class WebsiteAutopilotMapperService
             $mapped[] = [
                 'target' => 'category',
                 'source_url' => trim((string) ($categoryAsset['source_url'] ?? '')),
+                'preview_url' => trim((string) ($categoryAsset['preview_url'] ?? $categoryAsset['source_url'] ?? '')),
             ];
         }
 
@@ -164,6 +165,7 @@ class WebsiteAutopilotMapperService
             $mapped[] = [
                 'target' => $target,
                 'source_url' => trim((string) ($asset['source_url'] ?? '')),
+                'preview_url' => trim((string) ($asset['preview_url'] ?? $asset['source_url'] ?? '')),
             ];
         }
 

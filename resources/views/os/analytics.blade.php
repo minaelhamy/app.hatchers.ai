@@ -55,6 +55,14 @@
 
         <main class="analytics-main">
             <div class="analytics-main-inner">
+                @include('os.partials.guidebook-workspace-topbar', [
+                    'founder' => $founder,
+                    'company' => $founder->company,
+                    'workspace' => $dashboard['workspace'] ?? [],
+                    'projectName' => $founder->company->company_name ?? 'Founder workspace',
+                    'sectionLabel' => 'Analytics',
+                    'searchPlaceholder' => 'See the metrics that actually matter for this launch plan...',
+                ])
                 <h1>Analytics</h1>
                 <p>Unified performance across execution, growth, and marketing from one founder workspace.</p>
 

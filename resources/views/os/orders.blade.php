@@ -69,6 +69,14 @@
 
         <main class="ops-main">
             <div class="ops-main-inner">
+                @include('os.partials.guidebook-workspace-topbar', [
+                    'founder' => $founder,
+                    'company' => $founder->company,
+                    'workspace' => $dashboard['workspace'] ?? [],
+                    'projectName' => $founder->company->company_name ?? 'Founder workspace',
+                    'sectionLabel' => 'Orders',
+                    'searchPlaceholder' => 'Monitor orders, fulfillment, customers, and store operations from one workspace...',
+                ])
                 <h1>Orders</h1>
                 <p>Track Bazaar-driven order operations from Hatchers Ai Business OS while the storefront engine keeps doing the backend work.</p>
 

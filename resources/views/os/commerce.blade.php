@@ -108,6 +108,14 @@
 
         <main class="commerce-main">
             <div class="commerce-main-inner">
+                @include('os.partials.guidebook-workspace-topbar', [
+                    'founder' => $founder,
+                    'company' => $founder->company,
+                    'workspace' => $dashboard['workspace'] ?? [],
+                    'projectName' => $founder->company->company_name ?? 'Founder workspace',
+                    'sectionLabel' => 'Commerce',
+                    'searchPlaceholder' => 'Review offers, bookings, revenue, and the storefront operations that matter now...',
+                ])
                 <h1>Commerce</h1>
                 <p>{{ $commerceHeading }}</p>
                 <div class="commerce-view-nav">

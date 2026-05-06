@@ -68,6 +68,14 @@
 
         <main class="ops-main">
             <div class="ops-main-inner">
+                @include('os.partials.guidebook-workspace-topbar', [
+                    'founder' => $founder,
+                    'company' => $founder->company,
+                    'workspace' => $dashboard['workspace'] ?? [],
+                    'projectName' => $founder->company->company_name ?? 'Founder workspace',
+                    'sectionLabel' => 'Bookings',
+                    'searchPlaceholder' => 'Track bookings, customer issues, schedules, and service operations...',
+                ])
                 <h1>Bookings</h1>
                 <p>Track Servio-driven bookings and service operations from Hatchers Ai Business OS while the service engine keeps running underneath.</p>
 

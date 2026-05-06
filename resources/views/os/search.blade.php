@@ -53,6 +53,14 @@
 
         <main class="workspace-main">
             <div class="workspace-main-inner">
+                @include('os.partials.guidebook-workspace-topbar', [
+                    'founder' => $founder,
+                    'company' => $founder?->company,
+                    'workspace' => [],
+                    'projectName' => $founder?->company?->company_name ?? 'Founder workspace',
+                    'sectionLabel' => 'Search',
+                    'searchPlaceholder' => 'Search tasks, campaigns, offers, leads, and anything already living in your OS...',
+                ])
                 <section class="hero">
                     <div class="eyebrow">Unified Search</div>
                     <h1>Search across your OS work.</h1>

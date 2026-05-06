@@ -346,6 +346,14 @@
 
         <main class="notifications-main">
             <div class="notifications-main-inner">
+                @include('os.partials.guidebook-workspace-topbar', [
+                    'founder' => $founder,
+                    'company' => $founder->company,
+                    'workspace' => $workspace,
+                    'projectName' => $founder->company->company_name ?? 'Founder workspace',
+                    'sectionLabel' => 'Notifications',
+                    'searchPlaceholder' => 'Search alerts, recent activity, and the next founder actions to review...',
+                ])
                 <h1>Notifications</h1>
 
                 <div class="notifications-filter">

@@ -14,7 +14,6 @@
     $sidebarActive = $activeKey ?? 'home';
     $sidebarName = trim((string) ($sidebarFounder?->full_name ?? 'Founder'));
     $sidebarInitial = strtoupper(substr($sidebarName !== '' ? $sidebarName : 'F', 0, 1));
-    $sidebarStorageKey = 'hatchers-os-launcher-order-' . ($sidebarFounder?->id ?? 'guest');
     $sidebarToday = now()->timezone(config('app.timezone'))->format('D j M');
     $sidebarItems = [
         ['key' => 'home', 'label' => 'Home', 'icon' => 'HM', 'accent' => 'amber', 'href' => '/dashboard/founder'],
@@ -48,72 +47,108 @@
         ->filter(fn ($item) => in_array($item['key'], $sidebarDockKeys, true))
         ->values()
         ->all();
+    $sidebarPrimaryItems = collect($sidebarItems)
+        ->filter(fn ($item) => in_array($item['key'], ['home', 'tasks', 'marketing', 'website', 'commerce', 'inbox', 'ai-tools'], true))
+        ->values()
+        ->all();
+    $sidebarSupportItems = collect($sidebarItems)
+        ->reject(fn ($item) => in_array($item['key'], ['home', 'tasks', 'marketing', 'website', 'commerce', 'inbox', 'ai-tools'], true))
+        ->values()
+        ->all();
 @endphp
 
-<div class="{{ $sidebarInnerClass }} os-launcher">
-    <div class="os-launcher-header">
-        <a class="{{ $sidebarBrandClass }} os-launcher-brand" href="/dashboard/founder">
-            <img src="/brand/hatchers-ai-logo.png" alt="Hatchers AI">
+<div class="{{ $sidebarInnerClass }} os-launcher guidebook-sidepane">
+    <div class="guidebook-sidepane-head">
+        <a class="{{ $sidebarBrandClass }} guidebook-sidepane-brand" href="/dashboard/founder">
+            <span class="guidebook-sidepane-mark"></span>
+            <span class="guidebook-sidepane-brand-copy">
+                <strong>Hatchers AI OS</strong>
+                <span>{{ $sidebarToday }}</span>
+            </span>
         </a>
-        <div class="os-launcher-status">
-            <span>Hatchers AI OS</span>
-            <strong>{{ $sidebarToday }}</strong>
-        </div>
     </div>
-    <div class="os-launcher-note">
-        Drag icons to rearrange your workspace. Click any app to open it.
+
+    <div class="guidebook-sidepane-segment">
+        <span class="guidebook-sidepane-segment-button">
+            <span class="guidebook-sidepane-segment-icon">◫</span>
+            <span>Browse</span>
+        </span>
+        <span class="guidebook-sidepane-segment-button is-active">
+            <span class="guidebook-sidepane-segment-icon">✦</span>
+            <span>Agent</span>
+            <span class="guidebook-sidepane-badge">NEW</span>
+        </span>
     </div>
-    <nav class="{{ $sidebarNavClass }} os-launcher-nav" data-os-launcher data-storage-key="{{ $sidebarStorageKey }}">
-        @foreach ($sidebarItems as $item)
+
+    <div class="guidebook-sidepane-search">
+        <span class="guidebook-sidepane-search-icon">⌕</span>
+        <span>Search workspaces...</span>
+    </div>
+
+    <div class="guidebook-sidepane-section-label">Core</div>
+    <nav class="{{ $sidebarNavClass }} guidebook-sidepane-nav">
+        @foreach ($sidebarPrimaryItems as $item)
             <a
-                class="{{ $sidebarItemClass }} os-launcher-app {{ $sidebarActive === $item['key'] ? 'active' : '' }}"
+                class="{{ $sidebarItemClass }} guidebook-sidepane-item {{ $sidebarActive === $item['key'] ? 'active' : '' }} {{ !empty($item['disabled']) ? 'is-disabled' : '' }}"
                 href="{{ $item['href'] }}"
-                draggable="true"
-                data-launcher-key="{{ $item['key'] }}"
-                data-launcher-label="{{ $item['label'] }}"
-                @if (empty($item['disabled']))
-                    data-launcher-route="{{ $item['href'] }}"
-                @endif
-                data-launcher-icon="{{ $item['icon'] }}"
                 data-launcher-disabled="{{ !empty($item['disabled']) ? '1' : '0' }}"
                 aria-disabled="{{ !empty($item['disabled']) ? 'true' : 'false' }}"
             >
-                <span class="os-launcher-app-surface tone-{{ $item['accent'] }}">
-                    <span class="{{ $sidebarIconClass }} os-launcher-app-glyph">{{ $item['icon'] }}</span>
+                <span class="guidebook-sidepane-item-copy">
+                    <span class="{{ $sidebarIconClass }} guidebook-sidepane-item-icon">{{ $item['icon'] }}</span>
+                    <span>{{ $item['label'] }}</span>
                 </span>
-                <span class="os-launcher-app-label">{{ $item['label'] }}</span>
                 @if ($sidebarActive === $item['key'])
-                    <span class="os-launcher-app-indicator"></span>
+                    <span class="guidebook-sidepane-item-indicator"></span>
                 @endif
             </a>
         @endforeach
     </nav>
+
+    <div class="guidebook-sidepane-section-label">Support</div>
+    <nav class="{{ $sidebarNavClass }} guidebook-sidepane-nav guidebook-sidepane-nav--compact">
+        @foreach ($sidebarSupportItems as $item)
+            <a
+                class="{{ $sidebarItemClass }} guidebook-sidepane-item {{ $sidebarActive === $item['key'] ? 'active' : '' }} {{ !empty($item['disabled']) ? 'is-disabled' : '' }}"
+                href="{{ $item['href'] }}"
+                data-launcher-disabled="{{ !empty($item['disabled']) ? '1' : '0' }}"
+                aria-disabled="{{ !empty($item['disabled']) ? 'true' : 'false' }}"
+            >
+                <span class="guidebook-sidepane-item-copy">
+                    <span class="{{ $sidebarIconClass }} guidebook-sidepane-item-icon">{{ $item['icon'] }}</span>
+                    <span>{{ $item['label'] }}</span>
+                </span>
+                @if ($sidebarActive === $item['key'])
+                    <span class="guidebook-sidepane-item-indicator"></span>
+                @endif
+            </a>
+        @endforeach
+    </nav>
+
+    <div class="guidebook-sidepane-spacer"></div>
 </div>
-<div class="{{ $sidebarFooterClass }} os-dock">
-    <div class="os-dock-pins">
+<div class="{{ $sidebarFooterClass }} os-dock guidebook-sidepane-footer">
+    <div class="guidebook-sidepane-quick-label">Quick access</div>
+    <div class="os-dock-pins guidebook-sidepane-pins">
         @foreach ($sidebarDockItems as $item)
             <a
-                class="os-dock-item {{ $sidebarActive === $item['key'] ? 'active' : '' }}"
+                class="os-dock-item guidebook-sidepane-pin {{ $sidebarActive === $item['key'] ? 'active' : '' }}"
                 href="{{ $item['href'] }}"
                 title="{{ $item['label'] }}"
-                data-launcher-key="{{ $item['key'] }}"
-                data-launcher-label="{{ $item['label'] }}"
-                data-launcher-route="{{ $item['href'] }}"
-                data-launcher-icon="{{ $item['icon'] }}"
             >
-                <span class="os-dock-surface tone-{{ $item['accent'] }}">{{ $item['icon'] }}</span>
+                <span class="os-dock-surface guidebook-sidepane-pin-surface tone-{{ $item['accent'] }}">{{ $item['icon'] }}</span>
             </a>
         @endforeach
     </div>
-    <div class="{{ $sidebarUserClass }} os-dock-user">
-        <div class="{{ $sidebarAvatarClass }} os-dock-avatar">{{ $sidebarInitial }}</div>
-        <div class="os-dock-user-copy">
+    <div class="{{ $sidebarUserClass }} os-dock-user guidebook-sidepane-user">
+        <div class="{{ $sidebarAvatarClass }} os-dock-avatar guidebook-sidepane-user-avatar">{{ $sidebarInitial }}</div>
+        <div class="os-dock-user-copy guidebook-sidepane-user-copy">
             <strong>{{ $sidebarName !== '' ? $sidebarName : 'Founder' }}</strong>
-            <span>Signed in</span>
+            <span>{{ $sidebarFounder?->email ?: 'Signed in' }}</span>
         </div>
     </div>
     <form method="POST" action="/logout" style="margin:0;">
         @csrf
-        <button class="os-dock-logout" type="submit" aria-label="Log out">↘</button>
+        <button class="os-dock-logout guidebook-sidepane-logout" type="submit" aria-label="Log out">Logout</button>
     </form>
 </div>

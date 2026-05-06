@@ -206,6 +206,14 @@
 
         <main class="workspace-main">
             <div class="workspace-main-inner">
+            @include('os.partials.guidebook-workspace-topbar', [
+                'founder' => $founder,
+                'company' => $founder->company,
+                'workspace' => $dashboard['workspace'] ?? [],
+                'projectName' => $companyName,
+                'sectionLabel' => 'Website',
+                'searchPlaceholder' => 'Build, review, and publish the first version of this website...',
+            ])
             @if (session('success'))
                 <section class="card" style="margin-bottom: 22px; border-color: rgba(44, 122, 87, 0.35);">
                     <strong>Success</strong>

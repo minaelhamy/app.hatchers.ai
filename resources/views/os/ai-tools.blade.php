@@ -82,6 +82,14 @@
 
         <main class="tools-main">
             <div class="tools-main-inner">
+                @include('os.partials.guidebook-workspace-topbar', [
+                    'founder' => $founder,
+                    'company' => $company,
+                    'workspace' => $workspace,
+                    'projectName' => $company?->company_name ?? 'Founder workspace',
+                    'sectionLabel' => 'AI Studio',
+                    'searchPlaceholder' => 'Open Brand Studio, continue agent work, or jump into campaign creation...',
+                ])
                 <h1>AI Studio</h1>
                 <p>Use one OS workspace for brand direction, campaign work, and AI help without switching products.</p>
 

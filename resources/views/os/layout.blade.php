@@ -108,6 +108,420 @@
             padding: 30px 32px 48px;
         }
 
+        .guidebook-topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 18px;
+            margin-bottom: 22px;
+            padding: 18px 20px;
+            border-radius: 28px;
+            border: 1px solid rgba(118, 101, 90, 0.12);
+            background: rgba(255, 251, 247, 0.82);
+            box-shadow: 0 18px 44px rgba(60, 46, 36, 0.06);
+            backdrop-filter: blur(14px);
+        }
+
+        .guidebook-topbar-search {
+            flex: 1;
+            min-height: 54px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 0 18px;
+            border-radius: 999px;
+            border: 1px solid rgba(118, 101, 90, 0.12);
+            background: rgba(255,255,255,0.86);
+            color: rgba(89, 74, 63, 0.7);
+            min-width: 0;
+        }
+
+        .guidebook-topbar-search-icon {
+            font-size: 1.15rem;
+            line-height: 1;
+        }
+
+        .guidebook-topbar-kbd {
+            margin-left: auto;
+            padding: 6px 10px;
+            border-radius: 12px;
+            border: 1px solid rgba(118, 101, 90, 0.12);
+            background: rgba(245, 238, 231, 0.85);
+            color: rgba(101, 83, 70, 0.72);
+            font-size: 0.76rem;
+        }
+
+        .guidebook-topbar-right {
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .guidebook-topbar-bell,
+        .guidebook-topbar-user,
+        .guidebook-topbar-chip,
+        .guidebook-topbar-logout {
+            min-height: 54px;
+            border-radius: 999px;
+            border: 1px solid rgba(118, 101, 90, 0.12);
+            background: rgba(255,255,255,0.86);
+            box-shadow: 0 14px 40px rgba(60, 46, 36, 0.06);
+        }
+
+        .guidebook-topbar-bell,
+        .guidebook-topbar-chip {
+            text-decoration: none;
+            color: #40362f;
+        }
+
+        .guidebook-topbar-bell {
+            width: 54px;
+            display: grid;
+            place-items: center;
+            position: relative;
+        }
+
+        .guidebook-topbar-badge {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            min-width: 18px;
+            height: 18px;
+            padding: 0 4px;
+            border-radius: 999px;
+            background: linear-gradient(135deg, #f26444, #f13b74);
+            color: #fff;
+            font-size: 0.68rem;
+            font-weight: 800;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .guidebook-topbar-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 0 18px;
+            font-size: 0.86rem;
+        }
+
+        .guidebook-topbar-chip-label {
+            color: rgba(102, 84, 72, 0.76);
+            font-weight: 600;
+        }
+
+        .guidebook-topbar-user {
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            padding: 0 18px 0 10px;
+            color: #201915;
+        }
+
+        .guidebook-topbar-avatar {
+            width: 34px;
+            height: 34px;
+            border-radius: 999px;
+            background: linear-gradient(135deg, #f2dcc4, #d2b28b);
+            display: grid;
+            place-items: center;
+            font-weight: 800;
+            color: #2f251f;
+            flex-shrink: 0;
+        }
+
+        .guidebook-topbar-user-copy {
+            display: grid;
+            gap: 2px;
+            min-width: 0;
+        }
+
+        .guidebook-topbar-user-copy strong {
+            font-size: 0.94rem;
+        }
+
+        .guidebook-topbar-user-copy span {
+            color: rgba(102, 84, 72, 0.72);
+            font-size: 0.8rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 220px;
+        }
+
+        .guidebook-topbar-logout {
+            padding: 0 18px;
+            font: inherit;
+            font-weight: 700;
+            color: #4b3f36;
+            cursor: pointer;
+        }
+
+        .guidebook-sidepane {
+            display: grid;
+            gap: 16px;
+            align-content: start;
+            min-height: 0;
+        }
+
+        .guidebook-sidepane-head {
+            display: flex;
+            align-items: center;
+        }
+
+        .guidebook-sidepane-brand {
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            text-decoration: none;
+        }
+
+        .guidebook-sidepane-mark {
+            width: 36px;
+            height: 36px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #f13b74, #f26444);
+            box-shadow: 0 14px 28px rgba(241, 59, 116, 0.22);
+            flex-shrink: 0;
+        }
+
+        .guidebook-sidepane-brand-copy {
+            display: grid;
+            gap: 2px;
+            min-width: 0;
+        }
+
+        .guidebook-sidepane-brand-copy strong {
+            font-size: 0.98rem;
+            color: #201915;
+        }
+
+        .guidebook-sidepane-brand-copy span {
+            font-size: 0.74rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: rgba(108, 90, 78, 0.68);
+        }
+
+        .guidebook-sidepane-segment {
+            display: grid;
+            gap: 8px;
+        }
+
+        .guidebook-sidepane-segment-button {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            min-height: 46px;
+            padding: 0 14px;
+            border-radius: 16px;
+            border: 1px solid rgba(220, 207, 191, 0.76);
+            background: rgba(255,255,255,0.72);
+            color: #4a3d34;
+            font-size: 0.92rem;
+            font-weight: 600;
+        }
+
+        .guidebook-sidepane-segment-button.is-active {
+            background: linear-gradient(135deg, rgba(255, 249, 244, 0.98), rgba(248, 238, 229, 0.92));
+            border-color: rgba(185, 162, 139, 0.9);
+        }
+
+        .guidebook-sidepane-segment-icon {
+            width: 22px;
+            text-align: center;
+            color: rgba(96, 79, 68, 0.74);
+        }
+
+        .guidebook-sidepane-badge {
+            margin-left: auto;
+            padding: 4px 8px;
+            border-radius: 999px;
+            background: rgba(255, 239, 244, 0.98);
+            color: #b32253;
+            font-size: 0.68rem;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+        }
+
+        .guidebook-sidepane-search {
+            min-height: 46px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 0 14px;
+            border-radius: 16px;
+            border: 1px solid rgba(220, 207, 191, 0.76);
+            background: rgba(255,255,255,0.72);
+            color: rgba(107, 89, 77, 0.68);
+            font-size: 0.9rem;
+        }
+
+        .guidebook-sidepane-search-icon {
+            color: rgba(107, 89, 77, 0.78);
+        }
+
+        .guidebook-sidepane-section-label {
+            font-size: 0.76rem;
+            text-transform: uppercase;
+            letter-spacing: 0.14em;
+            color: rgba(108, 90, 78, 0.68);
+            margin-top: 2px;
+        }
+
+        .guidebook-sidepane-nav {
+            display: grid;
+            gap: 8px;
+        }
+
+        .guidebook-sidepane-nav--compact {
+            gap: 6px;
+        }
+
+        .guidebook-sidepane-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            min-height: 48px;
+            padding: 0 14px;
+            border-radius: 16px;
+            text-decoration: none;
+            color: #201915;
+            border: 1px solid rgba(220, 207, 191, 0.72);
+            background: rgba(255,255,255,0.62);
+            transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+        }
+
+        .guidebook-sidepane-item:hover {
+            transform: translateY(-1px);
+            border-color: rgba(186, 164, 139, 0.9);
+            background: rgba(255,255,255,0.82);
+        }
+
+        .guidebook-sidepane-item.active {
+            background: linear-gradient(135deg, rgba(255, 247, 240, 0.98), rgba(249, 238, 228, 0.92));
+            border-color: rgba(185, 162, 139, 0.9);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.72);
+        }
+
+        .guidebook-sidepane-item.is-disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .guidebook-sidepane-item-copy {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 0;
+            font-size: 0.93rem;
+            font-weight: 600;
+        }
+
+        .guidebook-sidepane-item-icon {
+            width: 28px;
+            height: 28px;
+            border-radius: 10px;
+            display: grid;
+            place-items: center;
+            font-size: 0.72rem;
+            border: 1px solid rgba(220, 207, 191, 0.82);
+            background: rgba(245, 238, 231, 0.86);
+            color: rgba(89, 74, 63, 0.8);
+            flex-shrink: 0;
+        }
+
+        .guidebook-sidepane-item-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 999px;
+            background: linear-gradient(135deg, #f26444, #f13b74);
+            flex-shrink: 0;
+        }
+
+        .guidebook-sidepane-spacer {
+            min-height: 8px;
+        }
+
+        .guidebook-sidepane-footer {
+            display: grid;
+            gap: 12px;
+        }
+
+        .guidebook-sidepane-quick-label {
+            font-size: 0.74rem;
+            text-transform: uppercase;
+            letter-spacing: 0.14em;
+            color: rgba(108, 90, 78, 0.68);
+        }
+
+        .guidebook-sidepane-pins {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .guidebook-sidepane-pin {
+            text-decoration: none;
+        }
+
+        .guidebook-sidepane-pin-surface {
+            min-width: 42px;
+            height: 42px;
+            padding: 0 10px;
+            border-radius: 14px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.72rem;
+            font-weight: 700;
+        }
+
+        .guidebook-sidepane-user {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 0;
+        }
+
+        .guidebook-sidepane-user-avatar {
+            width: 34px;
+            height: 34px;
+        }
+
+        .guidebook-sidepane-user-copy {
+            display: grid;
+            gap: 2px;
+            min-width: 0;
+        }
+
+        .guidebook-sidepane-user-copy strong {
+            font-size: 0.9rem;
+        }
+
+        .guidebook-sidepane-user-copy span {
+            font-size: 0.74rem;
+            color: rgba(102, 84, 72, 0.72);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .guidebook-sidepane-logout {
+            min-height: 44px;
+            padding: 0 16px;
+            border-radius: 14px;
+            background: rgba(255,255,255,0.72);
+            border: 1px solid rgba(220, 207, 191, 0.76);
+            color: #4b3f36;
+            font: inherit;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
         .public-shell {
             max-width: 1180px;
             margin: 0 auto;
@@ -627,6 +1041,24 @@
             .topbar, .page {
                 padding-left: 18px;
                 padding-right: 18px;
+            }
+
+            .guidebook-topbar {
+                padding: 16px;
+                border-radius: 24px;
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .guidebook-topbar-right {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .guidebook-topbar-chip,
+            .guidebook-topbar-user,
+            .guidebook-topbar-logout {
+                justify-content: center;
             }
 
             .assistant-window {

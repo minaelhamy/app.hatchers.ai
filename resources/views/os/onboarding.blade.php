@@ -1,510 +1,196 @@
 @extends('os.layout')
 
 @section('hide_topbar', '1')
-@section('page_class', 'auth-entry-page')
+@section('page_class', 'minimal-signup-page')
 
 @section('head')
     <style>
-        .page.auth-entry-page {
+        .page.minimal-signup-page {
             min-height: 100vh;
             padding: 0;
             font-family: "Inter", "Avenir Next", "Segoe UI", sans-serif;
         }
 
-        .signup-scene {
+        .ms-scene {
             min-height: 100vh;
             display: grid;
             place-items: center;
             padding: 28px;
             background:
-                radial-gradient(circle at 82% 14%, rgba(234, 187, 199, 0.22), transparent 0 18%),
-                linear-gradient(165deg, #ddd2c8 0%, #c8b8b0 100%);
+                radial-gradient(circle at 82% 16%, rgba(241, 121, 145, 0.18), transparent 0 18%),
+                linear-gradient(180deg, #f4efe8 0%, #e8dfd4 100%);
         }
 
-        .signup-scene::before {
-            content: "";
-            position: fixed;
-            inset: 0;
-            pointer-events: none;
-            background-image:
-                linear-gradient(rgba(255, 255, 255, 0.11) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(255, 255, 255, 0.11) 1px, transparent 1px);
-            background-size: 88px 88px;
-            opacity: 0.28;
+        .ms-card {
+            width: min(100%, 560px);
+            border-radius: 34px;
+            border: 1px solid rgba(118, 101, 90, 0.12);
+            background: rgba(255, 251, 247, 0.92);
+            box-shadow: 0 32px 70px rgba(33, 23, 18, 0.14);
+            padding: 30px;
         }
 
-        .signup-wrap {
-            position: relative;
-            z-index: 1;
-            width: min(100%, 920px);
-            display: grid;
-            gap: 18px;
-            justify-items: center;
-            text-align: center;
-            opacity: 1;
-            transition: opacity 320ms ease, transform 420ms ease, filter 420ms ease;
+        .ms-mark {
+            width: 58px;
+            height: 58px;
+            border-radius: 18px;
+            background: linear-gradient(135deg, #f13b74, #f26444);
+            box-shadow: 0 18px 34px rgba(241, 59, 116, 0.24);
+            margin-bottom: 16px;
         }
 
-        .signup-scene.is-launch-arrival .signup-wrap {
-            opacity: 0;
-            transform: translateY(20px) scale(0.986);
-            filter: blur(8px);
-        }
-
-        .signup-scene.is-launch-arrival.is-launch-ready .signup-wrap {
-            opacity: 1;
-            transform: translateY(0) scale(1);
-            filter: blur(0);
-        }
-
-        .signup-mark {
-            width: 82px;
-            height: 82px;
-            border-radius: 24px;
-            background: linear-gradient(145deg, #ec2d70, #f24c44);
-            box-shadow:
-                0 22px 48px rgba(225, 29, 116, 0.2),
-                0 0 0 12px rgba(255,255,255,0.14);
-        }
-
-        .signup-brand {
-            margin-top: -6px;
-            font-size: 1.55rem;
-            letter-spacing: 0.16em;
-            text-transform: uppercase;
-            color: rgba(131, 111, 100, 0.72);
-        }
-
-        .signup-copy {
-            color: rgba(116, 96, 86, 0.82);
-            font-size: 0.92rem;
-            line-height: 1.5;
-        }
-
-        .signup-card {
-            width: 100%;
-            padding: 24px;
-            border-radius: 24px;
-            border: 1px solid rgba(214, 201, 184, 0.84);
-            background:
-                radial-gradient(circle at 78% 18%, rgba(234, 197, 201, 0.14), transparent 0 18%),
-                linear-gradient(180deg, rgba(249, 244, 238, 0.88), rgba(240, 230, 220, 0.92));
-            box-shadow:
-                0 18px 54px rgba(71, 52, 31, 0.1),
-                inset 0 1px 0 rgba(255, 255, 255, 0.72);
-            backdrop-filter: blur(14px);
-            text-align: left;
-        }
-
-        .signup-kicker {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            margin-bottom: 10px;
-            font-size: 0.66rem;
+        .ms-kicker {
+            margin: 0 0 10px;
+            font-size: 0.78rem;
             letter-spacing: 0.14em;
             text-transform: uppercase;
-            color: rgba(116, 97, 86, 0.72);
+            color: rgba(105, 88, 77, 0.68);
         }
 
-        .signup-kicker::before {
-            content: "";
-            width: 8px;
-            height: 8px;
-            border-radius: 999px;
-            background: rgba(225, 29, 116, 0.7);
-        }
-
-        .signup-header {
-            display: grid;
-            gap: 12px;
-            margin-bottom: 20px;
-        }
-
-        .signup-title {
+        .ms-title {
             margin: 0;
             font-family: "Inter Tight", "Inter", sans-serif;
-            font-size: clamp(1.95rem, 4vw, 2.8rem);
-            line-height: 0.98;
+            font-size: clamp(2rem, 4vw, 3rem);
+            line-height: 0.94;
             letter-spacing: -0.05em;
             color: #171310;
         }
 
-        .signup-subcopy {
-            margin: 0;
-            color: rgba(92, 76, 67, 0.84);
-            line-height: 1.5;
-            font-size: 0.92rem;
-            max-width: 720px;
+        .ms-copy {
+            margin: 14px 0 0;
+            font-size: 0.98rem;
+            line-height: 1.6;
+            color: rgba(88, 73, 63, 0.82);
         }
 
-        .signup-topline {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 14px;
-            flex-wrap: wrap;
-        }
-
-        .signup-plan-pill,
-        .signup-arrival-badge {
+        .ms-pill {
+            margin-top: 20px;
             display: inline-flex;
             align-items: center;
             gap: 8px;
-            width: fit-content;
-            padding: 9px 13px;
+            padding: 10px 14px;
             border-radius: 999px;
-            border: 1px solid rgba(223, 210, 197, 0.92);
-            background: rgba(255,255,255,0.74);
-            color: rgba(90, 72, 62, 0.88);
-            font-size: 0.78rem;
+            background: rgba(245, 238, 231, 0.96);
+            border: 1px solid rgba(118, 101, 90, 0.12);
+            color: rgba(91, 74, 64, 0.84);
+            font-size: 0.84rem;
             font-weight: 600;
         }
 
-        .signup-plan-pill::before,
-        .signup-arrival-badge::before {
+        .ms-pill::before {
             content: "";
             width: 8px;
             height: 8px;
             border-radius: 999px;
-            background: linear-gradient(135deg, #e11d74, #ef4444);
+            background: linear-gradient(135deg, #f13b74, #f26444);
         }
 
-        .signup-entry-banner {
-            display: none;
-            align-items: center;
-            justify-content: space-between;
-            gap: 16px;
-            padding: 14px 16px;
-            border-radius: 18px;
-            border: 1px solid rgba(223, 210, 197, 0.92);
-            background: rgba(255,255,255,0.66);
-            box-shadow: inset 0 1px 0 rgba(255,255,255,0.8);
-        }
-
-        .signup-entry-banner.is-visible {
-            display: flex;
-        }
-
-        .signup-entry-banner strong {
-            display: block;
-            color: #171310;
-            letter-spacing: -0.02em;
-            margin-bottom: 4px;
-        }
-
-        .signup-entry-banner span {
-            color: rgba(96, 81, 73, 0.84);
-            font-size: 0.88rem;
-        }
-
-        .signup-alert {
-            margin-bottom: 16px;
-            border-radius: 18px;
-            padding: 14px 16px;
-        }
-
-        .signup-alert.error {
-            border: 1px solid rgba(179, 34, 83, 0.2);
-            background: rgba(179, 34, 83, 0.06);
-            color: var(--rose);
-        }
-
-        .signup-form-grid {
-            display: grid;
-            gap: 14px;
-        }
-
-        .signup-grid-2,
-        .signup-grid-3 {
+        .ms-form {
+            margin-top: 24px;
             display: grid;
             gap: 16px;
         }
 
-        .signup-grid-2 {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-
-        .signup-grid-3 {
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-        }
-
-        .signup-label {
+        .ms-field label {
             display: block;
             margin-bottom: 7px;
-            font-size: 0.84rem;
-            color: rgba(96, 81, 73, 0.86);
+            font-size: 0.86rem;
+            color: rgba(88, 73, 63, 0.82);
         }
 
-        .signup-input,
-        .signup-select,
-        .signup-textarea {
+        .ms-field input {
             width: 100%;
-            padding: 13px 15px;
-            border-radius: 14px;
-            border: 1px solid rgba(220, 207, 191, 0.94);
-            background: rgba(255, 255, 255, 0.9);
-            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78);
-            color: #191411;
+            min-height: 56px;
+            border-radius: 18px;
+            border: 1px solid rgba(118, 101, 90, 0.14);
+            background: rgba(255,255,255,0.95);
+            padding: 0 16px;
             font: inherit;
-            font-size: 0.9rem;
+            color: #181210;
         }
 
-        .signup-textarea {
-            resize: vertical;
-            min-height: 118px;
-        }
-
-        .signup-error {
-            margin-top: 6px;
-            color: #b32253;
-            font-size: 0.9rem;
-        }
-
-        .signup-actions {
-            display: flex;
-            gap: 12px;
-            flex-wrap: wrap;
-            margin-top: 6px;
-        }
-
-        .signup-submit,
-        .signup-secondary {
-            text-decoration: none;
-            border-radius: 999px;
-            padding: 12px 16px;
-            font-weight: 700;
-            font: inherit;
-            font-size: 0.88rem;
-        }
-
-        .signup-submit {
+        .ms-btn {
+            min-height: 58px;
+            border-radius: 20px;
             border: 0;
-            background: linear-gradient(180deg, #181310, #2b221d);
+            background: #111;
             color: #fff;
+            font: inherit;
+            font-weight: 700;
             cursor: pointer;
-            box-shadow: 0 14px 28px rgba(33, 25, 20, 0.15);
         }
 
-        .signup-secondary {
-            border: 1px solid rgba(220, 207, 191, 0.94);
-            background: rgba(255,255,255,0.72);
-            color: #1c1714;
+        .ms-note {
+            margin-top: 18px;
+            padding: 14px 16px;
+            border-radius: 18px;
+            background: rgba(245, 238, 231, 0.94);
+            border: 1px solid rgba(118, 101, 90, 0.12);
+            color: rgba(91, 74, 64, 0.84);
+            line-height: 1.5;
+            font-size: 0.9rem;
         }
 
-        .signup-footnote {
-            margin: 0;
-            color: rgba(104, 88, 79, 0.78);
+        .ms-error {
+            color: #b32253;
             font-size: 0.84rem;
+            margin-top: 6px;
         }
 
-        @media (max-width: 840px) {
-            .signup-grid-2,
-            .signup-grid-3 {
-                grid-template-columns: 1fr;
-            }
-
-            .signup-card {
-                padding: 24px;
-            }
-
-            .signup-entry-banner {
-                align-items: flex-start;
-                flex-direction: column;
-            }
+        .ms-alert {
+            margin-top: 16px;
+            padding: 14px 16px;
+            border-radius: 18px;
+            border: 1px solid rgba(179, 34, 83, 0.18);
+            background: rgba(179, 34, 83, 0.06);
+            color: #b32253;
         }
     </style>
 @endsection
 
 @section('content')
-    <div class="signup-scene" data-signup-scene>
-        <section class="signup-wrap">
-            <div class="signup-mark"></div>
-            <div class="signup-brand">Hatchers AI OS</div>
-            <div class="signup-copy">Create your workspace.</div>
+    <div class="ms-scene">
+        <div class="ms-card">
+            <div class="ms-mark"></div>
+            <p class="ms-kicker">Hatchers OS signup</p>
+            <h1 class="ms-title">Create the account first. We’ll shape the business inside the chat.</h1>
+            <p class="ms-copy">
+                Choose your plan, create the founder login, then Hatchers will collect the business context conversationally and turn it into your launch plan, tasks, and website direction.
+            </p>
 
-            <div class="signup-card">
-                <div class="signup-header">
-                    <div class="signup-topline">
-                        <div class="signup-kicker">Founder signup</div>
-                        <div class="signup-plan-pill">{{ $selectedPlan['label'] }}</div>
-                    </div>
+            <div class="ms-pill">{{ $selectedPlan['name'] ?? 'Selected plan' }}</div>
 
-                    <h1 class="signup-title">Tell Hatchers how your business works.</h1>
-                    <p class="signup-subcopy">
-                        Finish this setup once so we can tailor your website, learning, and workspace to your business.
-                    </p>
+            @if($errors->has('signup'))
+                <div class="ms-alert">{{ $errors->first('signup') }}</div>
+            @endif
 
-                    <div class="signup-entry-banner" data-signup-entry-banner>
-                        <div>
-                            <strong data-signup-entry-title>Founder mode selected</strong>
-                            <span data-signup-entry-copy>We’re preparing your workspace and keeping your onboarding context ready.</span>
-                        </div>
-                        <div class="signup-arrival-badge" data-signup-entry-badge>{{ $selectedPlan['label'] }}</div>
-                    </div>
+            <form method="POST" action="{{ route('onboarding.store') }}" class="ms-form">
+                @csrf
+                <input type="hidden" name="plan_code" value="{{ $selectedPlan['code'] }}">
+
+                <div class="ms-field">
+                    <label for="email">Email</label>
+                    <input id="email" name="email" type="email" value="{{ old('email') }}" required autocomplete="email">
+                    @error('email')<div class="ms-error">{{ $message }}</div>@enderror
                 </div>
 
-                @if (session('error'))
-                    <div class="signup-alert error">
-                        {{ session('error') }}
-                    </div>
-                @endif
-                @if ($errors->any())
-                    <div class="signup-alert error">
-                        <strong style="display: block; margin-bottom: 8px;">Please complete every required field.</strong>
-                        <ul style="margin: 0 0 0 18px; padding: 0;">
-                            @foreach ($errors->all() as $error)
-                                <li>{{ $error }}</li>
-                            @endforeach
-                        </ul>
-                    </div>
-                @endif
+                <div class="ms-field">
+                    <label for="password">Password</label>
+                    <input id="password" name="password" type="password" required autocomplete="new-password">
+                    @error('password')<div class="ms-error">{{ $message }}</div>@enderror
+                </div>
 
-                <form method="POST" action="/onboarding" class="signup-form-grid">
-                    @csrf
-                    <input type="hidden" name="plan_code" value="{{ $selectedPlan['code'] }}">
-                    <div class="signup-grid-2">
-                        <label>
-                            <div class="signup-label">Founder Name</div>
-                            <input class="signup-input" required type="text" name="full_name" value="{{ old('full_name') }}">
-                            @error('full_name')<div class="signup-error">{{ $message }}</div>@enderror
-                        </label>
-                        <label>
-                            <div class="signup-label">Email</div>
-                            <input class="signup-input" required type="email" name="email" value="{{ old('email') }}">
-                            @error('email')<div class="signup-error">{{ $message }}</div>@enderror
-                        </label>
-                    </div>
-                    <div class="signup-grid-2">
-                        <label>
-                            <div class="signup-label">Username</div>
-                            <input class="signup-input" required type="text" name="username" value="{{ old('username') }}">
-                            @error('username')<div class="signup-error">{{ $message }}</div>@enderror
-                        </label>
-                        <label>
-                            <div class="signup-label">Company Name</div>
-                            <input class="signup-input" required type="text" name="company_name" value="{{ old('company_name') }}">
-                            @error('company_name')<div class="signup-error">{{ $message }}</div>@enderror
-                        </label>
-                    </div>
-                    <div class="signup-grid-2">
-                        <label>
-                            <div class="signup-label">Password</div>
-                            <input class="signup-input" required type="password" name="password">
-                            @error('password')<div class="signup-error">{{ $message }}</div>@enderror
-                        </label>
-                        <label>
-                            <div class="signup-label">Confirm Password</div>
-                            <input class="signup-input" required type="password" name="password_confirmation">
-                        </label>
-                    </div>
-                    <div class="signup-grid-2">
-                        <label>
-                            <div class="signup-label">Business Model</div>
-                            <select class="signup-select" required name="business_model">
-                                <option value="">Select a business model</option>
-                                @foreach ($businessModelOptions as $value => $label)
-                                    <option value="{{ $value }}" @selected(old('business_model') === $value)>{{ $label }}</option>
-                                @endforeach
-                            </select>
-                            @error('business_model')<div class="signup-error">{{ $message }}</div>@enderror
-                        </label>
-                        <label>
-                            <div class="signup-label">Stage</div>
-                            <select class="signup-select" required name="stage">
-                                <option value="">Select your stage</option>
-                                @foreach ($stageOptions as $value => $label)
-                                    <option value="{{ $value }}" @selected(old('stage') === $value)>{{ $label }}</option>
-                                @endforeach
-                            </select>
-                            @error('stage')<div class="signup-error">{{ $message }}</div>@enderror
-                        </label>
-                    </div>
-                    <label>
-                        <div class="signup-label">Company Description</div>
-                        <textarea class="signup-textarea" required name="company_description" rows="5">{{ old('company_description') }}</textarea>
-                        @error('company_description')<div class="signup-error">{{ $message }}</div>@enderror
-                    </label>
-                    <label>
-                        <div class="signup-label">Ideal Customer Profile</div>
-                        <textarea class="signup-textarea" required name="ideal_customer_profile" rows="4">{{ old('ideal_customer_profile') }}</textarea>
-                        @error('ideal_customer_profile')<div class="signup-error">{{ $message }}</div>@enderror
-                    </label>
-                    <div class="signup-grid-2">
-                        <label>
-                            <div class="signup-label">Primary Growth Goal</div>
-                            <select class="signup-select" required name="primary_growth_goal">
-                                <option value="">Select your goal</option>
-                                @foreach ($growthGoalOptions as $option)
-                                    <option value="{{ $option }}" @selected(old('primary_growth_goal') === $option)>{{ $option }}</option>
-                                @endforeach
-                            </select>
-                            @error('primary_growth_goal')<div class="signup-error">{{ $message }}</div>@enderror
-                        </label>
-                        <label>
-                            <div class="signup-label">Current Biggest Blocker</div>
-                            <select class="signup-select" required name="known_blockers">
-                                <option value="">Select a blocker</option>
-                                @foreach ($knownBlockerOptions as $option)
-                                    <option value="{{ $option }}" @selected(old('known_blockers') === $option)>{{ $option }}</option>
-                                @endforeach
-                            </select>
-                            @error('known_blockers')<div class="signup-error">{{ $message }}</div>@enderror
-                        </label>
-                    </div>
-                    <div class="signup-actions">
-                        <button class="signup-submit" type="submit">Complete founder signup</button>
-                        <a class="signup-secondary" href="{{ route('plans') }}">Back to plans</a>
-                    </div>
-                    <p class="signup-footnote">Hatchers will infer the blueprint, industry, offer structure, customer pains, objections, and website direction from this shorter founder brief before building your workspace.</p>
-                </form>
+                <div class="ms-field">
+                    <label for="password_confirmation">Confirm Password</label>
+                    <input id="password_confirmation" name="password_confirmation" type="password" required autocomplete="new-password">
+                </div>
+
+                <button type="submit" class="ms-btn">Create founder account</button>
+            </form>
+
+            <div class="ms-note">
+                After this, Hatchers will ask the onboarding questions inside the OS chat and build your launch plan from there instead of making you fill a long form up front.
             </div>
-        </section>
+        </div>
     </div>
-
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const scene = document.querySelector('[data-signup-scene]');
-            const banner = document.querySelector('[data-signup-entry-banner]');
-            const bannerTitle = document.querySelector('[data-signup-entry-title]');
-            const bannerCopy = document.querySelector('[data-signup-entry-copy]');
-            const bannerBadge = document.querySelector('[data-signup-entry-badge]');
-
-            if (!scene) {
-                return;
-            }
-
-            let transitionState = null;
-
-            try {
-                transitionState = JSON.parse(sessionStorage.getItem('hatchersPlanLaunchTransition') || 'null');
-                if (transitionState) {
-                    sessionStorage.removeItem('hatchersPlanLaunchTransition');
-                }
-            } catch (error) {
-                transitionState = null;
-            }
-
-            if (!transitionState || !transitionState.planName) {
-                return;
-            }
-
-            scene.classList.add('is-launch-arrival');
-
-            if (banner && bannerTitle && bannerCopy && bannerBadge) {
-                banner.classList.add('is-visible');
-                bannerTitle.textContent = `${transitionState.planName} selected`;
-                bannerCopy.textContent = `Now shaping your onboarding around ${String(transitionState.planBestFor || 'your business').toLowerCase()}.`;
-                if (transitionState.planLabel) {
-                    bannerBadge.textContent = transitionState.planLabel;
-                }
-            }
-
-            window.requestAnimationFrame(() => {
-                window.requestAnimationFrame(() => {
-                    scene.classList.add('is-launch-ready');
-                });
-            });
-        });
-    </script>
 @endsection

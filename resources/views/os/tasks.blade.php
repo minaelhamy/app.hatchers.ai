@@ -83,6 +83,14 @@
 
         <main class="tasks-main">
             <div class="tasks-main-inner">
+                @include('os.partials.guidebook-workspace-topbar', [
+                    'founder' => $founder,
+                    'company' => $founder->company,
+                    'workspace' => $workspace,
+                    'projectName' => $founder->company->company_name ?? 'Founder workspace',
+                    'sectionLabel' => 'Tasks',
+                    'searchPlaceholder' => 'Review the next milestone, update task status, or ask what to do next...',
+                ])
                 <h1>Tasks</h1>
                 <p>Your single daily execution center. If you want to know what to do next, start here.</p>
                 @if (session('success'))

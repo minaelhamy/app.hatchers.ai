@@ -95,10 +95,6 @@ class OsShellController extends Controller
             'pageTitle' => 'Founder Onboarding',
             'submitted' => session('submitted'),
             'selectedPlan' => $selectedPlan,
-            'businessModelOptions' => $this->founderBusinessModelOptions(),
-            'stageOptions' => $this->founderStageOptions(),
-            'growthGoalOptions' => $this->founderPrimaryGrowthGoalOptions(),
-            'knownBlockerOptions' => $this->founderKnownBlockerOptions(),
         ]);
     }
 
@@ -301,6 +297,8 @@ class OsShellController extends Controller
             'dashboard' => $founderDashboardService->build($user),
             'launchCards' => $workspaceLaunchService->launchCards($user),
             'companyIntelligenceWizard' => $this->companyIntelligenceWizardState($user),
+            'chatOnboardingState' => $this->founderChatOnboardingState($user),
+            'launchPlanState' => $this->founderLaunchPlanState($user),
         ]);
     }
 
@@ -6587,29 +6585,14 @@ class OsShellController extends Controller
         );
     }
 
-    public function storeOnboarding(
-        Request $request,
-        AtlasIntelligenceService $atlas,
-        FounderModuleSyncService $founderModuleSyncService
-    ): RedirectResponse
+    public function storeOnboarding(Request $request): RedirectResponse
     {
         $validated = $request->validate([
             'plan_code' => ['required', Rule::in(array_keys($this->founderSignupPlans()))],
-            'full_name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', 'unique:founders,email'],
-            'username' => ['required', 'string', 'max:255', 'unique:founders,username'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
-            'company_name' => ['required', 'string', 'max:255'],
-            'business_model' => ['required', Rule::in(array_keys($this->founderBusinessModelOptions()))],
-            'stage' => ['required', Rule::in(array_keys($this->founderStageOptions()))],
-            'company_description' => ['required', 'string', 'max:3000'],
-            'ideal_customer_profile' => ['required', 'string', 'max:2000'],
-            'primary_growth_goal' => ['required', Rule::in($this->founderPrimaryGrowthGoalOptions())],
-            'known_blockers' => ['required', Rule::in($this->founderKnownBlockerOptions())],
         ], [
             'plan_code.required' => 'Please choose a founder plan before signing up.',
-            'company_description.required' => 'Please tell Hatchers what the company does.',
-            'ideal_customer_profile.required' => 'Please describe the ideal customer profile.',
         ]);
 
         $plan = $this->founderSignupPlans()[$validated['plan_code']] ?? null;
@@ -6617,17 +6600,19 @@ class OsShellController extends Controller
             return redirect()->route('plans')->with('error', 'Please choose a valid founder plan.');
         }
 
-        $deducedProfile = $this->deduceFounderSignupProfile($validated);
-        $blueprint = $this->upsertVerticalBlueprint((string) $deducedProfile['vertical_blueprint']);
-        $atlasPayload = $this->atlasFounderOnboardingPayload($validated, $deducedProfile, $blueprint);
+        $emailLocal = Str::before((string) $validated['email'], '@');
+        $username = $this->uniqueFounderUsernameFromSeed($emailLocal);
+        $displayName = $this->placeholderFounderNameFromEmail((string) $validated['email']);
+        $companyName = $this->placeholderCompanyNameFromEmail((string) $validated['email']);
+        $defaultBlueprint = $this->upsertVerticalBlueprint($this->defaultVerticalBlueprintCodeForBusinessModel('service'));
 
         try {
-            DB::transaction(function () use ($validated, $atlas, $plan, $blueprint, $deducedProfile, $atlasPayload) {
+            DB::transaction(function () use ($validated, $plan, $username, $displayName, $companyName, $defaultBlueprint) {
                 $founder = Founder::create(
                     [
-                        'username' => $validated['username'],
+                        'username' => $username,
                         'email' => $validated['email'],
-                        'full_name' => $validated['full_name'],
+                        'full_name' => $displayName,
                         'password' => Hash::make($validated['password']),
                         'status' => 'active',
                         'role' => 'founder',
@@ -6641,73 +6626,18 @@ class OsShellController extends Controller
                 $company = Company::updateOrCreate(
                     ['founder_id' => $founder->id],
                     [
-                        'company_name' => $validated['company_name'],
-                        'business_model' => $validated['business_model'],
-                        'vertical_blueprint_id' => $blueprint->id,
-                        'industry' => (string) ($deducedProfile['industry'] ?? ''),
-                        'stage' => $validated['stage'],
-                        'primary_city' => (string) ($deducedProfile['primary_city'] ?? ''),
-                        'service_radius' => (string) ($deducedProfile['service_radius'] ?? ''),
-                        'primary_goal' => $validated['primary_growth_goal'],
-                        'launch_stage' => 'brief_captured',
-                        'website_generation_status' => 'queued',
+                        'company_name' => $companyName,
+                        'business_model' => 'service',
+                        'vertical_blueprint_id' => $defaultBlueprint->id,
+                        'industry' => '',
+                        'stage' => 'idea',
+                        'primary_city' => '',
+                        'service_radius' => '',
+                        'primary_goal' => '',
+                        'launch_stage' => 'chat_onboarding_pending',
+                        'website_generation_status' => 'not_started',
                         'website_status' => 'not_started',
-                        'company_brief' => $validated['company_description'],
-                    ]
-                );
-
-                FounderBusinessBrief::updateOrCreate(
-                    ['founder_id' => $founder->id, 'company_id' => $company->id],
-                    [
-                        'vertical_blueprint_id' => $blueprint->id,
-                        'business_name' => $validated['company_name'],
-                        'business_summary' => $validated['company_description'],
-                        'problem_solved' => (string) ($deducedProfile['problem_solved'] ?? ''),
-                        'core_offer' => (string) ($deducedProfile['core_offer'] ?? ''),
-                        'business_type_detail' => $blueprint->name,
-                        'location_city' => (string) ($deducedProfile['primary_city'] ?? ''),
-                        'location_country' => (string) ($deducedProfile['location_country'] ?? ''),
-                        'service_radius' => (string) ($deducedProfile['service_radius'] ?? ''),
-                        'delivery_scope' => (string) ($deducedProfile['service_radius'] ?? ''),
-                        'proof_points' => (string) ($deducedProfile['differentiators'] ?? ''),
-                        'founder_story' => $validated['company_description'],
-                        'constraints_json' => [
-                            'known_blockers' => $validated['known_blockers'],
-                        ],
-                        'status' => 'captured',
-                    ]
-                );
-
-                FounderIcpProfile::updateOrCreate(
-                    ['founder_id' => $founder->id, 'company_id' => $company->id],
-                    [
-                        'primary_icp_name' => (string) ($deducedProfile['primary_icp_name'] ?? 'Ideal customer'),
-                        'pain_points_json' => array_values((array) ($deducedProfile['pain_points'] ?? [])),
-                        'desired_outcomes_json' => array_values((array) ($deducedProfile['desired_outcomes'] ?? [])),
-                        'objections_json' => array_values((array) ($deducedProfile['objections'] ?? [])),
-                        'price_sensitivity' => 'unknown',
-                        'primary_channels_json' => $blueprint->default_channels_json ?? [],
-                        'local_area_focus_json' => array_values(array_filter([(string) ($deducedProfile['primary_city'] ?? '')])),
-                        'language_style' => (string) ($deducedProfile['brand_voice'] ?? ''),
-                    ]
-                );
-
-                CompanyIntelligence::updateOrCreate(
-                    ['company_id' => $company->id],
-                    [
-                        'target_audience' => (string) ($deducedProfile['target_audience'] ?? ''),
-                        'ideal_customer_profile' => $validated['ideal_customer_profile'],
-                        'primary_icp_name' => (string) ($deducedProfile['primary_icp_name'] ?? ''),
-                        'problem_solved' => (string) ($deducedProfile['problem_solved'] ?? ''),
-                        'brand_voice' => (string) ($deducedProfile['brand_voice'] ?? ''),
-                        'differentiators' => (string) ($deducedProfile['differentiators'] ?? ''),
-                        'core_offer' => (string) ($deducedProfile['core_offer'] ?? ''),
-                        'primary_growth_goal' => $validated['primary_growth_goal'],
-                        'known_blockers' => $validated['known_blockers'],
-                        'objections' => implode(', ', array_values((array) ($deducedProfile['objections'] ?? []))),
-                        'buying_triggers' => implode(', ', array_values((array) ($deducedProfile['desired_outcomes'] ?? []))),
-                        'local_market_notes' => $this->localMarketNotesFromProfile($deducedProfile),
-                        'intelligence_updated_at' => now(),
+                        'company_brief' => 'Founder account created. Chat onboarding still needs to capture the business context.',
                     ]
                 );
 
@@ -6739,55 +6669,31 @@ class OsShellController extends Controller
                 FounderWeeklyState::updateOrCreate(
                     ['founder_id' => $founder->id],
                     [
-                        'weekly_focus' => 'Complete onboarding and begin the first business build sprint.',
+                        'weekly_focus' => 'Complete the founder chat so Hatchers can build your first launch plan.',
                         'state_updated_at' => now(),
                     ]
                 );
-
-                $actions = [
+                FounderActionPlan::firstOrCreate(
                     [
-                        'title' => 'Complete company intelligence',
-                        'description' => 'Refine your audience, offer, and positioning so Hatchers can build the right direct-response business system for you.',
-                        'platform' => 'atlas',
-                        'priority' => 95,
-                        'cta_label' => 'Open Atlas',
-                        'cta_url' => '/dashboard',
+                        'founder_id' => $founder->id,
+                        'context' => 'task',
+                        'title' => 'Complete your founder chat',
                     ],
                     [
-                        'title' => 'Choose your website path',
-                        'description' => 'Review the pre-selected launch engine and get your first site ready for publishing.',
-                        'platform' => (string) $blueprint->engine,
-                        'priority' => 88,
-                        'cta_label' => 'Open Website Workspace',
-                        'cta_url' => '/website',
-                    ],
-                    [
-                        'title' => 'Review your first revenue sprint',
-                        'description' => 'Start with the first tasks Hatchers recommends for getting your first customers fast.',
+                        'description' => 'Answer the onboarding questions in Hatchers OS so we can generate your launch plan, company intelligence, and first tasks.',
                         'platform' => 'os',
-                        'priority' => 90,
-                        'cta_label' => 'Open Tasks',
-                        'cta_url' => '/tasks',
-                    ],
-                ];
-
-                foreach ($actions as $action) {
-                    FounderActionPlan::firstOrCreate(
-                        [
-                            'founder_id' => $founder->id,
-                            'context' => 'task',
-                            'title' => $action['title'],
-                        ],
-                        $action
-                    );
-                }
-
-                $atlas->syncFounderOnboarding($founder, $company, $atlasPayload);
+                        'priority' => 100,
+                        'status' => 'pending',
+                        'cta_label' => 'Open Dashboard',
+                        'cta_url' => '/dashboard',
+                        'metadata_json' => ['source' => 'minimal_signup'],
+                    ]
+                );
             });
         } catch (Throwable $exception) {
             Log::error('Founder signup failed unexpectedly.', [
                 'email' => $validated['email'] ?? '',
-                'username' => $validated['username'] ?? '',
+                'username' => $username ?? '',
                 'message' => $exception->getMessage(),
             ]);
 
@@ -6797,17 +6703,6 @@ class OsShellController extends Controller
         }
 
         $founder = Founder::query()->with('company')->where('email', $validated['email'])->first();
-        if ($founder instanceof Founder) {
-            $syncResult = $founderModuleSyncService->syncFounder($founder, 'all');
-            if (empty($syncResult['ok'])) {
-                Log::warning('Founder signup completed but module sync had issues.', [
-                    'founder_id' => $founder->id,
-                    'email' => $founder->email,
-                    'message' => $syncResult['message'] ?? 'Founder module sync failed.',
-                    'results' => $syncResult['results'] ?? [],
-                ]);
-            }
-        }
 
         if ($founder && $this->authVerificationDisabled()) {
             $founder->forceFill([
@@ -6820,7 +6715,7 @@ class OsShellController extends Controller
 
             return redirect()->route('login')->with(
                 'success',
-                'Your founder workspace has been created under the ' . $plan['name'] . ' plan. Verification is disabled for test mode, so you can log in immediately.'
+                'Your founder workspace is ready under the ' . $plan['name'] . ' plan. Log in and Hatchers will collect the rest through chat.'
             );
         }
 
@@ -6831,8 +6726,210 @@ class OsShellController extends Controller
 
         return redirect()->route('verification.email.notice', ['email' => $validated['email']])->with(
             'success',
-            'Your founder workspace has been created under the ' . $plan['name'] . ' plan. We sent a verification code to your email before you can log in.'
+            'Your founder workspace has been created under the ' . $plan['name'] . ' plan. We sent a verification code to your email before you can log in and continue in chat.'
         );
+    }
+
+    public function completeChatOnboarding(
+        Request $request,
+        AtlasIntelligenceService $atlas,
+        FounderModuleSyncService $founderModuleSyncService
+    ): JsonResponse
+    {
+        /** @var \App\Models\Founder $founder */
+        $founder = Auth::user();
+        if (!$founder->isFounder()) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Only founder accounts can complete onboarding here.',
+            ], 403);
+        }
+
+        $validated = $request->validate([
+            'q1' => ['required', 'string', 'max:1200'],
+            'q2' => ['required', 'string', 'max:1200'],
+            'q3' => ['required', 'string', 'max:1200'],
+            'q4' => ['nullable', 'string', 'max:1200'],
+            'budget_strategy' => ['required', Rule::in(['organic', 'paid', 'unsure'])],
+            'time_commitment' => ['required', Rule::in(['low', 'mid', 'high'])],
+        ]);
+
+        $company = $founder->company;
+        if (!$company) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Your founder workspace is missing a company record. Please refresh and try again.',
+            ], 422);
+        }
+
+        $signupProfile = $this->chatOnboardingValidatedProfile($founder, $validated);
+        $deducedProfile = $this->deduceFounderSignupProfile($signupProfile);
+        if (trim((string) ($deducedProfile['primary_city'] ?? '')) === '') {
+            $deducedProfile['primary_city'] = 'Online / to be confirmed';
+        }
+        if (trim((string) ($deducedProfile['service_radius'] ?? '')) === '') {
+            $deducedProfile['service_radius'] = 'Flexible service area';
+        }
+        $blueprint = $this->upsertVerticalBlueprint((string) $deducedProfile['vertical_blueprint']);
+        $launchPlan = $this->buildFounderLaunchPlan($signupProfile, $deducedProfile, $blueprint);
+
+        DB::transaction(function () use ($founder, $company, $signupProfile, $deducedProfile, $blueprint, $launchPlan) {
+            $projectName = trim((string) ($signupProfile['company_name'] ?? ''));
+
+            $founder->forceFill([
+                'full_name' => $projectName !== '' && trim((string) $founder->full_name) === $this->placeholderFounderNameFromEmail((string) $founder->email)
+                    ? $this->placeholderFounderNameFromEmail((string) $founder->email)
+                    : (string) $founder->full_name,
+            ])->save();
+
+            $company->forceFill([
+                'company_name' => $projectName !== '' ? $projectName : (string) $company->company_name,
+                'business_model' => (string) $signupProfile['business_model'],
+                'vertical_blueprint_id' => $blueprint->id,
+                'industry' => (string) ($deducedProfile['industry'] ?? ''),
+                'stage' => (string) $signupProfile['stage'],
+                'primary_city' => (string) ($deducedProfile['primary_city'] ?? ''),
+                'service_radius' => (string) ($deducedProfile['service_radius'] ?? ''),
+                'primary_goal' => (string) $signupProfile['primary_growth_goal'],
+                'launch_stage' => 'launch_plan_ready',
+                'website_generation_status' => 'queued',
+                'website_status' => 'not_started',
+                'company_brief' => (string) $signupProfile['company_description'],
+            ])->save();
+
+            FounderBusinessBrief::updateOrCreate(
+                ['founder_id' => $founder->id, 'company_id' => $company->id],
+                [
+                    'vertical_blueprint_id' => $blueprint->id,
+                    'business_name' => (string) $company->company_name,
+                    'business_summary' => (string) $signupProfile['company_description'],
+                    'problem_solved' => (string) ($deducedProfile['problem_solved'] ?? ''),
+                    'core_offer' => (string) ($deducedProfile['core_offer'] ?? ''),
+                    'business_type_detail' => (string) $blueprint->name,
+                    'location_city' => (string) ($deducedProfile['primary_city'] ?? ''),
+                    'location_country' => (string) ($deducedProfile['location_country'] ?? ''),
+                    'service_radius' => (string) ($deducedProfile['service_radius'] ?? ''),
+                    'delivery_scope' => (string) ($deducedProfile['service_radius'] ?? ''),
+                    'proof_points' => (string) ($deducedProfile['differentiators'] ?? ''),
+                    'founder_story' => (string) $signupProfile['company_description'],
+                    'constraints_json' => [
+                        'known_blockers' => (string) $signupProfile['known_blockers'],
+                        'budget_strategy' => (string) $signupProfile['budget_strategy'],
+                        'time_commitment' => (string) $signupProfile['time_commitment'],
+                        'hours_per_week' => (int) $launchPlan['pace']['hours_per_week'],
+                    ],
+                    'status' => 'captured',
+                ]
+            );
+
+            FounderIcpProfile::updateOrCreate(
+                ['founder_id' => $founder->id, 'company_id' => $company->id],
+                [
+                    'primary_icp_name' => (string) ($deducedProfile['primary_icp_name'] ?? 'Ideal customer'),
+                    'pain_points_json' => array_values((array) ($deducedProfile['pain_points'] ?? [])),
+                    'desired_outcomes_json' => array_values((array) ($deducedProfile['desired_outcomes'] ?? [])),
+                    'buying_triggers_json' => array_values((array) ($deducedProfile['desired_outcomes'] ?? [])),
+                    'objections_json' => array_values((array) ($deducedProfile['objections'] ?? [])),
+                    'price_sensitivity' => 'unknown',
+                    'primary_channels_json' => $launchPlan['channels'],
+                    'local_area_focus_json' => array_values(array_filter([(string) ($deducedProfile['primary_city'] ?? '')])),
+                    'language_style' => (string) ($deducedProfile['brand_voice'] ?? ''),
+                ]
+            );
+
+            CompanyIntelligence::updateOrCreate(
+                ['company_id' => $company->id],
+                [
+                    'target_audience' => (string) ($deducedProfile['target_audience'] ?? ''),
+                    'ideal_customer_profile' => (string) $signupProfile['ideal_customer_profile'],
+                    'primary_icp_name' => (string) ($deducedProfile['primary_icp_name'] ?? ''),
+                    'problem_solved' => (string) ($deducedProfile['problem_solved'] ?? ''),
+                    'brand_voice' => (string) ($deducedProfile['brand_voice'] ?? ''),
+                    'differentiators' => (string) ($deducedProfile['differentiators'] ?? ''),
+                    'content_goals' => implode(', ', array_values((array) ($launchPlan['north_star_metrics'] ?? []))),
+                    'visual_style' => (string) $launchPlan['visual_direction'],
+                    'core_offer' => (string) ($deducedProfile['core_offer'] ?? ''),
+                    'primary_growth_goal' => (string) $signupProfile['primary_growth_goal'],
+                    'known_blockers' => (string) $signupProfile['known_blockers'],
+                    'objections' => implode(', ', array_values((array) ($deducedProfile['objections'] ?? []))),
+                    'buying_triggers' => implode(', ', array_values((array) ($deducedProfile['desired_outcomes'] ?? []))),
+                    'local_market_notes' => $this->localMarketNotesFromProfile($deducedProfile),
+                    'last_summary' => (string) $launchPlan['summary'],
+                    'intelligence_updated_at' => now(),
+                ]
+            );
+
+            FounderLaunchSystem::updateOrCreate(
+                ['founder_id' => $founder->id, 'company_id' => $company->id],
+                [
+                    'vertical_blueprint_id' => $blueprint->id,
+                    'status' => 'ready',
+                    'selected_engine' => (string) $blueprint->engine,
+                    'launch_strategy_json' => $launchPlan,
+                    'funnel_blocks_json' => $launchPlan['assets'],
+                    'offer_stack_json' => $launchPlan['offer_stack'],
+                    'acquisition_system_json' => [
+                        'channel_strategy' => $launchPlan['channel_strategy'],
+                        'budget_strategy' => $signupProfile['budget_strategy'],
+                        'channels' => $launchPlan['channels'],
+                    ],
+                    'applied_at' => now(),
+                    'last_reviewed_at' => now(),
+                ]
+            );
+
+            FounderActionPlan::query()
+                ->where('founder_id', $founder->id)
+                ->where('context', 'task')
+                ->where(function ($query) {
+                    $query->where('title', 'Complete your founder chat')
+                        ->orWhere('metadata_json->source', 'launch_chat');
+                })
+                ->delete();
+
+            foreach ($launchPlan['tasks'] as $index => $task) {
+                FounderActionPlan::create([
+                    'founder_id' => $founder->id,
+                    'title' => (string) $task['title'],
+                    'description' => (string) $task['description'],
+                    'platform' => (string) $task['platform'],
+                    'context' => 'task',
+                    'priority' => max(45, 95 - ($index * 3)),
+                    'status' => 'pending',
+                    'cta_label' => (string) $task['cta_label'],
+                    'cta_url' => (string) $task['cta_url'],
+                    'available_on' => $task['available_on'] ?? now()->toDateString(),
+                    'metadata_json' => [
+                        'source' => 'launch_chat',
+                        'milestone' => (string) $task['milestone'],
+                        'north_star_metric' => (string) $task['north_star_metric'],
+                    ],
+                ]);
+            }
+
+            FounderWeeklyState::updateOrCreate(
+                ['founder_id' => $founder->id],
+                [
+                    'weekly_focus' => (string) $launchPlan['weekly_focus'],
+                    'open_tasks' => count($launchPlan['tasks']),
+                    'weekly_progress_percent' => 0,
+                    'state_updated_at' => now(),
+                ]
+            );
+
+            $this->syncFounderBusinessContextModels($founder, $company);
+        });
+
+        $company->refresh();
+        $atlasPayload = $this->atlasFounderOnboardingPayload($signupProfile, $deducedProfile, $blueprint);
+        $atlas->syncFounderOnboarding($founder->fresh(), $company->fresh(), $atlasPayload);
+        $founderModuleSyncService->syncFounder($founder->fresh(['company.intelligence', 'company.businessBrief', 'company.icpProfiles']), 'all');
+
+        return response()->json([
+            'success' => true,
+            'reply' => 'Your launch plan is ready. Hatchers mapped the milestones, tasks, channels, and website path based on your answers.',
+            'launch_plan' => $launchPlan,
+        ]);
     }
 
     public function authenticate(
@@ -9264,6 +9361,463 @@ class OsShellController extends Controller
             'Low conversions or sales',
             'Limited time or team capacity',
         ];
+    }
+
+    private function founderChatOnboardingState(Founder $founder): array
+    {
+        $wizard = $this->companyIntelligenceWizardState($founder);
+        $company = $founder->company;
+        $launchSystem = $founder->launchSystems()->latest('id')->first();
+
+        return [
+            'is_complete' => (bool) ($wizard['is_complete'] ?? false),
+            'needs_onboarding' => !(bool) ($wizard['is_complete'] ?? false),
+            'project_name' => trim((string) ($company?->company_name ?? '')),
+            'placeholder_founder_name' => $this->placeholderFounderNameFromEmail((string) $founder->email),
+            'completion_percent' => (int) ($wizard['completion_percent'] ?? 0),
+            'has_launch_plan' => $launchSystem !== null && !empty($launchSystem->launch_strategy_json),
+        ];
+    }
+
+    private function founderLaunchPlanState(Founder $founder): array
+    {
+        $launchSystem = $founder->launchSystems()->latest('id')->first();
+        $strategy = is_array($launchSystem?->launch_strategy_json) ? $launchSystem->launch_strategy_json : [];
+        $tasks = $founder->actionPlans()
+            ->where('context', 'task')
+            ->orderBy('available_on')
+            ->orderByDesc('priority')
+            ->limit(12)
+            ->get()
+            ->map(function (FounderActionPlan $task): array {
+                return [
+                    'id' => (int) $task->id,
+                    'title' => (string) $task->title,
+                    'description' => (string) $task->description,
+                    'available_on' => optional($task->available_on)->toDateString(),
+                    'milestone' => (string) data_get($task->metadata_json, 'milestone', ''),
+                    'north_star_metric' => (string) data_get($task->metadata_json, 'north_star_metric', ''),
+                    'status' => (string) ($task->status ?? 'pending'),
+                    'cta_label' => (string) ($task->cta_label ?? 'Open'),
+                    'cta_url' => (string) ($task->cta_url ?? '/tasks'),
+                ];
+            })
+            ->values()
+            ->all();
+
+        return [
+            'is_ready' => !empty($strategy),
+            'title' => (string) ($strategy['title'] ?? 'Your launch plan'),
+            'summary' => (string) ($strategy['summary'] ?? ''),
+            'weekly_focus' => (string) ($strategy['weekly_focus'] ?? ''),
+            'north_star_metrics' => array_values((array) ($strategy['north_star_metrics'] ?? [])),
+            'milestones' => array_values((array) ($strategy['milestones'] ?? [])),
+            'pace' => is_array($strategy['pace'] ?? null) ? $strategy['pace'] : [],
+            'tasks' => $tasks,
+        ];
+    }
+
+    private function uniqueFounderUsernameFromSeed(string $seed): string
+    {
+        $base = Str::lower((string) Str::slug($seed !== '' ? $seed : 'founder', '_'));
+        $base = preg_replace('/[^a-z0-9_]/', '', $base) ?: 'founder';
+        $candidate = Str::limit($base, 32, '');
+        $suffix = 2;
+
+        while (Founder::query()->where('username', $candidate)->exists()) {
+            $candidate = Str::limit($base, max(1, 32 - strlen((string) $suffix)), '') . $suffix;
+            $suffix++;
+        }
+
+        return $candidate;
+    }
+
+    private function placeholderFounderNameFromEmail(string $email): string
+    {
+        $local = trim(Str::before($email, '@'));
+        if ($local === '') {
+            return 'New Founder';
+        }
+
+        return Str::title(str_replace(['.', '_', '-'], ' ', $local));
+    }
+
+    private function placeholderCompanyNameFromEmail(string $email): string
+    {
+        $local = trim(Str::before($email, '@'));
+        if ($local === '') {
+            return 'New Venture';
+        }
+
+        return Str::title(str_replace(['.', '_', '-'], ' ', $local)) . ' Project';
+    }
+
+    private function chatOnboardingValidatedProfile(Founder $founder, array $answers): array
+    {
+        $companyDescription = trim(implode(' ', array_filter([
+            (string) ($answers['q1'] ?? ''),
+            (string) ($answers['q3'] ?? ''),
+            (string) ($answers['q4'] ?? ''),
+        ])));
+        $projectName = $this->deduceProjectNameFromAnswer((string) ($answers['q1'] ?? ''), (string) $founder->email);
+        $businessModel = $this->inferBusinessModelFromChatAnswers($answers);
+        $stage = $this->inferStageFromChatAnswers($answers);
+
+        return [
+            'company_name' => $projectName,
+            'company_description' => $companyDescription !== '' ? $companyDescription : (string) ($answers['q1'] ?? ''),
+            'ideal_customer_profile' => (string) ($answers['q2'] ?? ''),
+            'business_model' => $businessModel,
+            'stage' => $stage,
+            'primary_growth_goal' => $this->inferPrimaryGrowthGoalFromChatAnswers($stage, $answers),
+            'known_blockers' => $this->inferKnownBlockerFromChatAnswers($answers),
+            'budget_strategy' => (string) ($answers['budget_strategy'] ?? 'organic'),
+            'time_commitment' => (string) ($answers['time_commitment'] ?? 'mid'),
+        ];
+    }
+
+    private function deduceProjectNameFromAnswer(string $answer, string $email): string
+    {
+        $clean = trim(preg_replace('/\s+/', ' ', $answer));
+        if ($clean !== '') {
+            $fragments = preg_split('/[,.!?]/', $clean) ?: [];
+            $first = trim((string) ($fragments[0] ?? ''));
+            if ($first !== '') {
+                $first = trim(Str::headline(Str::limit($first, 36, '')));
+                if (mb_strlen($first) >= 4 && str_word_count($first) <= 5) {
+                    return $first;
+                }
+            }
+        }
+
+        return $this->placeholderCompanyNameFromEmail($email);
+    }
+
+    private function inferBusinessModelFromChatAnswers(array $answers): string
+    {
+        $combined = Str::lower(implode(' ', array_filter([
+            (string) ($answers['q1'] ?? ''),
+            (string) ($answers['q3'] ?? ''),
+            (string) ($answers['q4'] ?? ''),
+        ])));
+
+        if (preg_match('/course|software|app|product|shop|ecommerce|e-commerce|physical product|subscription box/', $combined)) {
+            return 'product';
+        }
+
+        if (preg_match('/service|studio|agency|coaching|consulting|classes|appointments|bookings|freelance|grooming/', $combined)) {
+            return 'service';
+        }
+
+        return 'service';
+    }
+
+    private function inferStageFromChatAnswers(array $answers): string
+    {
+        $combined = Str::lower(implode(' ', array_filter([
+            (string) ($answers['q1'] ?? ''),
+            (string) ($answers['q3'] ?? ''),
+        ])));
+
+        if (preg_match('/already have customers|already selling|existing business|operating|running|current clients|current customers/', $combined)) {
+            return 'operating';
+        }
+
+        if (preg_match('/launch|launching|about to start|mvp|landing page|pre-launch/', $combined)) {
+            return 'launching';
+        }
+
+        if (preg_match('/idea|thinking about|exploring|validation/', $combined)) {
+            return 'idea';
+        }
+
+        return 'idea';
+    }
+
+    private function inferPrimaryGrowthGoalFromChatAnswers(string $stage, array $answers): string
+    {
+        if ($stage === 'idea') {
+            return 'Get my first customers';
+        }
+
+        if ($stage === 'launching') {
+            return 'Launch my first website';
+        }
+
+        $combined = Str::lower((string) ($answers['q3'] ?? ''));
+        if (str_contains($combined, 'repeat') || str_contains($combined, 'return')) {
+            return 'Increase recurring sales';
+        }
+
+        return 'Build a stronger brand presence';
+    }
+
+    private function inferKnownBlockerFromChatAnswers(array $answers): string
+    {
+        $combined = Str::lower(implode(' ', array_filter([
+            (string) ($answers['q1'] ?? ''),
+            (string) ($answers['q3'] ?? ''),
+            (string) ($answers['q4'] ?? ''),
+        ])));
+
+        if (str_contains($combined, 'no website') || str_contains($combined, 'landing page') || str_contains($combined, 'funnel')) {
+            return 'No website or weak funnel';
+        }
+        if (str_contains($combined, 'traffic') || str_contains($combined, 'visibility') || str_contains($combined, 'discover')) {
+            return 'Low traffic or visibility';
+        }
+        if (str_contains($combined, 'convert') || str_contains($combined, 'sales') || str_contains($combined, 'buy')) {
+            return 'Low conversions or sales';
+        }
+        if (str_contains($combined, 'time') || str_contains($combined, 'capacity') || str_contains($combined, 'busy')) {
+            return 'Limited time or team capacity';
+        }
+
+        return 'No clear offer yet';
+    }
+
+    private function buildFounderLaunchPlan(array $signupProfile, array $deducedProfile, VerticalBlueprint $blueprint): array
+    {
+        $hoursPerWeek = match ((string) ($signupProfile['time_commitment'] ?? 'mid')) {
+            'low' => 2,
+            'high' => 7,
+            default => 4,
+        };
+        $effectiveHoursPerWeek = max(1, (int) floor($hoursPerWeek * match ((string) ($signupProfile['time_commitment'] ?? 'mid')) {
+            'low' => 0.55,
+            'high' => 0.8,
+            default => 0.7,
+        }));
+        $budgetStrategy = (string) ($signupProfile['budget_strategy'] ?? 'organic');
+        $stage = (string) ($signupProfile['stage'] ?? 'idea');
+
+        $milestones = [];
+        if ($stage === 'idea') {
+            $milestones[] = [
+                'title' => 'Customer discovery',
+                'objective' => 'Run discovery interviews to confirm the problem is real and understand exactly what the customer wants.',
+                'north_star_metric' => '10 discovery conversations completed',
+                'estimated_hours' => 14,
+            ];
+            $milestones[] = [
+                'title' => 'Lean MVP setup',
+                'objective' => 'Build a landing page, simple social proof, and a starter offer to test discoverability and intent.',
+                'north_star_metric' => 'Landing page published with one clear CTA',
+                'estimated_hours' => 18,
+            ];
+            $milestones[] = [
+                'title' => 'Demand validation',
+                'objective' => 'Drive organic interest to the MVP and measure whether people engage, ask, book, or buy.',
+                'north_star_metric' => 'First 5 qualified leads or 1 paid conversion',
+                'estimated_hours' => 20,
+            ];
+        } else {
+            $milestones[] = [
+                'title' => 'Positioning reset',
+                'objective' => 'Clarify the offer, audience, and message so every growth asset points to one practical outcome.',
+                'north_star_metric' => 'Offer stack and message locked',
+                'estimated_hours' => 10,
+            ];
+            $milestones[] = [
+                'title' => 'Asset buildout',
+                'objective' => 'Build the website, starter content, and primary channel assets needed to generate attention fast.',
+                'north_star_metric' => 'Website and acquisition assets published',
+                'estimated_hours' => 18,
+            ];
+            $milestones[] = [
+                'title' => 'Customer acquisition sprint',
+                'objective' => 'Run the chosen channel playbook and focus on leads, bookings, or first sales instead of vanity activity.',
+                'north_star_metric' => '10 qualified leads or 3 booked conversations',
+                'estimated_hours' => 16,
+            ];
+        }
+
+        $totalHours = array_sum(array_column($milestones, 'estimated_hours'));
+        $estimatedWeeks = max(2, (int) ceil($totalHours / max(1, $effectiveHoursPerWeek)));
+        $channels = $budgetStrategy === 'paid'
+            ? ['website', 'meta_ads', 'google_ads', 'email_capture']
+            : ['website', 'social_content', 'direct_outreach', 'email_capture'];
+        $assetList = $stage === 'idea'
+            ? ['Landing page', 'Email capture form', 'Starter offer', 'Social profile', 'Discovery script']
+            : ['Website refresh', 'Offer page', 'Service or product pages', 'Social content kit', 'Lead capture flow'];
+
+        $tasks = [];
+        $taskDate = now();
+        foreach ($milestones as $milestoneIndex => $milestone) {
+            $milestoneTasks = $this->milestoneTasksForLaunchPlan($milestone['title'], $signupProfile, $deducedProfile, $channels, $budgetStrategy);
+            foreach ($milestoneTasks as $taskIndex => $task) {
+                $tasks[] = [
+                    'title' => $task['title'],
+                    'description' => $task['description'],
+                    'platform' => $task['platform'],
+                    'cta_label' => $task['cta_label'],
+                    'cta_url' => $task['cta_url'],
+                    'milestone' => $milestone['title'],
+                    'north_star_metric' => $milestone['north_star_metric'],
+                    'available_on' => $taskDate->copy()->addDays(($milestoneIndex * 7) + $taskIndex)->toDateString(),
+                ];
+            }
+        }
+
+        return [
+            'title' => $stage === 'idea'
+                ? 'Idea-to-demand launch plan'
+                : 'Growth sprint launch plan',
+            'summary' => $stage === 'idea'
+                ? 'We start with customer discovery, then a lean MVP, then a demand test so the founder validates real interest before overbuilding.'
+                : 'We skip pure idea validation and move straight into offer clarity, asset buildout, and customer acquisition using the fastest practical channel mix.',
+            'weekly_focus' => $stage === 'idea'
+                ? 'Focus on discovery first, then only build the minimum assets needed to test demand.'
+                : 'Focus on one audience, one offer, and one primary acquisition channel before expanding.',
+            'north_star_metrics' => array_values(array_map(fn ($milestone) => (string) $milestone['north_star_metric'], $milestones)),
+            'milestones' => $milestones,
+            'pace' => [
+                'hours_per_week' => $hoursPerWeek,
+                'effective_hours_per_week' => $effectiveHoursPerWeek,
+                'estimated_total_hours' => $totalHours,
+                'estimated_weeks' => $estimatedWeeks,
+            ],
+            'assets' => $assetList,
+            'channels' => $channels,
+            'channel_strategy' => $budgetStrategy === 'paid'
+                ? 'Use paid distribution for speed, but still anchor the launch around a clear offer, a conversion page, and follow-up capture.'
+                : 'Use organic outreach, content, and social proof to validate demand without ad spend.',
+            'offer_stack' => [
+                [
+                    'name' => (string) ($deducedProfile['core_offer'] ?? 'Starter offer'),
+                    'purpose' => 'Fastest entry point for the best customer profile.',
+                ],
+            ],
+            'tasks' => $tasks,
+            'visual_direction' => $budgetStrategy === 'paid'
+                ? 'Sharp direct-response visuals with one clear CTA and channel-specific creative assets.'
+                : 'Trust-building visuals with credibility, human proof, and practical clarity over hype.',
+        ];
+    }
+
+    private function milestoneTasksForLaunchPlan(string $milestoneTitle, array $signupProfile, array $deducedProfile, array $channels, string $budgetStrategy): array
+    {
+        return match ($milestoneTitle) {
+            'Customer discovery' => [
+                [
+                    'title' => 'Write the discovery interview script',
+                    'description' => 'Prepare a short script focused on the pain points, current alternatives, and moments that trigger buying intent.',
+                    'platform' => 'os',
+                    'cta_label' => 'Open Tasks',
+                    'cta_url' => '/tasks',
+                ],
+                [
+                    'title' => 'List 10 ideal people to interview',
+                    'description' => 'Build a named list of likely buyers who match ' . (string) ($deducedProfile['primary_icp_name'] ?? 'the core ICP') . ' and schedule outreach.',
+                    'platform' => 'os',
+                    'cta_label' => 'Open First 100',
+                    'cta_url' => '/first-100',
+                ],
+                [
+                    'title' => 'Run the first discovery calls',
+                    'description' => 'Capture repeated pains, exact language, objections, and proof that the problem is urgent enough to solve.',
+                    'platform' => 'os',
+                    'cta_label' => 'Open Inbox',
+                    'cta_url' => '/inbox',
+                ],
+            ],
+            'Lean MVP setup' => [
+                [
+                    'title' => 'Build the first landing page',
+                    'description' => 'Create a simple page that presents the problem, the promise, the starter offer, and one conversion action.',
+                    'platform' => 'servio',
+                    'cta_label' => 'Open Website',
+                    'cta_url' => '/website',
+                ],
+                [
+                    'title' => 'Set up lead capture and CTA logic',
+                    'description' => 'Choose one CTA flow and connect forms, booking, or checkout so demand can be measured cleanly.',
+                    'platform' => 'servio',
+                    'cta_label' => 'Open Website',
+                    'cta_url' => '/website',
+                ],
+                [
+                    'title' => 'Create the first social proof assets',
+                    'description' => 'Prepare the minimum social page, intro copy, and credibility blocks needed to make the MVP trustworthy.',
+                    'platform' => 'atlas',
+                    'cta_label' => 'Open AI Studio',
+                    'cta_url' => '/ai-tools',
+                ],
+            ],
+            'Demand validation' => [
+                [
+                    'title' => 'Launch the first acquisition channel',
+                    'description' => $budgetStrategy === 'paid'
+                        ? 'Set up and launch the first paid campaign with one offer, one audience, and one landing page.'
+                        : 'Start direct outreach and organic content using one clear message and one CTA.',
+                    'platform' => 'os',
+                    'cta_label' => 'Open Marketing',
+                    'cta_url' => '/marketing',
+                ],
+                [
+                    'title' => 'Track every lead response',
+                    'description' => 'Measure discoverability through real signals: replies, bookings, opt-ins, and conversions.',
+                    'platform' => 'os',
+                    'cta_label' => 'Open First 100',
+                    'cta_url' => '/first-100',
+                ],
+                [
+                    'title' => 'Refine the page from real objections',
+                    'description' => 'Use what prospects actually say to sharpen the headline, CTA, and offer stack before scaling.',
+                    'platform' => 'servio',
+                    'cta_label' => 'Open Website',
+                    'cta_url' => '/website',
+                ],
+            ],
+            'Positioning reset' => [
+                [
+                    'title' => 'Lock the core offer and ICP',
+                    'description' => 'Refine the offer, differentiators, and best customer so every downstream asset stays consistent.',
+                    'platform' => 'os',
+                    'cta_label' => 'Open Tasks',
+                    'cta_url' => '/tasks',
+                ],
+                [
+                    'title' => 'Write the direct-response message',
+                    'description' => 'Turn the main pain, desired outcome, and objections into a clear promise and practical CTA.',
+                    'platform' => 'atlas',
+                    'cta_label' => 'Open AI Studio',
+                    'cta_url' => '/ai-tools',
+                ],
+            ],
+            'Asset buildout' => [
+                [
+                    'title' => 'Build the website assets',
+                    'description' => 'Create the website, conversion sections, service or product pages, and supporting content blocks.',
+                    'platform' => 'servio',
+                    'cta_label' => 'Open Website',
+                    'cta_url' => '/website',
+                ],
+                [
+                    'title' => 'Set up the primary channel presence',
+                    'description' => 'Publish the core social or outreach assets required for the first acquisition sprint.',
+                    'platform' => 'os',
+                    'cta_label' => 'Open Marketing',
+                    'cta_url' => '/marketing',
+                ],
+            ],
+            default => [
+                [
+                    'title' => 'Launch the first acquisition sprint',
+                    'description' => 'Use ' . implode(', ', $channels) . ' as the focused channel mix and chase the first real lead or booking signals.',
+                    'platform' => 'os',
+                    'cta_label' => 'Open Marketing',
+                    'cta_url' => '/marketing',
+                ],
+                [
+                    'title' => 'Track outcomes weekly',
+                    'description' => 'Review the north-star metric weekly and adjust only what affects qualified leads, bookings, or first sales.',
+                    'platform' => 'os',
+                    'cta_label' => 'Open Tasks',
+                    'cta_url' => '/tasks',
+                ],
+            ],
+        };
     }
 
     private function deduceFounderSignupProfile(array $validated): array

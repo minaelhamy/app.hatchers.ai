@@ -79,6 +79,14 @@
 
         <main class="wallet-main">
             <div class="wallet-main-inner">
+                @include('os.partials.guidebook-workspace-topbar', [
+                    'founder' => $founder,
+                    'company' => $founder->company,
+                    'workspace' => $dashboard['workspace'] ?? [],
+                    'projectName' => $founder->company->company_name ?? 'Founder workspace',
+                    'sectionLabel' => 'Wallet',
+                    'searchPlaceholder' => 'Review revenue, payouts, fees, refunds, and payment flow health...',
+                ])
                 <h1>Wallet</h1>
                 <p>Track what the founder has earned, what Hatchers retained as fees, what was refunded, and what is already in payout flow.</p>
 
