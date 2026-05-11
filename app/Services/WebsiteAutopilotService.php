@@ -23,6 +23,7 @@ class WebsiteAutopilotService
         private AtlasIntelligenceService $atlasIntelligenceService,
         private AtlasWorkspaceService $atlasWorkspaceService,
         private FounderModuleSyncService $founderModuleSyncService,
+        private OpenAiClientService $openAiClientService,
         private WebsiteAutopilotSchemaService $websiteAutopilotSchemaService,
         private WebsiteAutopilotMapperService $websiteAutopilotMapperService,
         private WebsiteAutopilotValidatorService $websiteAutopilotValidatorService,
@@ -1203,48 +1204,20 @@ class WebsiteAutopilotService
             return [];
         }
 
-        $apiKey = trim((string) config('services.openai.api_key', ''));
-        $baseUrl = rtrim((string) config('services.openai.base_url', 'https://api.openai.com/v1'), '/');
-        $model = trim((string) config('services.openai.website_copy_model', 'gpt-4o-mini'));
-
         $prompt = $this->openAiCopyPrompt($context, $block);
-
-        try {
-            $response = Http::timeout(45)
-                ->withHeaders([
-                    'Authorization' => 'Bearer ' . $apiKey,
-                    'Content-Type' => 'application/json',
-                ])->post($baseUrl . '/chat/completions', [
-                    'model' => $model,
-                    'temperature' => 0.8,
-                    'response_format' => ['type' => 'json_object'],
-                    'messages' => [
-                        [
-                            'role' => 'system',
-                            'content' => 'You are a premium direct-response website copywriter. Return valid JSON only. Write specific, publishable, non-generic copy.',
-                        ],
-                        [
-                            'role' => 'user',
-                            'content' => $prompt,
-                        ],
-                    ],
-                ]);
-        } catch (\Throwable $exception) {
-            return [];
-        }
-
-        $content = trim((string) ($response->json('choices.0.message.content') ?? ''));
-        if ($content === '') {
-            return [];
-        }
-
-        $decoded = json_decode($content, true);
-        return is_array($decoded) ? $decoded : [];
+        return $this->openAiClientService->requestJsonObject(
+            'You are a premium direct-response website copywriter. Return valid JSON only. Write specific, publishable, non-generic copy.',
+            $prompt,
+            'website_copy_model',
+            'gpt-5.5',
+            0.8,
+            45
+        );
     }
 
     private function openAiWebsiteCopyAvailable(): bool
     {
-        return trim((string) config('services.openai.api_key', '')) !== '';
+        return $this->openAiClientService->hasApiKey();
     }
 
     private function openAiCopySchema(string $block): array

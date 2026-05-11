@@ -26,7 +26,10 @@ return [
     'openai' => [
         'api_key' => env('OPENAI_API_KEY', ''),
         'base_url' => env('OPENAI_BASE_URL', 'https://api.openai.com/v1'),
-        'website_copy_model' => env('OPENAI_WEBSITE_COPY_MODEL', 'gpt-4o-mini'),
+        'chat_model' => env('OPENAI_CHAT_MODEL_DEFAULT', env('OPENAI_MODEL_DEFAULT', 'gpt-5.5')),
+        'website_copy_model' => env('OPENAI_WEBSITE_COPY_MODEL', env('OPENAI_CHAT_MODEL_DEFAULT', env('OPENAI_MODEL_DEFAULT', 'gpt-5.5'))),
+        'fallback_model' => env('OPENAI_FALLBACK_MODEL', 'gpt-5.2'),
+        'legacy_fallback_model' => env('OPENAI_LEGACY_FALLBACK_MODEL', 'gpt-4.1-mini'),
     ],
     'stripe' => [
         'secret' => env('STRIPE_SECRET', ''),

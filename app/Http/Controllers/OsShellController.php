@@ -41,6 +41,7 @@ use App\Services\FounderRevenueOsService;
 use App\Services\IdentitySyncService;
 use App\Services\LmsIdentityBridgeService;
 use App\Services\MentorDashboardService;
+use App\Services\OpenAiClientService;
 use App\Services\OsAssistantActionService;
 use App\Services\OsAssistantTimelineService;
 use App\Services\OsOperationsLogService;
@@ -10850,13 +10851,11 @@ class OsShellController extends Controller
 
     private function requestOpenAiFounderSignupProfile(array $validated, array $fallback): array
     {
-        $apiKey = trim((string) config('services.openai.api_key'));
-        if ($apiKey === '') {
+        /** @var OpenAiClientService $openAi */
+        $openAi = app(OpenAiClientService::class);
+        if (!$openAi->hasApiKey()) {
             return [];
         }
-
-        $model = trim((string) config('services.openai.website_copy_model', 'gpt-4.1-mini'));
-        $baseUrl = rtrim((string) config('services.openai.base_url', 'https://api.openai.com/v1'), '/');
         $blueprints = collect($this->verticalBlueprintDefinitions())
             ->map(fn (array $definition): array => [
                 'code' => (string) $definition['code'],
@@ -10915,39 +10914,14 @@ class OsShellController extends Controller
             ],
         ];
 
-        try {
-            $response = Http::withToken($apiKey)
-                ->acceptJson()
-                ->timeout(40)
-                ->post($baseUrl . '/chat/completions', [
-                    'model' => $model,
-                    'response_format' => ['type' => 'json_object'],
-                    'messages' => [
-                        ['role' => 'system', 'content' => 'You are a founder onboarding intelligence engine. Produce practical, structured business intelligence for website generation.'],
-                        ['role' => 'user', 'content' => json_encode($prompt, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)],
-                    ],
-                ]);
-
-            if (!$response->successful()) {
-                Log::warning('Founder signup AI deduction failed.', [
-                    'status' => $response->status(),
-                    'body' => Str::limit((string) $response->body(), 1000),
-                ]);
-
-                return [];
-            }
-
-            $content = trim((string) data_get($response->json(), 'choices.0.message.content', ''));
-            $decoded = json_decode($content, true);
-
-            return is_array($decoded) ? $decoded : [];
-        } catch (Throwable $exception) {
-            Log::warning('Founder signup AI deduction threw an exception.', [
-                'message' => $exception->getMessage(),
-            ]);
-
-            return [];
-        }
+        return $openAi->requestJsonObject(
+            'You are a founder onboarding intelligence engine. Produce practical, structured business intelligence for website generation.',
+            json_encode($prompt, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES),
+            'chat_model',
+            'gpt-5.5',
+            null,
+            40
+        );
     }
 
     private function normalizeFounderSignupProfile(array $validated, array $profile): array
