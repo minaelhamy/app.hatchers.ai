@@ -1195,13 +1195,6 @@
         data-assistant-endpoint="{{ route('assistant.chat') }}"
     >
         <div class="workspace">
-                    <div class="workspace-header">
-                        <button class="new-project-btn" id="newProjectBtn" type="button">
-                            <span class="plus">+</span>
-                            <span>New Project</span>
-                        </button>
-                    </div>
-
                     <div class="divider"></div>
 
                     @if (!$hasProject)
@@ -1226,23 +1219,6 @@
                     <button class="fab" id="chatFab" type="button" aria-label="Toggle chat">
                         <span class="fab-dot"></span>
                     </button>
-
-                    <div class="chat-card" id="chatCard" role="dialog" aria-label="New founder chat">
-                        <div class="chat-card-header">
-                            <span class="traffic">
-                                <span class="red" data-action="close" title="Close"></span>
-                                <span class="yellow" data-action="minimize" title="Minimize"></span>
-                                <span class="green" data-action="maximize" title="Maximize"></span>
-                            </span>
-                            <span class="chat-card-title">NEW FOUNDER CHAT</span>
-                        </div>
-                        <div class="chat-card-body">
-                            <div class="chat-card-prompt">How can we help you today?</div>
-                            <div class="chat-card-input-row">
-                                <span class="icon-circle">＋</span>
-                            </div>
-                        </div>
-                    </div>
 
                     <aside class="chat-panel" id="chatPanel" aria-label="Founder chat">
                         <div class="panel-topbar">
@@ -1298,7 +1274,6 @@
             const websiteBuildStatusEndpoint = shell.dataset.websiteBuildStatusEndpoint;
             const assistantEndpoint = shell.dataset.assistantEndpoint;
             const chatFab = document.getElementById('chatFab');
-            const chatCard = document.getElementById('chatCard');
             const chatPanel = document.getElementById('chatPanel');
             const closeChatBtn = document.getElementById('closeChatBtn');
             const chatStream = document.getElementById('chatStream');
@@ -1307,7 +1282,6 @@
             const openToolsBtn = document.getElementById('openToolsBtn');
             const railAiToolsBtn = document.getElementById('railAiToolsBtn');
             const sidepaneNewAgentBtn = document.getElementById('sidepaneNewAgentBtn');
-            const newProjectBtn = document.getElementById('newProjectBtn');
             const openSidebarBtn = document.getElementById('openSidebarBtn');
             const closeSidebarBtn = document.getElementById('closeSidebarBtn');
             const sidepane = document.getElementById('sidepane');
@@ -1368,7 +1342,6 @@
             function setChatState(state) {
                 chatState = state;
                 document.body.setAttribute('data-chat', state);
-                chatCard.classList.toggle('is-open', state === 'card');
                 chatPanel.classList.toggle('is-open', state === 'panel');
                 chatFab.classList.toggle('is-active', state !== 'closed');
             }
@@ -1724,19 +1697,16 @@
             }
 
             chatFab?.addEventListener('click', () => {
-                if (chatState === 'closed') setChatState('card');
-                else if (chatState === 'card') setChatState('panel');
+                if (chatState === 'closed') setChatState('panel');
                 else setChatState('closed');
             });
 
-            chatCard?.addEventListener('click', () => setChatState('panel'));
             closeChatBtn?.addEventListener('click', () => setChatState('closed'));
             openToolsBtn?.addEventListener('click', () => window.HatchersOsDesktop?.openLauncher());
             railAiToolsBtn?.addEventListener('click', () => window.HatchersOsDesktop?.openLauncher());
             sidepaneNewAgentBtn?.addEventListener('click', () => window.HatchersOsDesktop?.openLauncher());
             openSidebarBtn?.addEventListener('click', () => setSidebarOpen(true));
             closeSidebarBtn?.addEventListener('click', () => setSidebarOpen(false));
-            newProjectBtn?.addEventListener('click', startOnboardingFlow);
             chatSendBtn?.addEventListener('click', sendFreeformChat);
             chatInput?.addEventListener('keydown', (event) => {
                 if (event.key === 'Enter' && !event.shiftKey) {
@@ -1747,7 +1717,6 @@
 
             if (onboardingNeeded) {
                 setTimeout(() => {
-                    setChatState('card');
                     startOnboardingFlow();
                 }, 280);
             } else {
