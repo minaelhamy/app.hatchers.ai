@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Models\Company;
 use App\Models\Founder;
+use App\Models\FounderActionPlan;
+use App\Models\FounderConversationThread;
 use App\Models\ModuleSnapshot;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -113,7 +115,7 @@ class AtlasIntelligenceService
         $this->sendIntelligenceSync($founder, $body, 'Atlas mutation sync failed');
     }
 
-    public function chatFromOs(Founder $founder, string $message, string $currentPage = 'os_dashboard'): array
+    public function chatFromOs(Founder $founder, string $message, string $currentPage = 'os_dashboard', ?string $threadKey = null): array
     {
         $secret = trim((string) config('services.atlas.shared_secret'));
         $endpoint = rtrim((string) config('services.atlas.base_url'), '/') . '/hatchers/assistant/chat';
@@ -140,6 +142,24 @@ class AtlasIntelligenceService
             (($subscription?->plan_code ?? null) === 'hatchers-os-mentor') ||
             str_contains(strtolower((string) ($subscription?->plan_name ?? '')), 'mentor')
         );
+        $conversationMemory = $this->conversationMemory($founder, $threadKey);
+        $launchPlanSummary = $this->launchPlanSummary($founder);
+        $recentTasks = FounderActionPlan::query()
+            ->where('founder_id', $founder->id)
+            ->where('context', 'task')
+            ->orderBy('available_on')
+            ->orderByDesc('priority')
+            ->limit(6)
+            ->get()
+            ->map(fn (FounderActionPlan $task): array => [
+                'title' => (string) $task->title,
+                'description' => (string) $task->description,
+                'status' => (string) ($task->status ?? 'pending'),
+                'platform' => (string) ($task->platform ?? ''),
+                'milestone' => (string) data_get($task->metadata_json, 'milestone', ''),
+            ])
+            ->values()
+            ->all();
 
         $payload = [
             'app' => 'os',
@@ -154,10 +174,12 @@ class AtlasIntelligenceService
             'mentor_brief' => [
                 'positioning' => 'Act as the founder mentor inside Hatchers OS. Give clear, direct-response advice grounded in the founder’s real OS data.',
                 'methodology' => [
-                    'Use Sell Like Crazy style principles in paraphrased form only.',
-                    'Prioritize sharper offers, better hooks, stronger urgency, risk reversal, lead capture, and persistent follow-up.',
+                    'Blend Sell Like Crazy style direct-response discipline with Alex Hormozi style value creation, offer clarity, proof, and risk reversal.',
+                    'Use Sabri Suby style principles in paraphrased form only: lead quality, hooks, urgency, risk reversal, clear next steps, and persistent follow-up.',
+                    'Use Alex Hormozi style principles in paraphrased form only: make the offer easier to say yes to, increase perceived value, lower friction, and tie advice to concrete outcomes.',
                     'Bias toward the next revenue action, not generic motivation.',
                     'When the founder is stuck, turn the reply into the next three concrete actions inside Hatchers OS.',
+                    'When discussing plans or tasks, critique them like a mentor: what is strong, what is weak, what should happen next, and what should be cut.',
                 ],
                 'mentor_subscription_behavior' => [
                     'ai_mentor_entitled' => $mentorEntitled,
@@ -174,6 +196,7 @@ class AtlasIntelligenceService
                     'Servio handles service selling, bookings, services, staff, and working hours.',
                     'Founders should not be told to purchase separate plans inside those tools.',
                     'Answer founder product questions clearly, including where to go, what each tool does, and what step should happen next.',
+                    'You can recommend that Hatchers build the founder website after onboarding is complete, but only after confirming the founder is ready.',
                 ],
                 'response_style' => [
                     'Lead with the direct answer, then the brief explanation.',
@@ -182,8 +205,15 @@ class AtlasIntelligenceService
                     'For reviews, prefer Strengths, Weaknesses, and Next move.',
                     'For blockers, prefer Likely issue, Why it matters, and Next actions.',
                     'Keep most replies concise unless the founder explicitly asks for more depth.',
+                    'Be conversational and mentor-like. Ask a useful follow-up question when it helps move the founder forward.',
+                    'Offer concrete ideas, angles, or options instead of only describing what you did.',
+                    'If a request is ambiguous, ask one clarifying question before assuming the action.',
+                    'After advising on a plan or task, usually suggest the next best move in plain language.',
                 ],
             ],
+            'conversation_memory' => $conversationMemory,
+            'launch_plan' => $launchPlanSummary,
+            'recent_tasks' => $recentTasks,
             'company' => [
                 'company_name' => (string) ($company?->company_name ?? ''),
                 'business_model' => (string) ($company?->business_model ?? ''),
@@ -295,6 +325,65 @@ class AtlasIntelligenceService
         }
 
         return $summary;
+    }
+
+    private function conversationMemory(Founder $founder, ?string $threadKey = null): array
+    {
+        $query = FounderConversationThread::query()
+            ->where('founder_id', $founder->id)
+            ->where('source_channel', 'atlas_assistant');
+
+        if (trim((string) $threadKey) !== '') {
+            $query->where('thread_key', (string) $threadKey);
+        }
+
+        $thread = $query
+            ->orderByDesc('last_activity_at')
+            ->orderByDesc('updated_at')
+            ->first();
+
+        if (!$thread) {
+            return [
+                'thread_key' => '',
+                'label' => 'New founder chat',
+                'messages' => [],
+            ];
+        }
+
+        $meta = is_array($thread->meta_json) ? $thread->meta_json : [];
+        $messages = collect(is_array($meta['messages'] ?? null) ? $meta['messages'] : [])
+            ->take(-8)
+            ->map(fn (array $message): array => [
+                'type' => (string) ($message['type'] ?? ''),
+                'text' => (string) ($message['text'] ?? ''),
+                'page' => (string) ($message['page'] ?? ''),
+                'created_at' => (string) ($message['created_at'] ?? ''),
+            ])
+            ->values()
+            ->all();
+
+        return [
+            'thread_key' => (string) $thread->thread_key,
+            'label' => (string) ($meta['label'] ?? 'Founder chat'),
+            'messages' => $messages,
+        ];
+    }
+
+    private function launchPlanSummary(Founder $founder): array
+    {
+        $launchSystem = $founder->launchSystems()->latest('id')->first();
+        $strategy = is_array($launchSystem?->launch_strategy_json) ? $launchSystem->launch_strategy_json : [];
+
+        return [
+            'title' => (string) ($strategy['title'] ?? ''),
+            'summary' => (string) ($strategy['summary'] ?? ''),
+            'weekly_focus' => (string) ($strategy['weekly_focus'] ?? ''),
+            'north_star_metrics' => array_values((array) ($strategy['north_star_metrics'] ?? [])),
+            'milestones' => collect((array) ($strategy['milestones'] ?? []))
+                ->take(4)
+                ->values()
+                ->all(),
+        ];
     }
 
     private function sendIntelligenceSync(Founder $founder, array $body, string $logMessage): void

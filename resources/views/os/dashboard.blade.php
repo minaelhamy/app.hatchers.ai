@@ -1189,6 +1189,8 @@
         :recent-items="array_merge($recentTaskLabels, $recentNotificationLabels, empty($recentTaskLabels) && empty($recentNotificationLabels) ? [$projectName] : [])"
         data-onboarding-needed="{{ $chatNeedsOnboarding ? '1' : '0' }}"
         data-onboarding-endpoint="{{ route('assistant.chat.onboarding-complete') }}"
+        data-website-build-endpoint="{{ route('assistant.chat.website-build') }}"
+        data-website-build-status-endpoint="{{ route('assistant.chat.website-status') }}"
         data-reset-endpoint="{{ route('assistant.chat.reset') }}"
         data-assistant-endpoint="{{ route('assistant.chat') }}"
     >
@@ -1290,8 +1292,10 @@
             const shell = document.getElementById('guidebookShell');
             if (!shell) return;
 
-            const onboardingNeeded = shell.dataset.onboardingNeeded === '1';
+            let onboardingNeeded = shell.dataset.onboardingNeeded === '1';
             const onboardingEndpoint = shell.dataset.onboardingEndpoint;
+            const websiteBuildEndpoint = shell.dataset.websiteBuildEndpoint;
+            const websiteBuildStatusEndpoint = shell.dataset.websiteBuildStatusEndpoint;
             const assistantEndpoint = shell.dataset.assistantEndpoint;
             const chatFab = document.getElementById('chatFab');
             const chatCard = document.getElementById('chatCard');
@@ -1311,6 +1315,8 @@
             const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 
             let chatState = 'closed';
+            let threadKey = null;
+            let websiteBuildPoller = null;
             let onboarding = {
                 answers: {},
                 currentStep: onboardingNeeded ? 'q1' : 'freeform',
@@ -1397,6 +1403,57 @@
                 chatStream.appendChild(wrap);
                 chatStream.scrollTop = chatStream.scrollHeight;
                 return wrap;
+            }
+
+            function renderAssistantActions(wrap, actions) {
+                if (!wrap || !Array.isArray(actions) || !actions.length) return;
+                const target = wrap.querySelector('.ai-text');
+                if (!target) return;
+
+                const row = document.createElement('div');
+                row.className = 'chat-actions';
+
+                actions.slice(0, 3).forEach((action) => {
+                    const label = action.cta || action.title || 'Open';
+                    const button = document.createElement('button');
+                    button.type = 'button';
+                    button.className = 'choice';
+                    button.textContent = label;
+                    button.addEventListener('click', () => {
+                        const workspaceKey = action.os_workspace_key || '';
+                        const href = action.os_href || action.url || '';
+                        if (workspaceKey && window.HatchersOsDesktop?.openApp) {
+                            window.HatchersOsDesktop.openApp(workspaceKey);
+                            return;
+                        }
+                        if (href) {
+                            window.location.href = href;
+                        }
+                    });
+                    row.appendChild(button);
+                });
+
+                target.appendChild(row);
+            }
+
+            function maybeAutoOpenAssistantAction(action) {
+                if (!action) return;
+                const workspaceKey = action.os_workspace_key || '';
+                const href = action.os_href || action.url || '';
+                if (workspaceKey && window.HatchersOsDesktop?.openApp) {
+                    window.HatchersOsDesktop.openApp(workspaceKey);
+                    return;
+                }
+                if (href) {
+                    window.location.href = href;
+                }
+            }
+
+            function clearWebsiteBuildPoller() {
+                if (websiteBuildPoller) {
+                    window.clearInterval(websiteBuildPoller);
+                    websiteBuildPoller = null;
+                }
             }
 
             function showChoiceStep(stepKey) {
@@ -1497,11 +1554,121 @@
                     }
 
                     appendBubble('ai', `<p><strong>Launch plan ready.</strong></p><p style="color: var(--text-muted);">${payload.reply}</p>`);
-                    setTimeout(() => window.location.reload(), 1200);
+                    onboarding.processing = false;
+                    onboardingNeeded = false;
+                    onboarding.currentStep = 'freeform';
+                    chatInput.placeholder = 'Ask Atlas anything about your plan, offer, website, or next move…';
+                    if (payload.ask_for_website_build) {
+                        showWebsiteBuildApproval(payload.website_prompt || 'Do you want me to build and publish your website now?');
+                    }
                 } catch (error) {
                     onboarding.processing = false;
                     appendBubble('ai', `<p><strong>We hit a setup problem.</strong></p><p style="color: var(--text-muted);">${error.message}</p>`);
                 }
+            }
+
+            function showWebsiteBuildApproval(prompt) {
+                appendBubble('ai', `<p><strong>${prompt}</strong></p><p style="color: var(--text-muted);">If you approve it, I will trigger the website build and publish flow and keep watching until the live link is ready.</p>`);
+                const wrap = document.createElement('div');
+                wrap.className = 'msg-row ai';
+                const block = document.createElement('div');
+                block.className = 'ai-block';
+                const avatar = document.createElement('div');
+                avatar.className = 'ai-avatar';
+                const bubble = document.createElement('div');
+                bubble.className = 'ai-text';
+                const list = document.createElement('div');
+                list.className = 'choice-list';
+
+                const yesBtn = document.createElement('button');
+                yesBtn.type = 'button';
+                yesBtn.className = 'choice';
+                yesBtn.textContent = 'Yes, build and publish it';
+                yesBtn.addEventListener('click', async () => {
+                    if (onboarding.processing) return;
+                    appendBubble('user', 'Yes, build and publish it.');
+                    wrap.remove();
+                    await approveWebsiteBuild();
+                });
+
+                const noBtn = document.createElement('button');
+                noBtn.type = 'button';
+                noBtn.className = 'choice';
+                noBtn.textContent = 'Not yet';
+                noBtn.addEventListener('click', () => {
+                    appendBubble('user', 'Not yet.');
+                    wrap.remove();
+                    appendBubble('ai', '<p><strong>No problem.</strong></p><p style="color: var(--text-muted);">Your launch plan and company intelligence are saved. Ask me to build the website whenever you are ready.</p>');
+                });
+
+                list.append(yesBtn, noBtn);
+                bubble.appendChild(list);
+                block.append(avatar, bubble);
+                wrap.appendChild(block);
+                chatStream.appendChild(wrap);
+                chatStream.scrollTop = chatStream.scrollHeight;
+            }
+
+            async function approveWebsiteBuild() {
+                onboarding.processing = true;
+                try {
+                    const response = await fetch(websiteBuildEndpoint, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': csrf,
+                        },
+                        body: JSON.stringify({
+                            thread_key: threadKey,
+                            current_page: 'prototype_dashboard',
+                        }),
+                    });
+
+                    const payload = await response.json();
+                    if (!response.ok || !payload.success) {
+                        throw new Error(payload.error || 'Hatchers could not start the website build right now.');
+                    }
+
+                    appendBubble('ai', `<p><strong>Website build started.</strong></p><p style="color: var(--text-muted);">${payload.reply}</p>`);
+                    onboarding.processing = false;
+                    if (payload.poll_status) {
+                        startWebsiteBuildPolling();
+                    }
+                } catch (error) {
+                    onboarding.processing = false;
+                    appendBubble('ai', `<p><strong>We could not start the website build.</strong></p><p style="color: var(--text-muted);">${error.message}</p>`);
+                }
+            }
+
+            function startWebsiteBuildPolling() {
+                clearWebsiteBuildPoller();
+                websiteBuildPoller = window.setInterval(async () => {
+                    try {
+                        const response = await fetch(websiteBuildStatusEndpoint, {
+                            method: 'GET',
+                            headers: {
+                                'Accept': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest',
+                            },
+                        });
+                        const payload = await response.json();
+                        if (!response.ok || !payload.success) return;
+
+                        if (payload.state === 'ready') {
+                            clearWebsiteBuildPoller();
+                            appendBubble(
+                                'ai',
+                                `<p><strong>Your website is live.</strong></p><p style="color: var(--text-muted);">${payload.reply}</p><p><a href="${payload.website_url}" target="_blank" rel="noopener">Open website</a></p>`
+                            );
+                        } else if (payload.state === 'failed') {
+                            clearWebsiteBuildPoller();
+                            appendBubble('ai', `<p><strong>The website build paused.</strong></p><p style="color: var(--text-muted);">${payload.reply}</p>`);
+                        }
+                    } catch (error) {
+                        // Keep polling quietly unless the build finishes or fails explicitly.
+                    }
+                }, 10000);
             }
 
             async function sendFreeformChat() {
@@ -1535,7 +1702,12 @@
                     if (!response.ok || !payload.success) {
                         throw new Error(payload.error || 'Hatchers could not respond right now.');
                     }
-                    appendBubble('ai', `<p>${payload.reply}</p>`);
+                    if (payload.thread_key) {
+                        threadKey = payload.thread_key;
+                    }
+                    const bubble = appendBubble('ai', `<p>${payload.reply}</p>`);
+                    renderAssistantActions(bubble, payload.actions || []);
+                    maybeAutoOpenAssistantAction(payload.auto_open_action || null);
                 } catch (error) {
                     appendBubble('ai', `<p><strong>We could not answer that right now.</strong></p><p style="color: var(--text-muted);">${error.message}</p>`);
                 }

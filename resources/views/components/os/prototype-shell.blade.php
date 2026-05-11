@@ -18,40 +18,114 @@
     $statusLabel = $statusText ?: now()->format('D, M j g:i A');
     $windowApps = [
         [
+            'key' => 'tasks',
+            'label' => 'Tasks',
+            'description' => 'Step-by-step execution and priorities',
+            'url' => route('tasks', ['os_embed' => 1]),
+            'launcher' => false,
+        ],
+        [
+            'key' => 'inbox',
+            'label' => 'Inbox',
+            'description' => 'Notifications, replies, and OS updates',
+            'url' => route('inbox', ['os_embed' => 1]),
+            'launcher' => false,
+        ],
+        [
+            'key' => 'notifications',
+            'label' => 'Notifications',
+            'description' => 'Unread updates, inbox activity, and OS status changes',
+            'url' => route('notifications', ['os_embed' => 1]),
+            'launcher' => false,
+        ],
+        [
+            'key' => 'search',
+            'label' => 'Search',
+            'description' => 'Find tasks, campaigns, offers, and workspace content',
+            'url' => route('search', ['os_embed' => 1]),
+            'launcher' => false,
+        ],
+        [
+            'key' => 'lead-tracker',
+            'label' => 'Lead Tracker',
+            'description' => 'Pipeline, scripts, follow-up queues, and offline lead capture',
+            'url' => route('founder.first-100', ['os_embed' => 1]),
+            'launcher' => false,
+        ],
+        [
+            'key' => 'marketing',
+            'label' => 'Marketing',
+            'description' => 'Campaign planning, content queue, and publishing direction',
+            'url' => route('marketing', ['os_embed' => 1]),
+            'launcher' => false,
+        ],
+        [
+            'key' => 'analytics',
+            'label' => 'Analytics',
+            'description' => 'Execution, growth, and channel performance metrics',
+            'url' => route('analytics', ['os_embed' => 1]),
+            'launcher' => false,
+        ],
+        [
+            'key' => 'commerce',
+            'label' => 'Commerce',
+            'description' => 'Offers, operations, bookings, orders, and wallet overview',
+            'url' => route('commerce', ['os_embed' => 1]),
+            'launcher' => false,
+        ],
+        [
+            'key' => 'atlas-chat',
+            'label' => 'Atlas Chat',
+            'description' => 'Atlas conversational workspace',
+            'url' => route('workspace.launch', ['module' => 'atlas', 'target' => '/ai-chat']),
+            'launcher' => false,
+        ],
+        [
+            'key' => 'atlas-agents',
+            'label' => 'Atlas Agents',
+            'description' => 'Agent tools and prompt workflows',
+            'url' => route('workspace.launch', ['module' => 'atlas', 'target' => '/ai-chat-bots']),
+            'launcher' => false,
+        ],
+        [
             'key' => 'account-settings',
             'label' => 'Account Settings',
             'description' => 'Username, password, and profile photo',
             'url' => route('founder.settings', ['step' => 'account', 'os_embed' => 1]),
+            'launcher' => true,
         ],
         [
             'key' => 'servio',
             'label' => 'Servio',
             'description' => 'Website and service operations',
             'url' => route('workspace.launch', ['module' => 'servio']),
+            'launcher' => true,
         ],
         [
             'key' => 'bazaar',
             'label' => 'Bazaar',
             'description' => 'Commerce and storefront management',
             'url' => route('workspace.launch', ['module' => 'bazaar']),
+            'launcher' => true,
         ],
         [
             'key' => 'campaign-studio',
             'label' => 'Campaign Studio',
             'description' => 'Atlas campaign planning and creative execution',
-            'url' => route('workspace.launch', ['module' => 'atlas', 'target' => '/campaign-studio']),
+            'url' => route('founder.ai-tools.proxy', ['proxyPath' => '']) . '?target=' . rawurlencode('/campaign-studio'),
+            'launcher' => true,
         ],
         [
             'key' => 'build-my-website',
             'label' => 'Build My Website',
             'description' => 'Website build, review, and publishing controls',
             'url' => route('website', ['os_embed' => 1]),
+            'launcher' => true,
         ],
     ];
     $icons = [
         'panel-left' => '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 5.5A2.5 2.5 0 0 1 5.5 3h13A2.5 2.5 0 0 1 21 5.5v13a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 18.5z"/><path d="M9 3v18"/></svg>',
         'settings' => '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 15.5A3.5 3.5 0 1 0 12 8.5a3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1 1 0 0 0 .2 1.1l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1 1 0 0 0-1.1-.2 1 1 0 0 0-.6.9V20a2 2 0 1 1-4 0v-.1a1 1 0 0 0-.6-.9 1 1 0 0 0-1.1.2l-.1.1a2 2 0 0 1-2.8-2.8l.1-.1a1 1 0 0 0 .2-1.1 1 1 0 0 0-.9-.6H4a2 2 0 1 1 0-4h.1a1 1 0 0 0 .9-.6 1 1 0 0 0-.2-1.1l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1 1 0 0 0 1.1.2 1 1 0 0 0 .6-.9V4a2 2 0 1 1 4 0v.1a1 1 0 0 0 .6.9 1 1 0 0 0 1.1-.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1 1 0 0 0-.2 1.1 1 1 0 0 0 .9.6H20a2 2 0 1 1 0 4h-.1a1 1 0 0 0-.9.6Z"/></svg>',
-        'plus' => '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',
         'inbox' => '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M22 12h-4l-2 3H8l-2-3H2"/><path d="M5.5 20.5h13a2 2 0 0 0 2-2v-11a2 2 0 0 0-2-2h-13a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2Z"/></svg>',
         'search' => '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="6"/></svg>',
         'list' => '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></svg>',
@@ -99,9 +173,6 @@
         .rail-icon { width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; color: #6B6660; cursor: pointer; border-radius: 6px; background: transparent; border: 0; padding: 0; position: relative; text-decoration: none; }
         .rail-icon:hover { color: var(--text); background: var(--surface-2); }
         .rail-icon svg, .tile-art svg, .status-pill svg, .sidepane-search svg, .sidepane-user-caret svg, .sidepane-upgrade-icon svg { width: 18px; height: 18px; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
-        .rail-add { background: #ECE6FA; color: #5B45C9; border: 0.5px solid #C9BCF0; }
-        .rail-tooltip { position: absolute; left: calc(100% + 10px); top: 50%; transform: translateY(-50%); background: #fff; border: 0.5px solid var(--border); border-radius: 8px; padding: 5px 10px; font-size: 12px; color: var(--text); white-space: nowrap; box-shadow: var(--shadow-md); opacity: 0; pointer-events: none; transition: opacity .12s ease; }
-        .rail-add:hover .rail-tooltip { opacity: 1; }
         .rail-profile { position: relative; }
         .rail-profile[open] { z-index: 40; }
         .rail-profile summary { list-style: none; }
@@ -323,13 +394,6 @@
                 <a href="{{ route('dashboard') }}" class="rail-icon" aria-label="Dashboard">{!! $icons['panel-left'] !!}</a>
             @endif
             <button type="button" class="rail-icon" aria-label="Settings" data-open-app="account-settings">{!! $icons['settings'] !!}</button>
-            @if($showAiToolsButton)
-                @if($aiToolsMode === 'overlay')
-                    <button type="button" class="rail-icon rail-add" id="railAiToolsBtn" aria-label="New Agent">{!! $icons['plus'] !!}<span class="rail-tooltip">New Agent</span></button>
-                @else
-                    <a href="{{ route('founder.ai-tools') }}" class="rail-icon rail-add" aria-label="New Agent">{!! $icons['plus'] !!}<span class="rail-tooltip">New Agent</span></a>
-                @endif
-            @endif
         </div>
         <div class="rail-bottom">
             <button type="button" class="rail-icon" aria-label="Inbox" data-open-app="inbox">{!! $icons['inbox'] !!}</button>
@@ -370,8 +434,6 @@
             </div>
 
             <button type="button" class="sidepane-row" data-open-app="account-settings">Customize <span class="seg-badge">NEW</span></button>
-            <button type="button" class="sidepane-row" id="sidepaneNewAgentBtn">{!! $icons['plus'] !!} New Agent</button>
-
             <div class="sidepane-search">
                 <span>{!! $icons['search'] !!}</span>
                 <input type="text" placeholder="Search chats…">
@@ -543,7 +605,7 @@
                 win.classList.add('os-window-launcher');
                 const launcherGrid = document.createElement('div');
                 launcherGrid.className = 'os-launcher-grid';
-                apps.forEach((entry) => {
+                apps.filter((entry) => entry.launcher !== false).forEach((entry) => {
                     const card = document.createElement('button');
                     card.type = 'button';
                     card.className = 'os-launcher-card';
@@ -690,19 +752,33 @@
             windows.delete(key);
         }
 
-        shell.querySelectorAll('[data-open-app]').forEach((button) => {
-            button.addEventListener('click', () => openApp(button.getAttribute('data-open-app')));
-            button.addEventListener('keydown', (event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                    event.preventDefault();
-                    openApp(button.getAttribute('data-open-app'));
-                }
-            });
+        shell.addEventListener('click', (event) => {
+            const button = event.target.closest('[data-open-app]');
+            if (!button || !shell.contains(button)) {
+                return;
+            }
+
+            event.preventDefault();
+            event.stopPropagation();
+            openApp(button.getAttribute('data-open-app'));
+        });
+
+        shell.addEventListener('keydown', (event) => {
+            if (event.key !== 'Enter' && event.key !== ' ') {
+                return;
+            }
+
+            const button = event.target.closest('[data-open-app]');
+            if (!button || !shell.contains(button)) {
+                return;
+            }
+
+            event.preventDefault();
+            event.stopPropagation();
+            openApp(button.getAttribute('data-open-app'));
         });
 
         document.getElementById('openToolsBtn')?.addEventListener('click', () => openApp('app-launcher'));
-        document.getElementById('railAiToolsBtn')?.addEventListener('click', () => openApp('app-launcher'));
-        document.getElementById('sidepaneNewAgentBtn')?.addEventListener('click', () => openApp('app-launcher'));
 
         window.HatchersOsDesktop = {
             openApp,

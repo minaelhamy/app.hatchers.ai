@@ -144,6 +144,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/website/domain', [OsShellController::class, 'connectWebsiteDomain'])->name('website.domain');
     Route::post('/assistant/chat', [OsShellController::class, 'assistantChat'])->name('assistant.chat');
     Route::post('/assistant/chat/onboarding-complete', [OsShellController::class, 'completeChatOnboarding'])->name('assistant.chat.onboarding-complete');
+    Route::post('/assistant/chat/website-build', [OsShellController::class, 'assistantApproveWebsiteBuild'])->name('assistant.chat.website-build');
+    Route::get('/assistant/chat/website-status', [OsShellController::class, 'assistantWebsiteBuildStatus'])->name('assistant.chat.website-status');
     Route::post('/assistant/chat/thread', [OsShellController::class, 'assistantThread'])->name('assistant.chat.thread');
     Route::post('/assistant/chat/reset', [OsShellController::class, 'assistantReset'])->name('assistant.chat.reset');
     Route::post('/assistant/chat/tasks', [OsShellController::class, 'assistantCreateTasks'])->name('assistant.chat.tasks');

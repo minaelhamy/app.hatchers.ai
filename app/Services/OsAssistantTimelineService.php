@@ -165,6 +165,53 @@ class OsAssistantTimelineService
         return $thread;
     }
 
+    public function appendAssistantMessage(
+        Founder $founder,
+        ?string $threadKey,
+        string $currentPage,
+        string $reply,
+        array $actions = []
+    ): ?FounderConversationThread {
+        $thread = $this->thread($founder, $threadKey);
+        if (!$thread) {
+            return null;
+        }
+
+        $meta = is_array($thread->meta_json) ? $thread->meta_json : [];
+        $messages = collect(is_array($meta['messages'] ?? null) ? $meta['messages'] : []);
+        $now = now();
+
+        $messages->push([
+            'type' => 'atlas',
+            'title' => 'Atlas Assistant',
+            'text' => trim($reply),
+            'page' => $currentPage,
+            'actions' => collect($actions)
+                ->filter(fn ($action) => is_array($action))
+                ->map(fn (array $action): array => [
+                    'label' => (string) ($action['cta'] ?? $action['title'] ?? $action['platform'] ?? ''),
+                    'workspace_key' => (string) ($action['os_workspace_key'] ?? ''),
+                    'href' => (string) ($action['os_href'] ?? ''),
+                ])
+                ->filter(fn (array $action): bool => $action['label'] !== '')
+                ->take(3)
+                ->values()
+                ->all(),
+            'created_at' => $now->toIso8601String(),
+        ]);
+
+        $thread->forceFill([
+            'latest_message' => trim($reply),
+            'last_activity_at' => $now,
+            'meta_json' => array_merge($meta, [
+                'last_page' => $currentPage,
+                'messages' => $messages->take(-20)->values()->all(),
+            ]),
+        ])->save();
+
+        return $thread;
+    }
+
     private function thread(Founder $founder, ?string $threadKey = null): ?FounderConversationThread
     {
         $query = FounderConversationThread::query()

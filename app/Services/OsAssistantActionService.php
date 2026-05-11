@@ -6,6 +6,7 @@ use App\Models\Company;
 use App\Models\CompanyIntelligence;
 use App\Models\Founder;
 use App\Models\FounderActionPlan;
+use App\Models\FounderConversationThread;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -26,6 +27,11 @@ class OsAssistantActionService
         if (!empty($readOnly)) {
             return array_merge(['handled' => true, 'executed' => false], $readOnly);
         }
+
+        $threadAssistantContext = $this->latestAssistantThreadContext(
+            $founder,
+            trim((string) $request->input('thread_key', ''))
+        );
 
         $pending = $this->getPendingAction($request, $founder);
         $detectedRole = $this->detectActorRoleFromText($message);
@@ -70,6 +76,36 @@ class OsAssistantActionService
                 'reply' => $execution['reply'],
                 'executed' => (bool) ($execution['success'] ?? false),
                 'actions' => $execution['actions'] ?? [],
+            ];
+        }
+
+        $followUp = $this->buildThreadAwareFollowUpAction($message, $threadAssistantContext);
+        if (!empty($followUp)) {
+            $followUp['actor_role'] = $detectedRole !== '' ? $detectedRole : ($followUp['actor_role'] ?? '');
+
+            if (!empty($followUp['needs_choice'])) {
+                return [
+                    'handled' => true,
+                    'reply' => (string) $followUp['reply'],
+                    'executed' => false,
+                ];
+            }
+
+            $followUp['created_at'] = now()->toIso8601String();
+            $this->setPendingAction($request, $founder, $followUp);
+
+            if (($followUp['actor_role'] ?? '') === '') {
+                return [
+                    'handled' => true,
+                    'reply' => 'I can do that. Before I act, are you replying as the founder or the mentor? Reply with "Founder, yes" or "Mentor, yes" and I will proceed.',
+                    'executed' => false,
+                ];
+            }
+
+            return [
+                'handled' => true,
+                'reply' => 'I am ready to ' . $followUp['summary'] . '. Please reply "Yes" to proceed as ' . $followUp['actor_role'] . ', or say "cancel" to stop.',
+                'executed' => false,
             ];
         }
 
@@ -512,6 +548,47 @@ class OsAssistantActionService
             ];
         }
 
+        if ($type === 'company_field_website_refresh') {
+            $field = trim((string) ($action['field'] ?? ''));
+            $value = trim((string) ($action['value'] ?? ''));
+
+            if ($field === '' || $value === '') {
+                return [
+                    'success' => false,
+                    'reply' => "I couldn't complete that update because the field or value was missing.",
+                ];
+            }
+
+            if (in_array($field, ['company_name', 'company_brief'], true)) {
+                $company->forceFill([$field => $value])->save();
+            } else {
+                CompanyIntelligence::updateOrCreate(
+                    ['company_id' => $company->id],
+                    [
+                        $field => $value,
+                        'intelligence_updated_at' => now(),
+                    ]
+                );
+            }
+
+            return [
+                'success' => true,
+                'reply' => 'Done. I updated "' . str_replace('_', ' ', $field) . '" in your company intelligence, and I am ready to regenerate the website copy next.',
+                'actions' => [
+                    [
+                        'title' => 'Build My Website',
+                        'platform' => 'os',
+                        'url' => '/website',
+                    ],
+                ],
+                'actor_role' => $actorRole,
+                'action_type' => 'company_field_website_refresh',
+                'field' => $field,
+                'value' => $value,
+                'sync_summary' => 'Atlas updated the shared company field "' . $field . '" and prepared a website copy refresh from Hatchers OS.',
+            ];
+        }
+
         if ($type === 'draft_record') {
             $platform = trim((string) ($action['platform'] ?? 'os'));
             $category = trim((string) ($action['category'] ?? 'task'));
@@ -637,6 +714,9 @@ class OsAssistantActionService
                 ],
                 'actor_role' => $actorRole,
                 'action_type' => 'platform_record_update',
+                'platform' => $platform,
+                'category' => $category,
+                'target_name' => (string) ($action['target_name'] ?? ''),
                 'field' => $field,
                 'value' => $value,
                 'sync_summary' => 'Atlas updated ' . (!empty($action['target_name']) ? '"' . $action['target_name'] . '"' : 'the latest "' . $category . '" record') . ' in ' . $platform . ' from Hatchers OS.',
@@ -702,6 +782,146 @@ class OsAssistantActionService
             ];
         }
 
+        if ($type === 'website_build_start') {
+            return [
+                'success' => true,
+                'reply' => 'Perfect. I am ready to build and publish your website from Hatchers OS.',
+                'actions' => [
+                    [
+                        'title' => 'Build My Website',
+                        'platform' => 'os',
+                        'url' => '/website',
+                    ],
+                ],
+                'actor_role' => $actorRole,
+                'action_type' => 'website_build_start',
+                'sync_summary' => 'Atlas triggered a founder website build from Hatchers OS.',
+            ];
+        }
+
+        if ($type === 'task_batch_create') {
+            $steps = collect((array) ($action['steps'] ?? []))
+                ->map(fn ($step) => trim((string) $step))
+                ->filter()
+                ->take(6)
+                ->values()
+                ->all();
+
+            if (empty($steps)) {
+                return [
+                    'success' => false,
+                    'reply' => 'I could not create tasks because there were no usable steps in that request.',
+                ];
+            }
+
+            return [
+                'success' => true,
+                'reply' => 'Perfect. I am ready to turn those steps into real OS tasks.',
+                'actions' => [[
+                    'title' => 'Open Tasks',
+                    'platform' => 'lms',
+                    'url' => '/tasks',
+                ]],
+                'actor_role' => $actorRole,
+                'action_type' => 'task_batch_create',
+                'title' => (string) ($action['title'] ?? 'Atlas task list'),
+                'steps' => $steps,
+                'sync_summary' => 'Atlas created real founder tasks in Hatchers OS.',
+            ];
+        }
+
+        if ($type === 'launch_plan_refine') {
+            $focus = trim((string) ($action['focus'] ?? ''));
+
+            return [
+                'success' => true,
+                'reply' => $focus !== ''
+                    ? 'Perfect. I am ready to refine your launch plan around ' . $focus . '.'
+                    : 'Perfect. I am ready to refine your launch plan.',
+                'actions' => [[
+                    'title' => 'Open Tasks',
+                    'platform' => 'lms',
+                    'url' => '/tasks',
+                ]],
+                'actor_role' => $actorRole,
+                'action_type' => 'launch_plan_refine',
+                'focus' => $focus,
+                'sync_summary' => 'Atlas refined the founder launch plan in Hatchers OS.',
+            ];
+        }
+
+        if ($type === 'launch_plan_refine_campaign') {
+            $focus = trim((string) ($action['focus'] ?? ''));
+            $campaignAngle = trim((string) ($action['campaign_angle'] ?? ''));
+
+            return [
+                'success' => true,
+                'reply' => $focus !== ''
+                    ? 'Perfect. I am ready to refine your launch plan around ' . $focus . ', shape a campaign brief, and open Campaign Studio.'
+                    : 'Perfect. I am ready to refine your launch plan, shape a campaign brief, and open Campaign Studio.',
+                'actions' => [[
+                    'title' => 'Open Campaign Studio',
+                    'platform' => 'atlas',
+                    'reason' => 'Choose what campaign to launch next.',
+                    'url' => '/campaign-studio',
+                ]],
+                'actor_role' => $actorRole,
+                'action_type' => 'launch_plan_refine_campaign',
+                'focus' => $focus,
+                'campaign_angle' => $campaignAngle,
+                'sync_summary' => 'Atlas refined the founder launch plan, generated a campaign brief, and prepared Campaign Studio from Hatchers OS.',
+            ];
+        }
+
+        if ($type === 'campaign_format_choose') {
+            $campaignAngle = trim((string) ($action['campaign_angle'] ?? 'campaign'));
+
+            return [
+                'success' => true,
+                'reply' => 'Perfect. I am ready to shape the first ' . $campaignAngle . ' direction and open Campaign Studio.',
+                'actions' => [[
+                    'title' => 'Open Campaign Studio',
+                    'platform' => 'atlas',
+                    'reason' => 'Build the first ' . $campaignAngle . ' campaign asset.',
+                    'url' => '/campaign-studio',
+                ]],
+                'actor_role' => $actorRole,
+                'action_type' => 'campaign_format_choose',
+                'campaign_angle' => $campaignAngle,
+                'sync_summary' => 'Atlas prepared the next campaign format and reopened Campaign Studio from Hatchers OS.',
+            ];
+        }
+
+        if ($type === 'task_breakdown_next') {
+            return [
+                'success' => true,
+                'reply' => 'Perfect. I am ready to break the next task into smaller execution steps.',
+                'actions' => [[
+                    'title' => 'Open Tasks',
+                    'platform' => 'lms',
+                    'url' => '/tasks',
+                ]],
+                'actor_role' => $actorRole,
+                'action_type' => 'task_breakdown_next',
+                'sync_summary' => 'Atlas prepared a task breakdown for the next founder task in Hatchers OS.',
+            ];
+        }
+
+        if ($type === 'task_tighten_next') {
+            return [
+                'success' => true,
+                'reply' => 'Perfect. I am ready to tighten the next task into one cleaner execution block.',
+                'actions' => [[
+                    'title' => 'Open Tasks',
+                    'platform' => 'lms',
+                    'url' => '/tasks',
+                ]],
+                'actor_role' => $actorRole,
+                'action_type' => 'task_tighten_next',
+                'sync_summary' => 'Atlas prepared a tighter execution version of the next founder task in Hatchers OS.',
+            ];
+        }
+
         return [
             'success' => false,
             'reply' => "I understood the request as an action, but I don't support executing that action yet.",
@@ -710,6 +930,70 @@ class OsAssistantActionService
 
     private function buildWriteActionFromMessage(string $message): array
     {
+        if (
+            preg_match('/\b(?:refine|update|adjust|rework|improve)\b.*\blaunch\s+plan\b/i', $message) &&
+            preg_match('/\b(?:campaign|campaign\s+studio|post|grid|content)\b/i', $message)
+        ) {
+            preg_match('/\blaunch\s+plan\b(?:\s+(?:for|around|toward|with)\s+(.+?))?(?:\s+and|\s+then|$)/i', $message, $matches);
+            $focus = trim((string) ($matches[1] ?? ''));
+            $focus = rtrim($focus, ". \t\n\r\0\x0B");
+
+            return [
+                'type' => 'launch_plan_refine_campaign',
+                'focus' => $focus,
+                'campaign_angle' => $this->inferCampaignAngleFromMessage($message),
+                'summary' => $focus !== ''
+                    ? 'refine your launch plan around ' . $focus . ', generate a campaign brief, and open Campaign Studio'
+                    : 'refine your launch plan, generate a campaign brief, and open Campaign Studio',
+            ];
+        }
+
+        if (preg_match('/\b(?:build|rebuild|publish|launch)\b.*\b(?:my\s+)?website\b/i', $message) || preg_match('/\b(?:website)\b.*\b(?:build|rebuild|publish|launch)\b/i', $message)) {
+            return [
+                'type' => 'website_build_start',
+                'summary' => 'build and publish your website',
+            ];
+        }
+
+        if (preg_match('/\b(?:break\s+(?:it|this|that)\s+down|smaller\s+execution\s+steps)\b/i', $message)) {
+            return [
+                'type' => 'task_breakdown_next',
+                'summary' => 'break the next task into smaller execution steps',
+            ];
+        }
+
+        if (preg_match('/\b(?:tighten|sharpen|narrow)\b.*\btask\b/i', $message)) {
+            return [
+                'type' => 'task_tighten_next',
+                'summary' => 'tighten the next task into one clearer work block',
+            ];
+        }
+
+        if (preg_match('/\b(?:refine|update|adjust|rework|improve)\b.*\blaunch\s+plan\b(?:\s+(?:for|around|toward|with)\s+(.+))?/i', $message, $matches)) {
+            $focus = trim((string) ($matches[1] ?? ''));
+            $focus = rtrim($focus, ". \t\n\r\0\x0B");
+
+            return [
+                'type' => 'launch_plan_refine',
+                'focus' => $focus,
+                'summary' => $focus !== ''
+                    ? 'refine your launch plan around ' . $focus
+                    : 'refine your launch plan',
+            ];
+        }
+
+        if (preg_match('/\b(?:create|add|save|make)\s+(?:these\s+)?tasks?\s*:\s*(.+)$/is', $message, $matches)) {
+            $steps = $this->parseTaskBatchSteps((string) ($matches[1] ?? ''));
+            if (!empty($steps)) {
+                return [
+                    'type' => 'task_batch_create',
+                    'title' => 'Atlas task list',
+                    'steps' => $steps,
+                    'summary' => 'create ' . count($steps) . ' real OS tasks',
+                ];
+            }
+        }
+
         $fieldPatterns = [
             'company_name' => '/\b(?:set|update|change)\s+(?:the\s+)?company\s+name\s+to\s+(.+)/i',
             'company_brief' => '/\b(?:set|update|change)\s+(?:the\s+)?(?:company\s+description|company\s+brief)\s+to\s+(.+)/i',
@@ -729,6 +1013,15 @@ class OsAssistantActionService
                 $value = rtrim($value, ". \t\n\r\0\x0B");
 
                 if ($value !== '') {
+                    if (preg_match('/\b(?:regenerate|refresh|rewrite|rebuild)\b.*\bwebsite\b|\bwebsite\s+copy\b/i', $message)) {
+                        return [
+                            'type' => 'company_field_website_refresh',
+                            'field' => $field,
+                            'value' => $value,
+                            'summary' => 'update the shared company field "' . str_replace('_', ' ', $field) . '" and regenerate your website copy',
+                        ];
+                    }
+
                     return [
                         'type' => 'company_field_update',
                         'field' => $field,
@@ -1072,6 +1365,22 @@ class OsAssistantActionService
 
         $platformCreatePatterns = [
             [
+                'platform' => 'lms',
+                'category' => 'task',
+                'label' => 'Task',
+                'pattern' => '/\b(?:add|create|draft|write|prepare|make)\s+(?:a\s+)?task\s+"([^"]+)"(?:\s+(?:about|for|with)\s+(.+))?/i',
+                'title_from' => 1,
+                'description_from' => 2,
+            ],
+            [
+                'platform' => 'lms',
+                'category' => 'milestone',
+                'label' => 'Milestone',
+                'pattern' => '/\b(?:add|create|draft|write|prepare|make)\s+(?:a\s+)?milestone\s+"([^"]+)"(?:\s+(?:about|for|with)\s+(.+))?/i',
+                'title_from' => 1,
+                'description_from' => 2,
+            ],
+            [
                 'platform' => 'bazaar',
                 'category' => 'blog',
                 'label' => 'Bazaar blog',
@@ -1156,6 +1465,26 @@ class OsAssistantActionService
         }
 
         return Str::limit($prefix . ': ' . $clean, 110, '');
+    }
+
+    private function parseTaskBatchSteps(string $raw): array
+    {
+        $raw = trim($raw);
+        if ($raw === '') {
+            return [];
+        }
+
+        $parts = preg_split('/(?:\r\n|\r|\n|;|•|- )+/', $raw) ?: [];
+
+        return collect($parts)
+            ->map(function (string $part): string {
+                $part = preg_replace('/^\d+[\).\-\s]+/', '', trim($part)) ?? '';
+                return trim($part);
+            })
+            ->filter()
+            ->take(6)
+            ->values()
+            ->all();
     }
 
     private function detectActorRoleFromText(string $message): string
@@ -1864,5 +2193,103 @@ class OsAssistantActionService
             'restore' => 'restored',
             default => trim($operation) . 'd',
         };
+    }
+
+    private function inferCampaignAngleFromMessage(string $message): string
+    {
+        $message = strtolower($message);
+
+        if (str_contains($message, 'grid')) {
+            return 'grid';
+        }
+
+        if (str_contains($message, 'post')) {
+            return 'post';
+        }
+
+        if (str_contains($message, 'content')) {
+            return 'content';
+        }
+
+        return 'campaign';
+    }
+
+    private function latestAssistantThreadContext(Founder $founder, string $threadKey = ''): array
+    {
+        $query = FounderConversationThread::query()
+            ->where('founder_id', $founder->id)
+            ->where('thread_key', 'like', 'atlas-assistant%');
+
+        if ($threadKey !== '') {
+            $query->where('thread_key', $threadKey);
+        } else {
+            $query->orderByDesc('last_activity_at')->orderByDesc('updated_at');
+        }
+
+        $thread = $query->first();
+        if (!$thread) {
+            return [];
+        }
+
+        $meta = is_array($thread->meta_json) ? $thread->meta_json : [];
+        $messages = collect(is_array($meta['messages'] ?? null) ? $meta['messages'] : [])
+            ->filter(fn ($message) => is_array($message) && ($message['type'] ?? '') === 'atlas')
+            ->values();
+
+        $latest = $messages->last();
+
+        return is_array($latest) ? $latest : [];
+    }
+
+    private function buildThreadAwareFollowUpAction(string $message, array $assistantContext): array
+    {
+        $latestAssistantText = trim((string) ($assistantContext['text'] ?? ''));
+        $normalized = Str::lower(trim($message));
+
+        if ($latestAssistantText === '') {
+            return [];
+        }
+
+        if (
+            $this->isConfirmationMessage($message) &&
+            Str::contains(Str::lower($latestAssistantText), 'turn that into a campaign brief next')
+        ) {
+            return [
+                'type' => 'launch_plan_refine_campaign',
+                'focus' => '',
+                'campaign_angle' => 'campaign',
+                'summary' => 'turn the refined launch plan into a campaign brief and open Campaign Studio',
+            ];
+        }
+
+        if (
+            $this->isConfirmationMessage($message) &&
+            Str::contains(Str::lower($latestAssistantText), 'tighten that task or break it into smaller execution steps')
+        ) {
+            return [
+                'needs_choice' => true,
+                'reply' => 'Happy to. Do you want me to tighten the task into one cleaner work block, or break it into smaller execution steps? You can just reply "tighten it" or "break it down".',
+            ];
+        }
+
+        if (
+            in_array($normalized, ['post', 'grid', 'content', 'content sequence', 'sequence'], true) &&
+            Str::contains(Str::lower($latestAssistantText), 'post, grid, or a broader content sequence')
+        ) {
+            $campaignAngle = match ($normalized) {
+                'grid' => 'grid',
+                'post' => 'post',
+                'content', 'content sequence', 'sequence' => 'content',
+                default => 'campaign',
+            };
+
+            return [
+                'type' => 'campaign_format_choose',
+                'campaign_angle' => $campaignAngle,
+                'summary' => 'prepare the first ' . $campaignAngle . ' direction and reopen Campaign Studio',
+            ];
+        }
+
+        return [];
     }
 }

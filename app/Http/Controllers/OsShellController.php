@@ -4267,186 +4267,7 @@ class OsShellController extends Controller
         $isImprovementPass = $company->websiteGenerationRuns()->exists()
             || in_array((string) ($company->website_status ?? ''), ['live', 'in_progress'], true)
             || in_array((string) ($company->website_generation_status ?? ''), ['published', 'ready_for_review', 'in_progress'], true);
-        $company->forceFill([
-            'website_generation_status' => 'in_progress',
-            'website_status' => 'in_progress',
-        ])->save();
-
-        $founderNotificationService->websiteBuildStarted($founder, $engineLabel, $isImprovementPass);
-        $founderId = (int) $founder->id;
-
-        app()->terminating(function () use ($founderId) {
-            try {
-                /** @var Founder|null $backgroundFounder */
-                $backgroundFounder = Founder::query()->find($founderId);
-                if (!$backgroundFounder) {
-                    return;
-                }
-
-                /** @var WebsiteAutopilotService $websiteAutopilotService */
-                $websiteAutopilotService = app(WebsiteAutopilotService::class);
-                /** @var WebsiteProvisioningService $websiteProvisioningService */
-                $websiteProvisioningService = app(WebsiteProvisioningService::class);
-                /** @var FounderNotificationService $founderNotificationService */
-                $founderNotificationService = app(FounderNotificationService::class);
-                /** @var FounderModuleSyncService $founderModuleSyncService */
-                $founderModuleSyncService = app(FounderModuleSyncService::class);
-
-                $backgroundFounder = $backgroundFounder->fresh([
-                    'company.verticalBlueprint',
-                    'company.intelligence',
-                    'company.websiteGenerationRuns',
-                    'businessBrief',
-                    'icpProfiles',
-                    'actionPlans',
-                ]);
-                if (!$backgroundFounder) {
-                    return;
-                }
-
-                $engineTarget = strtolower(trim((string) ($backgroundFounder->company?->website_engine ?? '')));
-                if (!in_array($engineTarget, ['servio', 'bazaar'], true)) {
-                    $engineTarget = strtolower(trim((string) ($backgroundFounder->company?->business_model ?? ''))) === 'product'
-                        ? 'bazaar'
-                        : 'servio';
-                }
-
-                $syncResult = $founderModuleSyncService->syncFounder($backgroundFounder, $engineTarget);
-                if (empty($syncResult['ok'])) {
-                    $backgroundFounder->company?->forceFill([
-                        'website_generation_status' => 'queued',
-                        'website_status' => 'not_started',
-                    ])->save();
-
-                    $founderNotificationService->websiteBuildFailed(
-                        $backgroundFounder,
-                        (string) ($syncResult['message'] ?? 'We could not provision your founder account in the website engine yet.')
-                    );
-
-                    Log::warning('Website build stopped because founder engine sync failed.', [
-                        'founder_id' => $founderId,
-                        'engine_target' => $engineTarget,
-                        'message' => (string) ($syncResult['message'] ?? 'Founder engine sync failed.'),
-                        'results' => $syncResult['results'] ?? [],
-                    ]);
-
-                    return;
-                }
-
-                $result = $websiteAutopilotService->generate($backgroundFounder->fresh([
-                    'company.verticalBlueprint',
-                    'company.intelligence',
-                    'company.websiteGenerationRuns',
-                    'businessBrief',
-                    'icpProfiles',
-                    'actionPlans',
-                ]));
-
-                $freshFounder = $backgroundFounder->fresh(['company']);
-                $freshCompany = $freshFounder?->company;
-
-                if (!($result['ok'] ?? false)) {
-                    if ($freshCompany) {
-                        $freshCompany->forceFill([
-                            'website_generation_status' => 'queued',
-                            'website_status' => 'not_started',
-                        ])->save();
-                    }
-
-                    if ($freshFounder) {
-                        $founderNotificationService->websiteBuildFailed(
-                            $freshFounder,
-                            (string) ($result['error'] ?? 'We could not finish the website build yet. Please try again after the latest fixes.')
-                        );
-                    }
-
-                    Log::warning('Website build failed during after-response generation.', [
-                        'founder_id' => $founderId,
-                        'error' => (string) ($result['error'] ?? 'Unknown website generation error.'),
-                    ]);
-
-                    return;
-                }
-
-                $publishResult = $websiteProvisioningService->publishWebsite(
-                    $freshFounder,
-                    (string) ($freshCompany?->website_engine ?? 'servio')
-                );
-
-                if (!($publishResult['ok'] ?? false) && ($publishResult['bridge_status'] ?? null) !== 'pending') {
-                    if ($freshCompany) {
-                        $freshCompany->forceFill([
-                            'website_generation_status' => 'queued',
-                            'website_status' => 'not_started',
-                        ])->save();
-                    }
-
-                    $founderNotificationService->websiteBuildFailed(
-                        $freshFounder,
-                        (string) ($publishResult['error'] ?? 'We built the website draft, but could not publish it yet.')
-                    );
-
-                    return;
-                }
-
-                if ($freshCompany) {
-                    $this->syncCompanyWebsitePathFromEnginePublicUrl(
-                        $freshCompany,
-                        (string) ($publishResult['public_url'] ?? ''),
-                        (string) ($freshCompany->website_engine ?? 'servio')
-                    );
-                    $freshCompany->forceFill([
-                        'website_status' => 'live',
-                        'website_generation_status' => 'published',
-                        'launch_stage' => 'website_live',
-                    ])->save();
-                }
-
-                $websiteUrl = (string) ($freshCompany?->website_url ?: ('https://app.hatchers.ai/' . ltrim((string) ($freshCompany?->website_path ?? ''), '/')));
-                $engineAppKey = strtolower((string) ($freshCompany?->website_engine ?? 'servio')) === 'bazaar' ? 'bazaar-engine' : 'servio-engine';
-                $founderNotificationService->websiteReady($freshFounder, $engineAppKey, $websiteUrl);
-            } catch (Throwable $e) {
-                $crashedFounder = Founder::query()->with('company')->find($founderId);
-                if ($crashedFounder?->company) {
-                    $crashedFounder->company->forceFill([
-                        'website_generation_status' => 'queued',
-                        'website_status' => 'not_started',
-                    ])->save();
-                }
-
-                if ($crashedFounder) {
-                    $failureMessage = trim((string) $e->getMessage());
-                    if ($failureMessage === '') {
-                        $failureMessage = 'The website build ran into a technical issue before it could finish.';
-                    } else {
-                        $failureMessage = 'The website build ran into a technical issue: ' . $failureMessage;
-                    }
-
-                    app(FounderNotificationService::class)->websiteBuildFailed(
-                        $crashedFounder,
-                        $failureMessage
-                    );
-                }
-
-                Log::error('Website build crashed during after-response generation.', [
-                    'founder_id' => $founderId,
-                    'message' => $e->getMessage(),
-                    'file' => $e->getFile(),
-                    'line' => $e->getLine(),
-                    'exception' => get_class($e),
-                    'trace_preview' => collect($e->getTrace())
-                        ->take(5)
-                        ->map(fn (array $frame): array => [
-                            'file' => $frame['file'] ?? null,
-                            'line' => $frame['line'] ?? null,
-                            'function' => $frame['function'] ?? null,
-                            'class' => $frame['class'] ?? null,
-                        ])
-                        ->values()
-                        ->all(),
-                ]);
-            }
-        });
+        $this->startFounderWebsiteBuildPipeline($founder, $founderNotificationService, $engineLabel, $isImprovementPass);
 
             return redirect()
                 ->route('website', array_filter([
@@ -4467,6 +4288,202 @@ class OsShellController extends Controller
                 ->back()
                 ->withInput()
                 ->with('error', 'We could not start the website build just yet. Your notes are safe, and we already tightened this flow so it fails gracefully while we finish the last fixes.');
+        }
+    }
+
+    private function startFounderWebsiteBuildPipeline(
+        Founder $founder,
+        FounderNotificationService $founderNotificationService,
+        string $engineLabel,
+        bool $isImprovementPass
+    ): void {
+        $company = $founder->company;
+        if ($company) {
+            $company->forceFill([
+                'website_generation_status' => 'in_progress',
+                'website_status' => 'in_progress',
+            ])->save();
+        }
+
+        $founderNotificationService->websiteBuildStarted($founder, $engineLabel, $isImprovementPass);
+        $founderId = (int) $founder->id;
+
+        app()->terminating(function () use ($founderId): void {
+            $this->executeFounderWebsiteBuildPipeline($founderId);
+        });
+    }
+
+    private function executeFounderWebsiteBuildPipeline(int $founderId): void
+    {
+        try {
+            /** @var Founder|null $backgroundFounder */
+            $backgroundFounder = Founder::query()->find($founderId);
+            if (!$backgroundFounder) {
+                return;
+            }
+
+            /** @var WebsiteAutopilotService $websiteAutopilotService */
+            $websiteAutopilotService = app(WebsiteAutopilotService::class);
+            /** @var WebsiteProvisioningService $websiteProvisioningService */
+            $websiteProvisioningService = app(WebsiteProvisioningService::class);
+            /** @var FounderNotificationService $founderNotificationService */
+            $founderNotificationService = app(FounderNotificationService::class);
+            /** @var FounderModuleSyncService $founderModuleSyncService */
+            $founderModuleSyncService = app(FounderModuleSyncService::class);
+
+            $backgroundFounder = $backgroundFounder->fresh([
+                'company.verticalBlueprint',
+                'company.intelligence',
+                'company.websiteGenerationRuns',
+                'businessBrief',
+                'icpProfiles',
+                'actionPlans',
+            ]);
+            if (!$backgroundFounder) {
+                return;
+            }
+
+            $engineTarget = strtolower(trim((string) ($backgroundFounder->company?->website_engine ?? '')));
+            if (!in_array($engineTarget, ['servio', 'bazaar'], true)) {
+                $engineTarget = strtolower(trim((string) ($backgroundFounder->company?->business_model ?? ''))) === 'product'
+                    ? 'bazaar'
+                    : 'servio';
+            }
+
+            $syncResult = $founderModuleSyncService->syncFounder($backgroundFounder, $engineTarget);
+            if (empty($syncResult['ok'])) {
+                $backgroundFounder->company?->forceFill([
+                    'website_generation_status' => 'queued',
+                    'website_status' => 'not_started',
+                ])->save();
+
+                $founderNotificationService->websiteBuildFailed(
+                    $backgroundFounder,
+                    (string) ($syncResult['message'] ?? 'We could not provision your founder account in the website engine yet.')
+                );
+
+                Log::warning('Website build stopped because founder engine sync failed.', [
+                    'founder_id' => $founderId,
+                    'engine_target' => $engineTarget,
+                    'message' => (string) ($syncResult['message'] ?? 'Founder engine sync failed.'),
+                    'results' => $syncResult['results'] ?? [],
+                ]);
+
+                return;
+            }
+
+            $result = $websiteAutopilotService->generate($backgroundFounder->fresh([
+                'company.verticalBlueprint',
+                'company.intelligence',
+                'company.websiteGenerationRuns',
+                'businessBrief',
+                'icpProfiles',
+                'actionPlans',
+            ]));
+
+            $freshFounder = $backgroundFounder->fresh(['company']);
+            $freshCompany = $freshFounder?->company;
+
+            if (!($result['ok'] ?? false)) {
+                if ($freshCompany) {
+                    $freshCompany->forceFill([
+                        'website_generation_status' => 'queued',
+                        'website_status' => 'not_started',
+                    ])->save();
+                }
+
+                if ($freshFounder) {
+                    $founderNotificationService->websiteBuildFailed(
+                        $freshFounder,
+                        (string) ($result['error'] ?? 'We could not finish the website build yet. Please try again after the latest fixes.')
+                    );
+                }
+
+                Log::warning('Website build failed during after-response generation.', [
+                    'founder_id' => $founderId,
+                    'error' => (string) ($result['error'] ?? 'Unknown website generation error.'),
+                ]);
+
+                return;
+            }
+
+            $publishResult = $websiteProvisioningService->publishWebsite(
+                $freshFounder,
+                (string) ($freshCompany?->website_engine ?? 'servio')
+            );
+
+            if (!($publishResult['ok'] ?? false) && ($publishResult['bridge_status'] ?? null) !== 'pending') {
+                if ($freshCompany) {
+                    $freshCompany->forceFill([
+                        'website_generation_status' => 'queued',
+                        'website_status' => 'not_started',
+                    ])->save();
+                }
+
+                $founderNotificationService->websiteBuildFailed(
+                    $freshFounder,
+                    (string) ($publishResult['error'] ?? 'We built the website draft, but could not publish it yet.')
+                );
+
+                return;
+            }
+
+            if ($freshCompany) {
+                $this->syncCompanyWebsitePathFromEnginePublicUrl(
+                    $freshCompany,
+                    (string) ($publishResult['public_url'] ?? ''),
+                    (string) ($freshCompany->website_engine ?? 'servio')
+                );
+                $freshCompany->forceFill([
+                    'website_status' => 'live',
+                    'website_generation_status' => 'published',
+                    'launch_stage' => 'website_live',
+                ])->save();
+            }
+
+            $websiteUrl = (string) ($freshCompany?->website_url ?: ('https://app.hatchers.ai/' . ltrim((string) ($freshCompany?->website_path ?? ''), '/')));
+            $engineAppKey = strtolower((string) ($freshCompany?->website_engine ?? 'servio')) === 'bazaar' ? 'bazaar-engine' : 'servio-engine';
+            $founderNotificationService->websiteReady($freshFounder, $engineAppKey, $websiteUrl);
+        } catch (Throwable $e) {
+            $crashedFounder = Founder::query()->with('company')->find($founderId);
+            if ($crashedFounder?->company) {
+                $crashedFounder->company->forceFill([
+                    'website_generation_status' => 'queued',
+                    'website_status' => 'not_started',
+                ])->save();
+            }
+
+            if ($crashedFounder) {
+                $failureMessage = trim((string) $e->getMessage());
+                if ($failureMessage === '') {
+                    $failureMessage = 'The website build ran into a technical issue before it could finish.';
+                } else {
+                    $failureMessage = 'The website build ran into a technical issue: ' . $failureMessage;
+                }
+
+                app(FounderNotificationService::class)->websiteBuildFailed(
+                    $crashedFounder,
+                    $failureMessage
+                );
+            }
+
+            Log::error('Website build crashed during after-response generation.', [
+                'founder_id' => $founderId,
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'exception' => get_class($e),
+                'trace_preview' => collect($e->getTrace())
+                    ->take(5)
+                    ->map(fn (array $frame): array => [
+                        'file' => $frame['file'] ?? null,
+                        'line' => $frame['line'] ?? null,
+                        'function' => $frame['function'] ?? null,
+                        'class' => $frame['class'] ?? null,
+                    ])
+                    ->values()
+                    ->all(),
+            ]);
         }
     }
 
@@ -6782,7 +6799,8 @@ class OsShellController extends Controller
     public function completeChatOnboarding(
         Request $request,
         AtlasIntelligenceService $atlas,
-        FounderModuleSyncService $founderModuleSyncService
+        FounderModuleSyncService $founderModuleSyncService,
+        OsAssistantTimelineService $timeline
     ): JsonResponse
     {
         /** @var \App\Models\Founder $founder */
@@ -6974,10 +6992,36 @@ class OsShellController extends Controller
         $atlas->syncFounderOnboarding($founder->fresh(), $company->fresh(), $atlasPayload);
         $founderModuleSyncService->syncFounder($founder->fresh(['company.intelligence', 'company.businessBrief', 'company.icpProfiles']), 'all');
 
+        $onboardingSummary = implode("\n", array_filter([
+            'Business: ' . (string) $signupProfile['company_description'],
+            'Ideal customer: ' . (string) $signupProfile['ideal_customer_profile'],
+            'Stage: ' . (string) $signupProfile['stage'],
+            'Model: ' . (string) $signupProfile['business_model'],
+            'Goal: ' . (string) $signupProfile['primary_growth_goal'],
+            'Blocker: ' . (string) $signupProfile['known_blockers'],
+            'Growth approach: ' . (string) $signupProfile['budget_strategy'],
+            'Time commitment: ' . (string) $signupProfile['time_commitment'],
+        ]));
+        $reply = 'Your launch plan is ready. Hatchers mapped the milestones, tasks, channels, and website path based on your answers. If you want, I can build and publish your first website next.';
+        $timeline->record(
+            $founder,
+            null,
+            'prototype_dashboard',
+            $onboardingSummary,
+            $reply,
+            [[
+                'cta' => 'Build My Website',
+                'os_workspace_key' => 'website',
+                'os_href' => route('website'),
+            ]]
+        );
+
         return response()->json([
             'success' => true,
-            'reply' => 'Your launch plan is ready. Hatchers mapped the milestones, tasks, channels, and website path based on your answers.',
+            'reply' => $reply,
             'launch_plan' => $launchPlan,
+            'ask_for_website_build' => true,
+            'website_prompt' => 'Do you want me to build and publish your website now?',
         ]);
     }
 
@@ -7079,7 +7123,8 @@ class OsShellController extends Controller
         Request $request,
         AtlasIntelligenceService $atlas,
         OsAssistantActionService $actionService,
-        OsAssistantTimelineService $timeline
+        OsAssistantTimelineService $timeline,
+        FounderNotificationService $founderNotificationService
     ): JsonResponse
     {
         /** @var \App\Models\Founder $founder */
@@ -7098,6 +7143,62 @@ class OsShellController extends Controller
         $actionResult = $actionService->handle($founder, $request, $message);
         if (!empty($actionResult['handled'])) {
             if (!empty($actionResult['executed'])) {
+                if (($actionResult['action_type'] ?? '') === 'website_build_start') {
+                    $actionResult = $this->executeAssistantWebsiteBuildAction(
+                        $founder,
+                        $founderNotificationService,
+                        $actionResult
+                    );
+                } elseif (($actionResult['action_type'] ?? '') === 'task_batch_create') {
+                    $actionResult = $this->executeAssistantTaskBatchAction(
+                        $founder,
+                        $actionResult
+                    );
+                } elseif (($actionResult['action_type'] ?? '') === 'launch_plan_refine') {
+                    $actionResult = $this->executeAssistantLaunchPlanRefineAction(
+                        $founder,
+                        $actionResult
+                    );
+                } elseif (($actionResult['action_type'] ?? '') === 'launch_plan_refine_campaign') {
+                    $actionResult = $this->executeAssistantLaunchPlanRefineCampaignAction(
+                        $founder,
+                        $actionResult,
+                        $actionService
+                    );
+                } elseif (($actionResult['action_type'] ?? '') === 'company_field_website_refresh') {
+                    $actionResult = $this->executeAssistantCompanyRefreshWebsiteAction(
+                        $founder,
+                        $founderNotificationService,
+                        $actionResult
+                    );
+                } elseif (($actionResult['action_type'] ?? '') === 'campaign_format_choose') {
+                    $actionResult = $this->executeAssistantCampaignFormatAction(
+                        $founder,
+                        $actionResult
+                    );
+                } elseif (($actionResult['action_type'] ?? '') === 'task_breakdown_next') {
+                    $actionResult = $this->executeAssistantTaskBreakdownAction(
+                        $founder,
+                        $actionResult
+                    );
+                } elseif (($actionResult['action_type'] ?? '') === 'task_tighten_next') {
+                    $actionResult = $this->executeAssistantTaskTightenAction(
+                        $founder,
+                        $actionResult
+                    );
+                } elseif (
+                    ($actionResult['action_type'] ?? '') === 'platform_record_update' &&
+                    ($actionResult['platform'] ?? '') === 'lms' &&
+                    ($actionResult['category'] ?? '') === 'task' &&
+                    ($actionResult['field'] ?? '') === 'status' &&
+                    in_array((string) ($actionResult['value'] ?? ''), ['completed', 'complete', 'done'], true)
+                ) {
+                    $actionResult = $this->executeAssistantTaskCloseGuidanceAction(
+                        $founder,
+                        $actionResult
+                    );
+                }
+
                 $founder->refresh();
                 $founder->load([
                     'company.intelligence',
@@ -7130,16 +7231,13 @@ class OsShellController extends Controller
                 'success' => true,
                 'reply' => $actionResult['reply'] ?? '',
                 'actions' => $mappedActions,
+                'auto_open_action' => !empty($actionResult['executed']) && !empty($mappedActions) ? $mappedActions[0] : null,
                 'refresh' => !empty($actionResult['executed']),
                 'thread_key' => (string) $thread->thread_key,
             ]);
         }
 
-        $result = $atlas->chatFromOs(
-            $founder,
-            $message,
-            $currentPage
-        );
+        $result = $atlas->chatFromOs($founder, $message, $currentPage, $threadKey !== '' ? $threadKey : null);
 
         if (!$result['ok']) {
             return response()->json([
@@ -7162,8 +7260,812 @@ class OsShellController extends Controller
             'success' => true,
             'reply' => $result['reply'] ?? '',
             'actions' => $mappedActions,
+            'auto_open_action' => null,
             'refresh' => false,
             'thread_key' => (string) $thread->thread_key,
+        ]);
+    }
+
+    private function executeAssistantWebsiteBuildAction(
+        Founder $founder,
+        FounderNotificationService $founderNotificationService,
+        array $actionResult
+    ): array {
+        $company = $founder->company;
+        if (!$company) {
+            return array_merge($actionResult, [
+                'success' => false,
+                'executed' => false,
+                'reply' => 'Your founder workspace is missing a company record, so I could not start the website build yet.',
+            ]);
+        }
+
+        if (in_array((string) ($company->website_generation_status ?? ''), ['in_progress', 'ready_for_review'], true)) {
+            return array_merge($actionResult, [
+                'reply' => 'We are already working on your website. I will keep watching for the publish result and share the live link here as soon as it is ready.',
+                'actions' => [[
+                    'title' => 'Build My Website',
+                    'platform' => 'os',
+                    'url' => route('website'),
+                ]],
+            ]);
+        }
+
+        if (in_array((string) ($company->website_status ?? ''), ['live'], true) && trim((string) ($company->website_url ?? '')) !== '') {
+            return array_merge($actionResult, [
+                'reply' => 'Your website is already live. Here is the public link: ' . (string) $company->website_url,
+                'actions' => [[
+                    'title' => 'Open Live Website',
+                    'platform' => 'website',
+                    'url' => (string) $company->website_url,
+                ]],
+            ]);
+        }
+
+        $this->syncFounderBusinessContextModels($founder, $company);
+        $isImprovementPass = $company->websiteGenerationRuns()->exists()
+            || in_array((string) ($company->website_status ?? ''), ['live', 'in_progress'], true)
+            || in_array((string) ($company->website_generation_status ?? ''), ['published', 'ready_for_review', 'in_progress'], true);
+        $engineLabel = $this->websiteBuildEngineLabel($company, 'auto');
+        $this->startFounderWebsiteBuildPipeline($founder->fresh(['company']), $founderNotificationService, $engineLabel, $isImprovementPass);
+
+        return array_merge($actionResult, [
+            'reply' => 'Perfect. I am building and publishing your website now. I will reply here with the live link as soon as the website is ready.',
+            'actions' => [[
+                'title' => 'Build My Website',
+                'platform' => 'os',
+                'url' => route('website'),
+            ]],
+            'sync_summary' => 'Atlas triggered the founder website build and publish flow from Hatchers OS.',
+        ]);
+    }
+
+    public function assistantApproveWebsiteBuild(
+        Request $request,
+        FounderNotificationService $founderNotificationService,
+        OsAssistantTimelineService $timeline
+    ): JsonResponse {
+        /** @var \App\Models\Founder $founder */
+        $founder = Auth::user();
+        if (!$founder->isFounder()) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Only founder accounts can start a website build here.',
+            ], 403);
+        }
+
+        if ($redirect = $this->ensureCompanyIntelligenceComplete($founder)) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Complete company intelligence first so Atlas has enough context to build the website.',
+                'redirect' => $redirect->getTargetUrl(),
+            ], 422);
+        }
+
+        $validated = $request->validate([
+            'thread_key' => ['nullable', 'string', 'max:120'],
+            'current_page' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $founder->loadMissing('company.intelligence', 'businessBrief', 'icpProfiles', 'actionPlans');
+        $company = $founder->company;
+        if (!$company) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Your founder workspace is missing a company record. Please refresh and try again.',
+            ], 422);
+        }
+
+        if (in_array((string) ($company->website_generation_status ?? ''), ['in_progress', 'ready_for_review'], true)) {
+            $reply = 'We are already working on your website. I will keep watching for the publish result and share the live link here as soon as it is ready.';
+            $timeline->appendAssistantMessage(
+                $founder,
+                trim((string) ($validated['thread_key'] ?? '')) ?: null,
+                (string) ($validated['current_page'] ?? 'prototype_dashboard'),
+                $reply,
+                [[
+                    'cta' => 'Open Build My Website',
+                    'os_workspace_key' => 'website',
+                    'os_href' => route('website'),
+                ]]
+            );
+
+            return response()->json([
+                'success' => true,
+                'status' => 'already_running',
+                'reply' => $reply,
+                'poll_status' => true,
+            ]);
+        }
+
+        if (in_array((string) ($company->website_status ?? ''), ['live'], true) && trim((string) ($company->website_url ?? '')) !== '') {
+            $websiteUrl = (string) $company->website_url;
+            $reply = 'Your website is already live. Here is the public link: ' . $websiteUrl;
+
+            return response()->json([
+                'success' => true,
+                'status' => 'already_live',
+                'reply' => $reply,
+                'website_url' => $websiteUrl,
+            ]);
+        }
+
+        $this->syncFounderBusinessContextModels($founder, $company);
+        $isImprovementPass = $company->websiteGenerationRuns()->exists()
+            || in_array((string) ($company->website_status ?? ''), ['live', 'in_progress'], true)
+            || in_array((string) ($company->website_generation_status ?? ''), ['published', 'ready_for_review', 'in_progress'], true);
+        $engineLabel = $this->websiteBuildEngineLabel($company, 'auto');
+        $this->startFounderWebsiteBuildPipeline($founder->fresh(['company']), $founderNotificationService, $engineLabel, $isImprovementPass);
+
+        $reply = 'Perfect. I am building and publishing your website now. I will reply here with the live link as soon as the website is ready.';
+        $timeline->appendAssistantMessage(
+            $founder,
+            trim((string) ($validated['thread_key'] ?? '')) ?: null,
+            (string) ($validated['current_page'] ?? 'prototype_dashboard'),
+            $reply,
+            [[
+                'cta' => 'Open Build My Website',
+                'os_workspace_key' => 'website',
+                'os_href' => route('website'),
+            ]]
+        );
+
+        return response()->json([
+            'success' => true,
+            'status' => 'started',
+            'reply' => $reply,
+            'poll_status' => true,
+        ]);
+    }
+
+    private function executeAssistantTaskBatchAction(Founder $founder, array $actionResult): array
+    {
+        $title = trim((string) ($actionResult['title'] ?? 'Atlas task list'));
+        $steps = collect((array) ($actionResult['steps'] ?? []))
+            ->map(fn ($step) => trim((string) $step))
+            ->filter()
+            ->take(6)
+            ->values();
+
+        if ($steps->isEmpty()) {
+            return array_merge($actionResult, [
+                'success' => false,
+                'executed' => false,
+                'reply' => 'I could not create tasks because there were no usable steps in that request.',
+            ]);
+        }
+
+        $created = $steps->map(function (string $step, int $index) use ($founder, $title) {
+            return FounderActionPlan::create([
+                'founder_id' => $founder->id,
+                'title' => $step,
+                'description' => 'Created directly by Atlas from chat plan: ' . $title,
+                'platform' => 'atlas_assistant',
+                'priority' => max(40, 82 - ($index * 6)),
+                'status' => 'pending',
+                'cta_label' => 'Open Tasks',
+                'cta_url' => route('founder.tasks'),
+            ]);
+        });
+
+        return array_merge($actionResult, [
+            'reply' => 'Done. I turned that plan into ' . $created->count() . ' real OS tasks for you. I would start with the first task today, then tell me where you feel resistance so I can tighten the plan with you.',
+            'actions' => [[
+                'title' => 'Open Tasks',
+                'platform' => 'lms',
+                'url' => route('founder.tasks'),
+            ]],
+            'sync_summary' => 'Atlas created ' . $created->count() . ' founder tasks directly from chat in Hatchers OS.',
+        ]);
+    }
+
+    private function executeAssistantLaunchPlanRefineAction(Founder $founder, array $actionResult): array
+    {
+        $company = $founder->company;
+        if (!$company) {
+            return array_merge($actionResult, [
+                'success' => false,
+                'executed' => false,
+                'reply' => 'Your founder workspace is missing a company record, so I could not refine the launch plan yet.',
+            ]);
+        }
+
+        $company->loadMissing('intelligence');
+        $launchSystem = $founder->launchSystems()->latest('id')->first();
+        $blueprint = $company->verticalBlueprint ?: VerticalBlueprint::query()->find($company->vertical_blueprint_id);
+        if (!$blueprint) {
+            return array_merge($actionResult, [
+                'success' => false,
+                'executed' => false,
+                'reply' => 'I could not refine the launch plan because the business blueprint is missing.',
+            ]);
+        }
+
+        $focus = trim((string) ($actionResult['focus'] ?? ''));
+        $signupProfile = $this->launchPlanSignupProfileFromCurrentState($company, $launchSystem, $focus);
+        $deducedProfile = $this->launchPlanDeducedProfileFromCurrentState($company);
+        $launchPlan = $this->buildFounderLaunchPlan($signupProfile, $deducedProfile, $blueprint);
+
+        if ($focus !== '') {
+            $launchPlan['summary'] = trim($launchPlan['summary'] . ' Atlas refined this version around: ' . $focus . '.');
+            $launchPlan['weekly_focus'] = $focus;
+        }
+
+        DB::transaction(function () use ($founder, $company, $blueprint, $signupProfile, $launchPlan) {
+            FounderLaunchSystem::updateOrCreate(
+                ['founder_id' => $founder->id, 'company_id' => $company->id],
+                [
+                    'vertical_blueprint_id' => $blueprint->id,
+                    'status' => 'ready',
+                    'selected_engine' => (string) $blueprint->engine,
+                    'launch_strategy_json' => $launchPlan,
+                    'funnel_blocks_json' => $launchPlan['assets'],
+                    'offer_stack_json' => $launchPlan['offer_stack'],
+                    'acquisition_system_json' => [
+                        'channel_strategy' => $launchPlan['channel_strategy'],
+                        'budget_strategy' => $signupProfile['budget_strategy'],
+                        'channels' => $launchPlan['channels'],
+                    ],
+                    'applied_at' => now(),
+                    'last_reviewed_at' => now(),
+                ]
+            );
+
+            FounderActionPlan::query()
+                ->where('founder_id', $founder->id)
+                ->where('context', 'task')
+                ->where('status', 'pending')
+                ->where('metadata_json->source', 'launch_chat')
+                ->delete();
+
+            foreach ($launchPlan['tasks'] as $index => $task) {
+                FounderActionPlan::create([
+                    'founder_id' => $founder->id,
+                    'title' => (string) $task['title'],
+                    'description' => (string) $task['description'],
+                    'platform' => (string) $task['platform'],
+                    'context' => 'task',
+                    'priority' => max(45, 95 - ($index * 3)),
+                    'status' => 'pending',
+                    'cta_label' => (string) $task['cta_label'],
+                    'cta_url' => (string) $task['cta_url'],
+                    'available_on' => $task['available_on'] ?? now()->toDateString(),
+                    'metadata_json' => [
+                        'source' => 'launch_chat',
+                        'milestone' => (string) $task['milestone'],
+                        'north_star_metric' => (string) $task['north_star_metric'],
+                    ],
+                ]);
+            }
+
+            FounderWeeklyState::updateOrCreate(
+                ['founder_id' => $founder->id],
+                [
+                    'weekly_focus' => (string) $launchPlan['weekly_focus'],
+                    'open_tasks' => count($launchPlan['tasks']),
+                    'weekly_progress_percent' => 0,
+                    'state_updated_at' => now(),
+                ]
+            );
+
+            CompanyIntelligence::updateOrCreate(
+                ['company_id' => $company->id],
+                [
+                    'content_goals' => implode(', ', array_values((array) ($launchPlan['north_star_metrics'] ?? []))),
+                    'visual_style' => (string) $launchPlan['visual_direction'],
+                    'last_summary' => (string) $launchPlan['summary'],
+                    'intelligence_updated_at' => now(),
+                ]
+            );
+        });
+
+        return array_merge($actionResult, [
+            'reply' => $focus !== ''
+                ? 'Done. I refined your launch plan around ' . $focus . ' and refreshed the next OS tasks for you. The main thing I would watch now is whether this focus moves you closer to a real offer test, not just more activity. Want me to shape the next campaign angle too?'
+                : 'Done. I refined your launch plan and refreshed the next OS tasks for you. The key now is to make sure the next tasks create evidence, not just motion. Want me to turn that into a campaign brief next?',
+            'actions' => [[
+                'title' => 'Open Tasks',
+                'platform' => 'lms',
+                'url' => route('founder.tasks'),
+            ]],
+            'sync_summary' => 'Atlas refined the founder launch plan and refreshed the pending OS task set.',
+        ]);
+    }
+
+    private function executeAssistantLaunchPlanRefineCampaignAction(
+        Founder $founder,
+        array $actionResult,
+        OsAssistantActionService $actionService
+    ): array {
+        $refined = $this->executeAssistantLaunchPlanRefineAction($founder, [
+            'focus' => $actionResult['focus'] ?? '',
+            'reply' => '',
+            'actions' => [],
+            'sync_summary' => $actionResult['sync_summary'] ?? '',
+        ]);
+
+        $founder->refresh();
+        $founder->loadMissing('company.intelligence');
+
+        $campaignBrief = $this->assistantCampaignBriefFromState(
+            $founder,
+            trim((string) ($actionResult['focus'] ?? '')),
+            trim((string) ($actionResult['campaign_angle'] ?? 'campaign'))
+        );
+        $campaignIdeas = $this->assistantCampaignIdeasFromState(
+            $founder,
+            trim((string) ($actionResult['focus'] ?? '')),
+            trim((string) ($actionResult['campaign_angle'] ?? 'campaign'))
+        );
+
+        $campaignCreation = $actionService->createCampaignFromOs(
+            $founder,
+            $campaignBrief['title'],
+            $campaignBrief['description'],
+            (string) ($actionResult['actor_role'] ?? 'founder')
+        );
+
+        $actions = [[
+            'title' => 'Open Campaign Studio',
+            'platform' => 'atlas',
+            'reason' => 'Choose whether to launch a post, grid, or content campaign from this new brief.',
+            'url' => route('workspace.launch', ['module' => 'atlas', 'target' => '/campaign-studio']),
+        ]];
+
+        if ($campaignCreation['success'] ?? false) {
+            $actions[] = [
+                'title' => 'Open Tasks',
+                'platform' => 'lms',
+                'url' => route('founder.tasks'),
+            ];
+
+            return array_merge($actionResult, [
+                'reply' => 'Done. I refined your launch plan, created a campaign brief called "' . $campaignBrief['title'] . '", and I am opening Campaign Studio next so we can choose the best format. I would test this angle first: ' . $campaignBrief['angle'] . '. Three strong directions I see are: 1. ' . ($campaignIdeas[0] ?? 'lead with the core problem') . ' 2. ' . ($campaignIdeas[1] ?? 'show the offer outcome clearly') . ' 3. ' . ($campaignIdeas[2] ?? 'use one direct call to action') . ' Which one feels most aligned right now: post, grid, or a broader content sequence?',
+                'actions' => $actions,
+                'sync_summary' => 'Atlas refined the launch plan, generated a campaign brief, and prepared Campaign Studio in Hatchers OS.',
+            ]);
+        }
+
+        return array_merge($actionResult, [
+            'reply' => 'I refined your launch plan and refreshed the next OS tasks. I also drafted the campaign angle conceptually, but I could not save the Atlas campaign brief yet. The strongest next move is still to open Campaign Studio and choose whether this should start as a post, grid, or content sequence. My first three angle ideas would be: 1. ' . ($campaignIdeas[0] ?? 'lead with the core problem') . ' 2. ' . ($campaignIdeas[1] ?? 'show the offer outcome clearly') . ' 3. ' . ($campaignIdeas[2] ?? 'use one direct call to action') . '.',
+            'actions' => $actions,
+            'sync_summary' => 'Atlas refined the launch plan and prepared Campaign Studio, but campaign brief creation still needs follow-up.',
+        ]);
+    }
+
+    private function executeAssistantCompanyRefreshWebsiteAction(
+        Founder $founder,
+        FounderNotificationService $founderNotificationService,
+        array $actionResult
+    ): array {
+        $fieldLabel = str_replace('_', ' ', (string) ($actionResult['field'] ?? 'company intelligence'));
+        $websiteAction = $this->executeAssistantWebsiteBuildAction($founder, $founderNotificationService, [
+            'reply' => '',
+            'actions' => [],
+            'sync_summary' => '',
+        ]);
+        $areas = $this->assistantWebsiteRefreshAreas((string) ($actionResult['field'] ?? ''));
+        $areasText = empty($areas)
+            ? 'headline, offer, and proof blocks'
+            : implode(', ', $areas);
+
+        return array_merge($actionResult, [
+            'reply' => 'Done. I updated "' . $fieldLabel . '" and I am regenerating your website copy now so the live messaging reflects the new direction. I would expect the biggest changes to show up in the ' . $areasText . '. The strongest thing to watch next is whether the positioning feels sharper and easier to say yes to, not just different. I will reopen Build My Website for you so you can review the refreshed version.',
+            'actions' => [[
+                'title' => 'Build My Website',
+                'platform' => 'os',
+                'url' => route('website'),
+            ]],
+            'sync_summary' => $websiteAction['sync_summary'] ?? 'Atlas updated company intelligence and triggered a website copy refresh.',
+        ]);
+    }
+
+    private function executeAssistantTaskCloseGuidanceAction(Founder $founder, array $actionResult): array
+    {
+        $nextTask = FounderActionPlan::query()
+            ->where('founder_id', $founder->id)
+            ->where('context', 'task')
+            ->whereNotIn('status', ['completed', 'complete', 'done'])
+            ->orderByDesc('priority')
+            ->orderBy('available_on')
+            ->first();
+
+        if (!$nextTask) {
+            return array_merge($actionResult, [
+                'reply' => 'Done. I closed that task for you. Right now you have no pending tasks, which is a good checkpoint. Want me to refine the launch plan or create the next few tasks based on your current goal?',
+                'actions' => [[
+                    'title' => 'Open Tasks',
+                    'platform' => 'lms',
+                    'url' => route('founder.tasks'),
+                ]],
+            ]);
+        }
+
+        $milestone = trim((string) data_get($nextTask->metadata_json, 'milestone', ''));
+
+        return array_merge($actionResult, [
+            'reply' => 'Done. I closed that task for you. The next task I would move to is "' . $nextTask->title . '". It matters because ' . trim((string) ($nextTask->description ?? 'it is the next leverage point in the plan')) . ($milestone !== '' ? ' It belongs to the milestone "' . $milestone . '".' : '') . ' My advice is to keep this one narrow and finishable in one work block. Want me to tighten that task or break it into smaller execution steps?',
+            'actions' => [[
+                'title' => 'Open Tasks',
+                'platform' => 'lms',
+                'url' => route('founder.tasks'),
+            ]],
+        ]);
+    }
+
+    private function executeAssistantTaskBreakdownAction(Founder $founder, array $actionResult): array
+    {
+        $task = $this->assistantNextPendingTask($founder);
+        if (!$task) {
+            return array_merge($actionResult, [
+                'reply' => 'I am ready to break the work down, but there is no pending task to expand right now. Want me to create the next tasks from your current goal instead?',
+                'actions' => [[
+                    'title' => 'Open Tasks',
+                    'platform' => 'lms',
+                    'url' => route('founder.tasks'),
+                ]],
+            ]);
+        }
+
+        $steps = $this->assistantExecutionStepsForTask($task);
+        $metadata = is_array($task->metadata_json) ? $task->metadata_json : [];
+        $metadata['execution_steps'] = $steps;
+        $metadata['assistant_refined_at'] = now()->toIso8601String();
+        $metadata['assistant_refine_mode'] = 'breakdown';
+
+        $task->forceFill([
+            'description' => trim((string) ($task->description ?? '')) . "\n\nExecution steps:\n" . collect($steps)
+                ->values()
+                ->map(fn ($step, $index) => ($index + 1) . '. ' . $step)
+                ->implode("\n"),
+            'metadata_json' => $metadata,
+        ])->save();
+
+        return array_merge($actionResult, [
+            'reply' => 'Done. I broke "' . $task->title . '" into smaller execution steps for you. I would work them in this order: 1. ' . ($steps[0] ?? 'clarify the outcome') . ' 2. ' . ($steps[1] ?? 'build the first visible asset') . ' 3. ' . ($steps[2] ?? 'ship and review'). ' My advice is to finish step one in the next work block before touching the rest.',
+            'actions' => [[
+                'title' => 'Open Tasks',
+                'platform' => 'lms',
+                'url' => route('founder.tasks'),
+            ]],
+            'sync_summary' => 'Atlas broke the next founder task into smaller execution steps in Hatchers OS.',
+        ]);
+    }
+
+    private function executeAssistantTaskTightenAction(Founder $founder, array $actionResult): array
+    {
+        $task = $this->assistantNextPendingTask($founder);
+        if (!$task) {
+            return array_merge($actionResult, [
+                'reply' => 'I can tighten the next task, but there is no pending task to reshape right now. Want me to create the next tasks from your current goal instead?',
+                'actions' => [[
+                    'title' => 'Open Tasks',
+                    'platform' => 'lms',
+                    'url' => route('founder.tasks'),
+                ]],
+            ]);
+        }
+
+        $tightened = $this->assistantTightenedTaskCopy($task);
+        $metadata = is_array($task->metadata_json) ? $task->metadata_json : [];
+        $metadata['assistant_refined_at'] = now()->toIso8601String();
+        $metadata['assistant_refine_mode'] = 'tighten';
+
+        $task->forceFill([
+            'title' => $tightened['title'],
+            'description' => $tightened['description'],
+            'metadata_json' => $metadata,
+        ])->save();
+
+        return array_merge($actionResult, [
+            'reply' => 'Done. I tightened that task into a cleaner work block: "' . $tightened['title'] . '". The goal now is not to make it bigger, but to make it easier to finish in one sitting. If you want, I can break it into smaller execution steps next.',
+            'actions' => [[
+                'title' => 'Open Tasks',
+                'platform' => 'lms',
+                'url' => route('founder.tasks'),
+            ]],
+            'sync_summary' => 'Atlas tightened the next founder task into a narrower execution block in Hatchers OS.',
+        ]);
+    }
+
+    private function executeAssistantCampaignFormatAction(Founder $founder, array $actionResult): array
+    {
+        $campaignAngle = trim((string) ($actionResult['campaign_angle'] ?? 'campaign'));
+        $idea = $this->assistantFirstCampaignAssetIdea($founder, $campaignAngle);
+
+        FounderActionPlan::create([
+            'founder_id' => $founder->id,
+            'title' => $idea['task_title'],
+            'description' => $idea['task_description'],
+            'platform' => 'atlas',
+            'context' => 'task',
+            'priority' => 88,
+            'status' => 'pending',
+            'cta_label' => 'Open Atlas',
+            'cta_url' => route('workspace.launch', ['module' => 'atlas', 'target' => '/campaign-studio']),
+            'available_on' => now()->toDateString(),
+            'metadata_json' => [
+                'source' => 'atlas_campaign_follow_up',
+                'campaign_angle' => $campaignAngle,
+            ],
+        ]);
+
+        return array_merge($actionResult, [
+            'reply' => 'Perfect. I would start with a ' . $campaignAngle . ' first. My first direction would be: ' . $idea['idea'] . ' I created a matching OS task so you can execute it cleanly, and I am reopening Campaign Studio next so you can build it there.',
+            'actions' => [
+                [
+                    'title' => 'Open Campaign Studio',
+                    'platform' => 'atlas',
+                    'url' => route('workspace.launch', ['module' => 'atlas', 'target' => '/campaign-studio']),
+                ],
+                [
+                    'title' => 'Open Tasks',
+                    'platform' => 'lms',
+                    'url' => route('founder.tasks'),
+                ],
+            ],
+            'sync_summary' => 'Atlas prepared the next campaign format, created a matching OS task, and reopened Campaign Studio.',
+        ]);
+    }
+
+    private function assistantNextPendingTask(Founder $founder): ?FounderActionPlan
+    {
+        return FounderActionPlan::query()
+            ->where('founder_id', $founder->id)
+            ->where('context', 'task')
+            ->whereNotIn('status', ['completed', 'complete', 'done'])
+            ->orderByDesc('priority')
+            ->orderBy('available_on')
+            ->first();
+    }
+
+    private function assistantExecutionStepsForTask(FounderActionPlan $task): array
+    {
+        $title = trim((string) $task->title);
+        $description = trim((string) ($task->description ?? ''));
+        $shortContext = Str::limit($description !== '' ? $description : $title, 120, '...');
+
+        return [
+            'Clarify the exact output for "' . $title . '" in one sentence before you start.',
+            'Create the first concrete asset or draft tied to ' . Str::lower($shortContext) . '.',
+            'Review it against the milestone, tighten the weakest part, and ship it.',
+        ];
+    }
+
+    private function assistantTightenedTaskCopy(FounderActionPlan $task): array
+    {
+        $title = trim((string) $task->title);
+        $description = trim((string) ($task->description ?? ''));
+        $normalizedTitle = Str::of($title)->replaceMatches('/\s+/', ' ')->trim()->value();
+
+        return [
+            'title' => Str::limit($normalizedTitle, 68, ''),
+            'description' => 'Complete one tight work block for this task: ' . ($description !== '' ? Str::limit($description, 220, '...') : 'finish the smallest shippable version of it.') . ' Focus on one output, one CTA, and one finish line.',
+        ];
+    }
+
+    private function assistantFirstCampaignAssetIdea(Founder $founder, string $campaignAngle): array
+    {
+        $company = $founder->company;
+        $intelligence = $company?->intelligence;
+        $icp = trim((string) ($intelligence?->primary_icp_name ?? $intelligence?->ideal_customer_profile ?? 'the right buyer'));
+        $offer = trim((string) ($intelligence?->core_offer ?? 'your offer'));
+        $problem = trim((string) ($intelligence?->problem_solved ?? $company?->company_brief ?? 'the core problem'));
+
+        return match ($campaignAngle) {
+            'grid' => [
+                'idea' => 'a 3-card grid: call out the problem, reframe the belief, then make "' . $offer . '" feel like the obvious next step for ' . $icp . '.',
+                'task_title' => 'Draft first campaign grid',
+                'task_description' => 'Create the first 3-card campaign grid. Card 1 names the problem. Card 2 shifts the belief. Card 3 presents "' . $offer . '" with one CTA.',
+            ],
+            'content' => [
+                'idea' => 'a short content sequence that starts with the pain around ' . Str::lower(Str::limit($problem, 90, '...')) . ', then earns trust before asking for action.',
+                'task_title' => 'Draft first content sequence',
+                'task_description' => 'Write the first short content sequence: pain point, belief shift, proof, then CTA into "' . $offer . '".',
+            ],
+            default => [
+                'idea' => 'one direct-response post that names the problem, makes the offer concrete, and gives ' . $icp . ' one clean next step.',
+                'task_title' => 'Draft first campaign post',
+                'task_description' => 'Write the first direct-response post. Lead with the problem, frame "' . $offer . '" as the answer, and end with one clean CTA.',
+            ],
+        };
+    }
+
+    private function launchPlanSignupProfileFromCurrentState(Company $company, ?FounderLaunchSystem $launchSystem, string $focus = ''): array
+    {
+        $intelligence = $company->intelligence;
+        $hoursPerWeek = max(1, (int) data_get($launchSystem?->launch_strategy_json, 'pace.hours_per_week', 4));
+        $budgetStrategy = $this->inferBudgetStrategyFromRefinementFocus($focus, (string) data_get($launchSystem?->acquisition_system_json, 'budget_strategy', 'organic'));
+
+        return [
+            'company_name' => (string) ($company->company_name ?? 'Founder project'),
+            'company_description' => (string) ($company->company_brief ?? $intelligence?->problem_solved ?? $intelligence?->last_summary ?? ''),
+            'ideal_customer_profile' => (string) ($intelligence?->ideal_customer_profile ?? $intelligence?->primary_icp_name ?? ''),
+            'business_model' => (string) ($company->business_model ?? 'service'),
+            'stage' => (string) ($company->stage ?? 'operating'),
+            'primary_growth_goal' => (string) ($intelligence?->primary_growth_goal ?? 'Get my first customers'),
+            'known_blockers' => (string) ($intelligence?->known_blockers ?? 'No clear offer yet'),
+            'budget_strategy' => $budgetStrategy,
+            'time_commitment' => $hoursPerWeek <= 2 ? 'low' : ($hoursPerWeek >= 7 ? 'high' : 'mid'),
+            'hours_per_week' => $hoursPerWeek,
+        ];
+    }
+
+    private function launchPlanDeducedProfileFromCurrentState(Company $company): array
+    {
+        $intelligence = $company->intelligence;
+
+        return [
+            'primary_icp_name' => (string) ($intelligence?->primary_icp_name ?? 'Ideal customer'),
+            'target_audience' => (string) ($intelligence?->target_audience ?? 'Consumers / B2C'),
+            'problem_solved' => (string) ($intelligence?->problem_solved ?? $company->company_brief ?? ''),
+            'brand_voice' => (string) ($intelligence?->brand_voice ?? 'Professional and credible'),
+            'differentiators' => (string) ($intelligence?->differentiators ?? ''),
+            'core_offer' => (string) ($intelligence?->core_offer ?? 'Starter offer'),
+            'pain_points' => $this->splitIntelligenceCsv((string) ($intelligence?->ideal_customer_profile ?? '')),
+            'desired_outcomes' => $this->splitIntelligenceCsv((string) ($intelligence?->buying_triggers ?? '')),
+            'objections' => $this->splitIntelligenceCsv((string) ($intelligence?->objections ?? '')),
+            'primary_city' => (string) Str::before((string) ($intelligence?->local_market_notes ?? ''), '·'),
+        ];
+    }
+
+    private function assistantCampaignBriefFromState(Founder $founder, string $focus, string $campaignAngle): array
+    {
+        $company = $founder->company;
+        $intelligence = $company?->intelligence;
+        $launchSystem = $founder->launchSystems()->latest('id')->first();
+        $weeklyState = $founder->weeklyState;
+
+        $companyName = trim((string) ($company?->company_name ?? 'Founder project'));
+        $icp = trim((string) ($intelligence?->primary_icp_name ?? $intelligence?->ideal_customer_profile ?? 'ideal customers'));
+        $offer = trim((string) ($intelligence?->core_offer ?? 'the core offer'));
+        $goal = trim((string) ($intelligence?->primary_growth_goal ?? 'generate demand'));
+        $weeklyFocus = trim((string) ($weeklyState?->weekly_focus ?? data_get($launchSystem?->launch_strategy_json, 'weekly_focus', '')));
+        $northStar = collect((array) data_get($launchSystem?->launch_strategy_json, 'north_star_metrics', []))
+            ->filter(fn ($metric) => trim((string) $metric) !== '')
+            ->values()
+            ->all();
+
+        $angle = match ($campaignAngle) {
+            'grid' => 'a multi-card grid that educates the right buyer and leads them into the offer',
+            'post' => 'a single direct-response post that calls out the problem and pushes to the offer',
+            'content' => 'a short content sequence that builds trust before asking for the next step',
+            default => 'a direct-response campaign angle that turns attention into action quickly',
+        };
+
+        $titleFocus = $focus !== '' ? Str::title(Str::limit($focus, 40, '')) : 'Next Campaign';
+
+        return [
+            'title' => $companyName . ' · ' . $titleFocus,
+            'angle' => $angle,
+            'description' => trim(implode("\n\n", array_filter([
+                'Objective: ' . $goal,
+                'Audience: ' . $icp,
+                'Offer: ' . $offer,
+                $weeklyFocus !== '' ? 'Current focus: ' . $weeklyFocus : null,
+                !empty($northStar) ? 'North-star metric: ' . $northStar[0] : null,
+                'Creative direction: Build this around ' . $angle . '. Keep the message practical, direct, and conversion-focused. Lead with the problem, make the offer feel easy to say yes to, and use one clear CTA.',
+            ]))),
+        ];
+    }
+
+    private function assistantCampaignIdeasFromState(Founder $founder, string $focus, string $campaignAngle): array
+    {
+        $company = $founder->company;
+        $intelligence = $company?->intelligence;
+        $icp = trim((string) ($intelligence?->primary_icp_name ?? $intelligence?->ideal_customer_profile ?? 'ideal customers'));
+        $problem = trim((string) ($intelligence?->problem_solved ?? $company?->company_brief ?? 'a pressing customer problem'));
+        $offer = trim((string) ($intelligence?->core_offer ?? 'the core offer'));
+        $focusText = $focus !== '' ? $focus : 'the current growth goal';
+
+        $ideas = [
+            'Call out how ' . $icp . ' are still dealing with ' . Str::lower(Str::limit($problem, 90, '...')) . ' and frame the post around what they are losing by waiting.',
+            'Show how "' . $offer . '" moves people faster toward ' . $focusText . ' with one concrete before-and-after contrast.',
+            'Use a simple proof or founder-belief angle that lowers friction and ends with one clean CTA into the offer.',
+        ];
+
+        if ($campaignAngle === 'grid') {
+            $ideas[0] = 'Open with a problem card, then a belief-shift card, then a CTA card built for ' . $icp . '.';
+        } elseif ($campaignAngle === 'post') {
+            $ideas[1] = 'Write one sharp post that names the problem, reframes it, and makes "' . $offer . '" feel like the obvious next step.';
+        } elseif ($campaignAngle === 'content') {
+            $ideas[2] = 'Turn this into a short sequence: pain point, belief shift, proof, then CTA.';
+        }
+
+        return $ideas;
+    }
+
+    private function assistantWebsiteRefreshAreas(string $field): array
+    {
+        return match ($field) {
+            'company_name' => ['brand label', 'hero headline'],
+            'company_brief' => ['hero message', 'founder story', 'about section'],
+            'target_audience', 'ideal_customer_profile' => ['hero message', 'problem framing', 'service copy'],
+            'brand_voice' => ['headline tone', 'CTA language', 'body copy'],
+            'differentiators', 'core_offer' => ['offer stack', 'service descriptions', 'CTA blocks'],
+            'primary_growth_goal', 'known_blockers' => ['CTA direction', 'offer framing', 'FAQ emphasis'],
+            default => [],
+        };
+    }
+
+    private function inferBudgetStrategyFromRefinementFocus(string $focus, string $fallback = 'organic'): string
+    {
+        $focus = Str::lower(trim($focus));
+        if ($focus === '') {
+            return $fallback !== '' ? $fallback : 'organic';
+        }
+
+        if (preg_match('/paid|ads|meta ads|google ads|ad campaign/', $focus)) {
+            return 'paid';
+        }
+
+        if (preg_match('/organic|content|outreach|direct outreach|social/', $focus)) {
+            return 'organic';
+        }
+
+        return $fallback !== '' ? $fallback : 'organic';
+    }
+
+    private function splitIntelligenceCsv(string $value): array
+    {
+        return collect(preg_split('/[\r\n,;]+/', $value) ?: [])
+            ->map(fn ($item) => trim((string) $item))
+            ->filter()
+            ->take(6)
+            ->values()
+            ->all();
+    }
+
+    public function assistantWebsiteBuildStatus(Request $request): JsonResponse
+    {
+        /** @var \App\Models\Founder $founder */
+        $founder = Auth::user();
+        $company = $founder->company;
+
+        if (!$founder->isFounder() || !$company) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Your founder workspace is missing company context.',
+            ], 422);
+        }
+
+        $run = $company->websiteGenerationRuns()->latest('id')->first();
+        $websiteUrl = trim((string) ($company->website_url ?? ''));
+        if ($websiteUrl === '' && trim((string) ($company->website_path ?? '')) !== '') {
+            $websiteUrl = 'https://app.hatchers.ai/' . ltrim((string) $company->website_path, '/');
+        }
+
+        if (in_array((string) ($company->website_status ?? ''), ['live'], true) && $websiteUrl !== '') {
+            return response()->json([
+                'success' => true,
+                'state' => 'ready',
+                'reply' => 'Your website is ready. Here is the live link: ' . $websiteUrl,
+                'website_url' => $websiteUrl,
+            ]);
+        }
+
+        if (($run?->status ?? '') === 'failed') {
+            $message = trim((string) data_get($run?->output_json, 'engine_sync.message', ''));
+            if ($message === '') {
+                $message = trim((string) data_get($run?->output_json, 'starter_sync.message', ''));
+            }
+            if ($message === '') {
+                $message = trim((string) data_get($run?->output_json, 'blog_sync.message', ''));
+            }
+
+            return response()->json([
+                'success' => true,
+                'state' => 'failed',
+                'reply' => $message !== ''
+                    ? 'The website build paused before publish: ' . $message
+                    : 'The website build paused before publish. Open Build My Website so we can review the last missing piece together.',
+            ]);
+        }
+
+        return response()->json([
+            'success' => true,
+            'state' => 'processing',
+            'reply' => 'Still working on the website build…',
         ]);
     }
 
@@ -7289,6 +8191,11 @@ class OsShellController extends Controller
                 'keywords' => ['company intelligence', 'positioning', 'audience', 'icp', 'offer'],
                 'key' => 'settings',
                 'href' => route('founder.settings'),
+            ],
+            [
+                'keywords' => ['campaign studio', 'post', 'grid', 'content sequence', 'campaign brief'],
+                'key' => 'campaign-studio',
+                'href' => route('workspace.launch', ['module' => 'atlas', 'target' => '/campaign-studio']),
             ],
             [
                 'keywords' => ['campaign', 'marketing assets', 'content', 'social'],
@@ -10696,10 +11603,12 @@ class OsShellController extends Controller
             '/company-intelligence',
             '/ai-chat',
             '/ai-chat-bots',
+            '/ai-images-hub',
             '/ai-images',
             '/ai-images/campaign',
             '/ai-images/campaign-detail',
             '/ai-images/grid',
+            '/campaign-studio',
             '/ai-templates',
             '/all-images',
             '/all-documents',
