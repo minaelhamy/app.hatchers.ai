@@ -7241,10 +7241,38 @@ class OsShellController extends Controller
         $result = $atlas->chatFromOs($founder, $message, $currentPage, $threadKey !== '' ? $threadKey : null);
 
         if (!$result['ok']) {
+            $fallbackResult = $this->localAssistantFallbackReply(
+                $founder,
+                $message,
+                $currentPage,
+                $threadKey !== '' ? $threadKey : null
+            );
+
+            if (!$fallbackResult['ok']) {
+                return response()->json([
+                    'success' => false,
+                    'error' => $result['error'] ?? $fallbackResult['error'] ?? 'Atlas could not respond right now.',
+                ], 502);
+            }
+
+            $mappedActions = $this->mapAssistantActionsToOs($fallbackResult['actions'] ?? []);
+            $thread = $timeline->record(
+                $founder,
+                $threadKey !== '' ? $threadKey : null,
+                $currentPage,
+                $message,
+                (string) ($fallbackResult['reply'] ?? ''),
+                $mappedActions
+            );
+
             return response()->json([
-                'success' => false,
-                'error' => $result['error'] ?? 'Atlas could not respond right now.',
-            ], 502);
+                'success' => true,
+                'reply' => $fallbackResult['reply'] ?? '',
+                'actions' => $mappedActions,
+                'auto_open_action' => null,
+                'refresh' => false,
+                'thread_key' => (string) $thread->thread_key,
+            ]);
         }
 
         $mappedActions = $this->mapAssistantActionsToOs($result['actions'] ?? []);
@@ -7265,6 +7293,138 @@ class OsShellController extends Controller
             'refresh' => false,
             'thread_key' => (string) $thread->thread_key,
         ]);
+    }
+
+    private function localAssistantFallbackReply(
+        Founder $founder,
+        string $message,
+        string $currentPage,
+        ?string $threadKey = null
+    ): array {
+        /** @var OpenAiClientService $openAi */
+        $openAi = app(OpenAiClientService::class);
+        if (!$openAi->hasApiKey()) {
+            return [
+                'ok' => false,
+                'error' => 'Atlas is temporarily unavailable, and the local Hatchers fallback is not configured yet.',
+            ];
+        }
+
+        $founder->loadMissing([
+            'company.intelligence',
+            'weeklyState',
+            'commercialSummary',
+            'actionPlans',
+        ]);
+
+        $company = $founder->company;
+        $intelligence = $company?->intelligence;
+        $weeklyState = $founder->weeklyState;
+        $commercialSummary = $founder->commercialSummary;
+        $recentTasks = $founder->actionPlans()
+            ->where('context', 'task')
+            ->orderBy('available_on')
+            ->orderByDesc('priority')
+            ->limit(5)
+            ->get(['title', 'description', 'status', 'platform'])
+            ->map(fn (FounderActionPlan $task): array => [
+                'title' => (string) $task->title,
+                'description' => (string) $task->description,
+                'status' => (string) ($task->status ?? 'pending'),
+                'platform' => (string) ($task->platform ?? ''),
+            ])
+            ->values()
+            ->all();
+
+        $thread = FounderConversationThread::query()
+            ->where('founder_id', $founder->id)
+            ->where('source_channel', 'atlas_assistant')
+            ->when(trim((string) $threadKey) !== '', fn ($query) => $query->where('thread_key', (string) $threadKey))
+            ->orderByDesc('last_activity_at')
+            ->orderByDesc('updated_at')
+            ->first();
+
+        $memory = collect(is_array($thread?->meta_json['messages'] ?? null) ? $thread->meta_json['messages'] : [])
+            ->take(-6)
+            ->map(fn (array $entry): array => [
+                'type' => (string) ($entry['type'] ?? ''),
+                'text' => (string) ($entry['text'] ?? ''),
+            ])
+            ->values()
+            ->all();
+
+        $prompt = [
+            'task' => 'Reply as the Hatchers founder mentor when Atlas is unavailable. Be conversational, helpful, and action-oriented.',
+            'instructions' => [
+                'Return valid JSON only.',
+                'Act like a practical mentor using direct-response and offer-clarity thinking.',
+                'Give a direct answer first, then short next actions.',
+                'Ask one useful follow-up question when it helps.',
+                'If appropriate, suggest up to two workspace actions.',
+                'Do not mention system outages, fallbacks, APIs, or internal failures.',
+            ],
+            'founder' => [
+                'name' => (string) $founder->full_name,
+                'username' => (string) $founder->username,
+            ],
+            'company' => [
+                'company_name' => (string) ($company?->company_name ?? ''),
+                'business_model' => (string) ($company?->business_model ?? ''),
+                'industry' => (string) ($company?->industry ?? ''),
+                'company_brief' => (string) ($company?->company_brief ?? ''),
+                'target_audience' => (string) ($intelligence?->target_audience ?? ''),
+                'ideal_customer_profile' => (string) ($intelligence?->ideal_customer_profile ?? ''),
+                'brand_voice' => (string) ($intelligence?->brand_voice ?? ''),
+                'core_offer' => (string) ($intelligence?->core_offer ?? ''),
+                'primary_growth_goal' => (string) ($intelligence?->primary_growth_goal ?? ''),
+                'known_blockers' => (string) ($intelligence?->known_blockers ?? ''),
+            ],
+            'execution' => [
+                'weekly_focus' => (string) ($weeklyState?->weekly_focus ?? ''),
+                'open_tasks' => (int) ($weeklyState?->open_tasks ?? 0),
+                'completed_tasks' => (int) ($weeklyState?->completed_tasks ?? 0),
+                'gross_revenue' => (float) ($commercialSummary?->gross_revenue ?? 0),
+                'currency' => (string) ($commercialSummary?->currency ?? 'USD'),
+                'recent_tasks' => $recentTasks,
+            ],
+            'current_page' => $currentPage,
+            'conversation_memory' => $memory,
+            'user_message' => $message,
+            'response_schema' => [
+                'reply' => 'string',
+                'actions' => [
+                    [
+                        'title' => 'string',
+                        'reason' => 'string',
+                        'cta' => 'string',
+                        'platform' => 'string',
+                    ],
+                ],
+            ],
+        ];
+
+        $response = $openAi->requestJsonObject(
+            'You are Hatchers, the founder mentor inside Hatchers AI OS. Reply with clear, founder-friendly advice and optional workspace actions in valid JSON only.',
+            json_encode($prompt, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES),
+            'chat_model',
+            'gpt-5.5',
+            null,
+            40
+        );
+
+        $reply = trim((string) ($response['reply'] ?? ''));
+        if ($reply === '') {
+            return [
+                'ok' => false,
+                'error' => 'Hatchers could not generate a fallback reply right now.',
+            ];
+        }
+
+        return [
+            'ok' => true,
+            'reply' => $reply,
+            'actions' => array_values(array_filter((array) ($response['actions'] ?? []), fn ($action) => is_array($action))),
+        ];
     }
 
     private function executeAssistantWebsiteBuildAction(
