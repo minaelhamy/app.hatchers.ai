@@ -111,10 +111,6 @@ class OpenAiClientService
             ],
         ];
 
-        if ($temperature !== null) {
-            $payload['temperature'] = $temperature;
-        }
-
         return $payload;
     }
 
