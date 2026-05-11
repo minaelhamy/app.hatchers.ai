@@ -53,23 +53,13 @@ class OpenAiClientService
 
         foreach ($this->modelCandidates($configKey, $fallbackModel) as $model) {
             try {
-                $payload = [
-                    'model' => $model,
-                    'response_format' => ['type' => 'json_object'],
-                    'messages' => [
-                        ['role' => 'system', 'content' => $systemPrompt],
-                        ['role' => 'user', 'content' => $userPrompt],
-                    ],
-                ];
+                $payload = $this->buildPayload($model, $systemPrompt, $userPrompt, $temperature);
+                $response = $this->sendRequest($payload, $timeoutSeconds);
 
-                if ($temperature !== null) {
-                    $payload['temperature'] = $temperature;
+                if (!$response->successful() && $this->shouldRetryWithoutTemperature($response, $payload)) {
+                    unset($payload['temperature']);
+                    $response = $this->sendRequest($payload, $timeoutSeconds);
                 }
-
-                $response = Http::withToken((string) config('services.openai.api_key', ''))
-                    ->acceptJson()
-                    ->timeout($timeoutSeconds)
-                    ->post($this->baseUrl() . '/chat/completions', $payload);
 
                 if (!$response->successful()) {
                     $this->logFailure($response, $configKey, $model);
@@ -110,6 +100,32 @@ class OpenAiClientService
         return [];
     }
 
+    private function buildPayload(string $model, string $systemPrompt, string $userPrompt, ?float $temperature): array
+    {
+        $payload = [
+            'model' => $model,
+            'response_format' => ['type' => 'json_object'],
+            'messages' => [
+                ['role' => 'system', 'content' => $systemPrompt],
+                ['role' => 'user', 'content' => $userPrompt],
+            ],
+        ];
+
+        if ($temperature !== null) {
+            $payload['temperature'] = $temperature;
+        }
+
+        return $payload;
+    }
+
+    private function sendRequest(array $payload, int $timeoutSeconds): Response
+    {
+        return Http::withToken((string) config('services.openai.api_key', ''))
+            ->acceptJson()
+            ->timeout($timeoutSeconds)
+            ->post($this->baseUrl() . '/chat/completions', $payload);
+    }
+
     private function shouldTryFallback(Response $response): bool
     {
         $body = strtolower((string) $response->body());
@@ -127,6 +143,18 @@ class OpenAiClientService
         }
 
         return in_array($response->status(), [400, 403, 404], true);
+    }
+
+    private function shouldRetryWithoutTemperature(Response $response, array $payload): bool
+    {
+        if (!array_key_exists('temperature', $payload)) {
+            return false;
+        }
+
+        $body = strtolower((string) $response->body());
+
+        return str_contains($body, "unsupported parameter: 'temperature'")
+            || (str_contains($body, 'temperature') && str_contains($body, 'not supported'));
     }
 
     private function logFailure(Response $response, string $configKey, string $model): void
