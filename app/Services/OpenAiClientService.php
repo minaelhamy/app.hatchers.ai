@@ -46,12 +46,21 @@ class OpenAiClientService
         int $timeoutSeconds = 45
     ): array {
         if (!$this->hasApiKey()) {
-            return [];
+            return [
+                '_meta' => [
+                    'ok' => false,
+                    'error' => 'OpenAI API key is not configured.',
+                ],
+            ];
         }
 
         $preferredModel = $this->model($configKey, $fallbackModel);
+        $lastError = 'OpenAI request failed.';
+        $lastStatus = null;
+        $lastModel = null;
 
         foreach ($this->modelCandidates($configKey, $fallbackModel) as $model) {
+            $lastModel = $model;
             try {
                 $payload = $this->buildPayload($model, $systemPrompt, $userPrompt, $temperature);
                 $response = $this->sendRequest($payload, $timeoutSeconds);
@@ -62,22 +71,35 @@ class OpenAiClientService
                 }
 
                 if (!$response->successful()) {
+                    $lastStatus = $response->status();
+                    $lastError = $this->extractResponseError($response);
                     $this->logFailure($response, $configKey, $model);
                     if ($this->shouldTryFallback($response)) {
                         continue;
                     }
 
-                    return [];
+                    return [
+                        '_meta' => [
+                            'ok' => false,
+                            'error' => $lastError,
+                            'status' => $lastStatus,
+                            'model' => $model,
+                        ],
+                    ];
                 }
 
                 $content = trim((string) data_get($response->json(), 'choices.0.message.content', ''));
                 if ($content === '') {
-                    return [];
+                    $lastStatus = $response->status();
+                    $lastError = 'OpenAI returned an empty response body.';
+                    continue;
                 }
 
                 $decoded = json_decode($content, true);
                 if (!is_array($decoded)) {
-                    return [];
+                    $lastStatus = $response->status();
+                    $lastError = 'OpenAI returned a non-JSON assistant payload.';
+                    continue;
                 }
 
                 if ($model !== $preferredModel) {
@@ -87,8 +109,15 @@ class OpenAiClientService
                     ]);
                 }
 
+                $decoded['_meta'] = [
+                    'ok' => true,
+                    'model' => $model,
+                    'fallback_used' => $model !== $preferredModel,
+                ];
+
                 return $decoded;
             } catch (\Throwable $exception) {
+                $lastError = $exception->getMessage();
                 Log::warning('OpenAI request threw an exception.', [
                     'model_config' => $configKey,
                     'model' => $model,
@@ -97,7 +126,14 @@ class OpenAiClientService
             }
         }
 
-        return [];
+        return [
+            '_meta' => [
+                'ok' => false,
+                'error' => $lastError,
+                'status' => $lastStatus,
+                'model' => $lastModel,
+            ],
+        ];
     }
 
     private function buildPayload(string $model, string $systemPrompt, string $userPrompt, ?float $temperature): array
@@ -161,5 +197,15 @@ class OpenAiClientService
             'status' => $response->status(),
             'body' => substr((string) $response->body(), 0, 1200),
         ]);
+    }
+
+    private function extractResponseError(Response $response): string
+    {
+        $message = trim((string) data_get($response->json(), 'error.message', ''));
+        if ($message !== '') {
+            return $message;
+        }
+
+        return 'OpenAI request failed with status ' . $response->status() . '.';
     }
 }

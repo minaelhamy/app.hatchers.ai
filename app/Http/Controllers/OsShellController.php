@@ -7438,7 +7438,7 @@ class OsShellController extends Controller
 
         $response = $openAi->requestJsonObject(
             'You are Hatchers, the founder mentor inside Hatchers AI OS. Reply with clear, founder-friendly advice and optional workspace actions in valid JSON only.',
-            json_encode($prompt, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES),
+            json_encode($prompt, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
             'chat_model',
             'gpt-5.5',
             null,
@@ -7447,6 +7447,93 @@ class OsShellController extends Controller
 
         $reply = trim((string) ($response['reply'] ?? ''));
         if ($reply === '') {
+            Log::warning('Local Hatchers assistant returned no structured reply.', [
+                'founder_id' => $founder->id,
+                'thread_key' => $threadKey,
+                'current_page' => $currentPage,
+                'model' => data_get($response, '_meta.model'),
+                'status' => data_get($response, '_meta.status'),
+                'error' => data_get($response, '_meta.error'),
+            ]);
+
+            $fallback = $this->localAssistantSlimFallbackReply($founder, $message, $currentPage);
+            if ($fallback['ok']) {
+                return $fallback;
+            }
+
+            return [
+                'ok' => false,
+                'error' => trim((string) data_get($response, '_meta.error', '')) !== ''
+                    ? 'The Hatchers assistant hit a model issue while generating a reply. Please try again in a moment.'
+                    : 'The Hatchers assistant could not generate a reply right now.',
+            ];
+        }
+
+        return [
+            'ok' => true,
+            'reply' => $reply,
+            'actions' => array_values(array_filter((array) ($response['actions'] ?? []), fn ($action) => is_array($action))),
+        ];
+    }
+
+    private function localAssistantSlimFallbackReply(Founder $founder, string $message, string $currentPage): array
+    {
+        /** @var OpenAiClientService $openAi */
+        $openAi = app(OpenAiClientService::class);
+
+        $founder->loadMissing([
+            'company.intelligence',
+            'weeklyState',
+            'commercialSummary',
+            'actionPlans',
+        ]);
+
+        $company = $founder->company;
+        $intelligence = $company?->intelligence;
+        $nextTask = $this->assistantNextPendingTaskSummary($founder);
+
+        $slimPrompt = [
+            'founder_name' => (string) $founder->full_name,
+            'company_name' => (string) ($company?->company_name ?? ''),
+            'business_model' => (string) ($company?->business_model ?? ''),
+            'primary_growth_goal' => (string) ($intelligence?->primary_growth_goal ?? ''),
+            'known_blockers' => (string) ($intelligence?->known_blockers ?? ''),
+            'brand_voice' => (string) ($intelligence?->brand_voice ?? ''),
+            'next_pending_task' => $nextTask,
+            'current_page' => $currentPage,
+            'user_message' => $message,
+            'response_schema' => [
+                'reply' => 'string',
+                'actions' => [
+                    [
+                        'title' => 'string',
+                        'reason' => 'string',
+                        'cta' => 'string',
+                        'platform' => 'string',
+                    ],
+                ],
+            ],
+        ];
+
+        $response = $openAi->requestJsonObject(
+            'You are Hatchers, a practical founder mentor. Reply in valid JSON only. Keep it compact, helpful, and grounded in the founder context.',
+            json_encode($slimPrompt, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+            'chat_model',
+            'gpt-5.5',
+            null,
+            30
+        );
+
+        $reply = trim((string) ($response['reply'] ?? ''));
+        if ($reply === '') {
+            Log::warning('Local Hatchers slim fallback also returned no reply.', [
+                'founder_id' => $founder->id,
+                'current_page' => $currentPage,
+                'model' => data_get($response, '_meta.model'),
+                'status' => data_get($response, '_meta.status'),
+                'error' => data_get($response, '_meta.error'),
+            ]);
+
             return [
                 'ok' => false,
                 'error' => 'The Hatchers assistant could not generate a reply right now.',
