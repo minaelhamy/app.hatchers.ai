@@ -1671,9 +1671,19 @@
                             current_page: 'prototype_dashboard',
                         }),
                     });
-                    const payload = await response.json();
+                    const raw = await response.text();
+                    let payload = {};
+                    try {
+                        payload = raw ? JSON.parse(raw) : {};
+                    } catch (parseError) {
+                        throw new Error(`Assistant request failed with status ${response.status}.`);
+                    }
                     if (!response.ok || !payload.success) {
-                        throw new Error(payload.error || 'Hatchers could not respond right now.');
+                        throw new Error(
+                            payload.error
+                            || payload.message
+                            || `Assistant request failed with status ${response.status}.`
+                        );
                     }
                     if (payload.thread_key) {
                         threadKey = payload.thread_key;
