@@ -7143,128 +7143,158 @@ class OsShellController extends Controller
         $currentPage = trim((string) ($validated['current_page'] ?? 'os_dashboard'));
         $threadKey = trim((string) ($validated['thread_key'] ?? ''));
 
-        $actionResult = $actionService->handle($founder, $request, $message);
-        if (!empty($actionResult['handled'])) {
-            if (!empty($actionResult['executed'])) {
-                if (($actionResult['action_type'] ?? '') === 'website_build_start') {
-                    $actionResult = $this->executeAssistantWebsiteBuildAction(
-                        $founder,
-                        $founderNotificationService,
-                        $actionResult
-                    );
-                } elseif (($actionResult['action_type'] ?? '') === 'task_batch_create') {
-                    $actionResult = $this->executeAssistantTaskBatchAction(
-                        $founder,
-                        $actionResult
-                    );
-                } elseif (($actionResult['action_type'] ?? '') === 'launch_plan_refine') {
-                    $actionResult = $this->executeAssistantLaunchPlanRefineAction(
-                        $founder,
-                        $actionResult
-                    );
-                } elseif (($actionResult['action_type'] ?? '') === 'launch_plan_refine_campaign') {
-                    $actionResult = $this->executeAssistantLaunchPlanRefineCampaignAction(
-                        $founder,
-                        $actionResult,
-                        $actionService
-                    );
-                } elseif (($actionResult['action_type'] ?? '') === 'company_field_website_refresh') {
-                    $actionResult = $this->executeAssistantCompanyRefreshWebsiteAction(
-                        $founder,
-                        $founderNotificationService,
-                        $actionResult
-                    );
-                } elseif (($actionResult['action_type'] ?? '') === 'campaign_format_choose') {
-                    $actionResult = $this->executeAssistantCampaignFormatAction(
-                        $founder,
-                        $actionResult
-                    );
-                } elseif (($actionResult['action_type'] ?? '') === 'task_breakdown_next') {
-                    $actionResult = $this->executeAssistantTaskBreakdownAction(
-                        $founder,
-                        $actionResult
-                    );
-                } elseif (($actionResult['action_type'] ?? '') === 'task_tighten_next') {
-                    $actionResult = $this->executeAssistantTaskTightenAction(
-                        $founder,
-                        $actionResult
-                    );
-                } elseif (
-                    ($actionResult['action_type'] ?? '') === 'platform_record_update' &&
-                    ($actionResult['platform'] ?? '') === 'lms' &&
-                    ($actionResult['category'] ?? '') === 'task' &&
-                    ($actionResult['field'] ?? '') === 'status' &&
-                    in_array((string) ($actionResult['value'] ?? ''), ['completed', 'complete', 'done'], true)
-                ) {
-                    $actionResult = $this->executeAssistantTaskCloseGuidanceAction(
-                        $founder,
-                        $actionResult
-                    );
+        try {
+            $actionResult = $actionService->handle($founder, $request, $message);
+            if (!empty($actionResult['handled'])) {
+                if (!empty($actionResult['executed'])) {
+                    if (($actionResult['action_type'] ?? '') === 'website_build_start') {
+                        $actionResult = $this->executeAssistantWebsiteBuildAction(
+                            $founder,
+                            $founderNotificationService,
+                            $actionResult
+                        );
+                    } elseif (($actionResult['action_type'] ?? '') === 'task_batch_create') {
+                        $actionResult = $this->executeAssistantTaskBatchAction(
+                            $founder,
+                            $actionResult
+                        );
+                    } elseif (($actionResult['action_type'] ?? '') === 'launch_plan_refine') {
+                        $actionResult = $this->executeAssistantLaunchPlanRefineAction(
+                            $founder,
+                            $actionResult
+                        );
+                    } elseif (($actionResult['action_type'] ?? '') === 'launch_plan_refine_campaign') {
+                        $actionResult = $this->executeAssistantLaunchPlanRefineCampaignAction(
+                            $founder,
+                            $actionResult,
+                            $actionService
+                        );
+                    } elseif (($actionResult['action_type'] ?? '') === 'company_field_website_refresh') {
+                        $actionResult = $this->executeAssistantCompanyRefreshWebsiteAction(
+                            $founder,
+                            $founderNotificationService,
+                            $actionResult
+                        );
+                    } elseif (($actionResult['action_type'] ?? '') === 'campaign_format_choose') {
+                        $actionResult = $this->executeAssistantCampaignFormatAction(
+                            $founder,
+                            $actionResult
+                        );
+                    } elseif (($actionResult['action_type'] ?? '') === 'task_breakdown_next') {
+                        $actionResult = $this->executeAssistantTaskBreakdownAction(
+                            $founder,
+                            $actionResult
+                        );
+                    } elseif (($actionResult['action_type'] ?? '') === 'task_tighten_next') {
+                        $actionResult = $this->executeAssistantTaskTightenAction(
+                            $founder,
+                            $actionResult
+                        );
+                    } elseif (
+                        ($actionResult['action_type'] ?? '') === 'platform_record_update' &&
+                        ($actionResult['platform'] ?? '') === 'lms' &&
+                        ($actionResult['category'] ?? '') === 'task' &&
+                        ($actionResult['field'] ?? '') === 'status' &&
+                        in_array((string) ($actionResult['value'] ?? ''), ['completed', 'complete', 'done'], true)
+                    ) {
+                        $actionResult = $this->executeAssistantTaskCloseGuidanceAction(
+                            $founder,
+                            $actionResult
+                        );
+                    }
+
+                    $founder->refresh();
+                    $founder->load([
+                        'company.intelligence',
+                        'subscription',
+                        'weeklyState',
+                        'commercialSummary',
+                        'moduleSnapshots',
+                    ]);
                 }
 
-                $founder->refresh();
-                $founder->load([
-                    'company.intelligence',
-                    'subscription',
-                    'weeklyState',
-                    'commercialSummary',
-                    'moduleSnapshots',
+                $mappedActions = $this->mapAssistantActionsToOs($actionResult['actions'] ?? []);
+                $thread = $timeline->record(
+                    $founder,
+                    $threadKey !== '' ? $threadKey : null,
+                    $currentPage,
+                    $message,
+                    (string) ($actionResult['reply'] ?? ''),
+                    $mappedActions
+                );
+
+                return response()->json([
+                    'success' => true,
+                    'reply' => $actionResult['reply'] ?? '',
+                    'actions' => $mappedActions,
+                    'auto_open_action' => !empty($actionResult['executed']) && !empty($mappedActions) ? $mappedActions[0] : null,
+                    'refresh' => !empty($actionResult['executed']),
+                    'thread_key' => (string) $thread->thread_key,
                 ]);
             }
 
-            $mappedActions = $this->mapAssistantActionsToOs($actionResult['actions'] ?? []);
+            $result = $this->localAssistantReply(
+                $founder,
+                $message,
+                $currentPage,
+                $threadKey !== '' ? $threadKey : null
+            );
+
+            if (!$result['ok']) {
+                return response()->json([
+                    'success' => false,
+                    'error' => $result['error'] ?? 'The Hatchers assistant could not respond right now.',
+                ], 502);
+            }
+
+            $mappedActions = $this->mapAssistantActionsToOs($result['actions'] ?? []);
             $thread = $timeline->record(
                 $founder,
                 $threadKey !== '' ? $threadKey : null,
                 $currentPage,
                 $message,
-                (string) ($actionResult['reply'] ?? ''),
+                (string) ($result['reply'] ?? ''),
                 $mappedActions
             );
+            $this->persistAssistantStrategicMemory($founder, $thread);
 
             return response()->json([
                 'success' => true,
-                'reply' => $actionResult['reply'] ?? '',
+                'reply' => $result['reply'] ?? '',
                 'actions' => $mappedActions,
-                'auto_open_action' => !empty($actionResult['executed']) && !empty($mappedActions) ? $mappedActions[0] : null,
-                'refresh' => !empty($actionResult['executed']),
+                'auto_open_action' => null,
+                'refresh' => false,
                 'thread_key' => (string) $thread->thread_key,
             ]);
-        }
+        } catch (\Throwable $exception) {
+            $reference = 'AST-' . now()->format('YmdHis') . '-' . strtoupper(substr(md5($founder->id . '|' . $message . '|' . microtime(true)), 0, 6));
 
-        $result = $this->localAssistantReply(
-            $founder,
-            $message,
-            $currentPage,
-            $threadKey !== '' ? $threadKey : null
-        );
+            Log::error('Assistant chat crashed before returning a response.', [
+                'reference' => $reference,
+                'founder_id' => $founder->id,
+                'current_page' => $currentPage,
+                'thread_key' => $threadKey,
+                'message' => $message,
+                'exception' => $exception->getMessage(),
+            ]);
 
-        if (!$result['ok']) {
+            $fallback = $this->localAssistantHeuristicFallbackReply($founder, $message, $currentPage);
+            if ($fallback['ok']) {
+                return response()->json([
+                    'success' => true,
+                    'reply' => $fallback['reply'] . ' Support reference: ' . $reference . '.',
+                    'actions' => $this->mapAssistantActionsToOs($fallback['actions'] ?? []),
+                    'auto_open_action' => null,
+                    'refresh' => false,
+                    'thread_key' => $threadKey,
+                ]);
+            }
+
             return response()->json([
                 'success' => false,
-                'error' => $result['error'] ?? 'The Hatchers assistant could not respond right now.',
-            ], 502);
+                'error' => 'The Hatchers assistant could not respond right now. Support reference: ' . $reference . '.',
+            ], 500);
         }
-
-        $mappedActions = $this->mapAssistantActionsToOs($result['actions'] ?? []);
-        $thread = $timeline->record(
-            $founder,
-            $threadKey !== '' ? $threadKey : null,
-            $currentPage,
-            $message,
-            (string) ($result['reply'] ?? ''),
-            $mappedActions
-        );
-        $this->persistAssistantStrategicMemory($founder, $thread);
-
-        return response()->json([
-            'success' => true,
-            'reply' => $result['reply'] ?? '',
-            'actions' => $mappedActions,
-            'auto_open_action' => null,
-            'refresh' => false,
-            'thread_key' => (string) $thread->thread_key,
-        ]);
     }
 
     private function localAssistantReply(
