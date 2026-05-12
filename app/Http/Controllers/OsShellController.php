@@ -7461,6 +7461,11 @@ class OsShellController extends Controller
                 return $fallback;
             }
 
+            $heuristicFallback = $this->localAssistantHeuristicFallbackReply($founder, $message, $currentPage);
+            if ($heuristicFallback['ok']) {
+                return $heuristicFallback;
+            }
+
             return [
                 'ok' => false,
                 'error' => trim((string) data_get($response, '_meta.error', '')) !== ''
@@ -7473,6 +7478,73 @@ class OsShellController extends Controller
             'ok' => true,
             'reply' => $reply,
             'actions' => array_values(array_filter((array) ($response['actions'] ?? []), fn ($action) => is_array($action))),
+        ];
+    }
+
+    private function localAssistantHeuristicFallbackReply(Founder $founder, string $message, string $currentPage): array
+    {
+        $founder->loadMissing([
+            'company.intelligence',
+            'actionPlans' => fn ($query) => $query->latest()->limit(6),
+        ]);
+
+        $company = $founder->company;
+        $intelligence = $company?->intelligence;
+        $nextTask = $this->assistantNextPendingTaskSummary($founder);
+        $normalizedMessage = strtolower(trim($message));
+        $companyName = trim((string) ($company?->company_name ?? 'your business'));
+        $growthGoal = trim((string) ($intelligence?->primary_growth_goal ?? 'get more customers'));
+        $blockers = trim((string) ($intelligence?->known_blockers ?? ''));
+
+        if (in_array($normalizedMessage, ['hi', 'hello', 'hey', 'hello!', 'hey!'], true)) {
+            $reply = "Hi {$founder->full_name}, I’m here and I’ve still got the context for {$companyName}. "
+                . "Right now our focus is {$growthGoal}."
+                . ($nextTask !== '' ? " The next best move is: {$nextTask}." : '')
+                . " If you want, I can help you tighten the offer, improve the website, or break the next task into simpler steps.";
+
+            return [
+                'ok' => true,
+                'reply' => $reply,
+                'actions' => array_values(array_filter([
+                    $nextTask !== '' ? [
+                        'title' => 'Open Tasks',
+                        'reason' => 'See the next recommended task.',
+                        'cta' => 'Review tasks',
+                        'platform' => 'tasks',
+                    ] : null,
+                    [
+                        'title' => 'Improve Website',
+                        'reason' => 'Review or rebuild the website draft.',
+                        'cta' => 'Open website',
+                        'platform' => 'website',
+                    ],
+                ])),
+            ];
+        }
+
+        $reply = "I’m still here with your launch context for {$companyName}, but the live model reply failed just now. "
+            . "Based on what I know, I’d keep the focus on {$growthGoal}."
+            . ($blockers !== '' ? " The main blocker I’m tracking is {$blockers}." : '')
+            . ($nextTask !== '' ? " The clearest next step is: {$nextTask}." : '')
+            . " If you want, tell me whether you want help with the offer, the website, or the next task and I’ll guide you from there.";
+
+        return [
+            'ok' => true,
+            'reply' => $reply,
+            'actions' => [
+                [
+                    'title' => 'Open Tasks',
+                    'reason' => 'Continue execution from the launch plan.',
+                    'cta' => 'Go to tasks',
+                    'platform' => 'tasks',
+                ],
+                [
+                    'title' => 'Build My Website',
+                    'reason' => 'Review or improve the website workspace.',
+                    'cta' => 'Open website',
+                    'platform' => 'website',
+                ],
+            ],
         ];
     }
 

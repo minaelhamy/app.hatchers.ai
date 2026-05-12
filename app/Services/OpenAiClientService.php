@@ -146,20 +146,8 @@ class OpenAiClientService
                         'type' => 'json_object',
                     ],
                 ],
-                'input' => [
-                    [
-                        'role' => 'system',
-                        'content' => [
-                            ['type' => 'input_text', 'text' => $systemPrompt],
-                        ],
-                    ],
-                    [
-                        'role' => 'user',
-                        'content' => [
-                            ['type' => 'input_text', 'text' => $userPrompt],
-                        ],
-                    ],
-                ],
+                'instructions' => $systemPrompt,
+                'input' => $userPrompt,
             ];
         }
 
