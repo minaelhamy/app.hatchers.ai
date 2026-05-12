@@ -32,186 +32,19 @@
     $recentNotificationLabels = collect($notifications)->map(function ($item) {
         return $item['title'] ?? $item['body'] ?? $item['description'] ?? null;
     })->filter()->take(3)->values()->all();
-    $launchPlanTaskDestination = function (?array $task): array {
-        if (!$task) {
-            return [
-                'label' => 'Start first action',
-                'href' => route('founder.tasks'),
-            ];
-        }
-
-        $ctaUrl = trim((string) ($task['cta_url'] ?? ''));
-        $label = trim((string) ($task['cta_label'] ?? ''));
-        $haystack = strtolower(trim(implode(' ', array_filter([
-            (string) ($task['title'] ?? ''),
-            (string) ($task['description'] ?? ''),
-            (string) ($task['milestone'] ?? ''),
-        ]))));
-
-        $smartLabel = static function (string $text): string {
-            if (str_contains($text, 'write') || str_contains($text, 'copy') || str_contains($text, 'message') || str_contains($text, 'caption')) {
-                return 'Write with AI';
-            }
-            if (str_contains($text, 'build') || str_contains($text, 'page') || str_contains($text, 'website') || str_contains($text, 'offer')) {
-                return 'Build with AI';
-            }
-            if (str_contains($text, 'campaign') || str_contains($text, 'content') || str_contains($text, 'social')) {
-                return 'Open Marketing';
-            }
-            if (str_contains($text, 'product') || str_contains($text, 'pricing') || str_contains($text, 'checkout') || str_contains($text, 'commerce')) {
-                return 'Open Commerce';
-            }
-
-            return 'Continue in Hatchers';
-        };
-
-        if ($ctaUrl !== '') {
-            return [
-                'label' => $label !== '' ? $label : $smartLabel($haystack),
-                'href' => $ctaUrl,
-            ];
-        }
-
-        if (str_contains($haystack, 'website') || str_contains($haystack, 'landing page') || str_contains($haystack, 'page copy')) {
-            return ['label' => 'Build with AI', 'href' => route('website')];
-        }
-        if (str_contains($haystack, 'campaign') || str_contains($haystack, 'content') || str_contains($haystack, 'social')) {
-            return ['label' => 'Write with AI', 'href' => route('founder.marketing')];
-        }
-        if (str_contains($haystack, 'product') || str_contains($haystack, 'pricing') || str_contains($haystack, 'checkout') || str_contains($haystack, 'commerce')) {
-            return ['label' => 'Open Commerce', 'href' => route('founder.commerce')];
-        }
-
-        return [
-            'label' => $smartLabel($haystack),
-            'href' => route('founder.tasks'),
-        ];
-    };
     $launchPlanReady = $hasProject && (bool) ($launchPlanState['is_ready'] ?? false);
-    $pendingTaskEntries = collect($taskEntries)
-        ->filter(fn ($task) => ($task['status'] ?? 'pending') !== 'completed')
-        ->values();
-    $nextTask = $pendingTaskEntries->first() ?? ($taskEntries[0] ?? null);
     $estimatedWeeks = max(1, (int) data_get($launchPlanState, 'pace.estimated_weeks', count($launchMilestones) ?: 1));
     $hoursPerWeek = max(1, (int) data_get($launchPlanState, 'pace.hours_per_week', 4));
     $durationLabel = $estimatedWeeks === 1 ? '1 week sprint' : ($estimatedWeeks . ' week sprint');
     $durationLabel .= ' at ' . $hoursPerWeek . ' hour' . ($hoursPerWeek === 1 ? '' : 's') . ' per week';
-    $launchPlanPrimaryAction = $launchPlanTaskDestination($nextTask);
+    $launchPlanPrimaryAction = $launchPlanState['next_action'] ?? [];
     $launchPlanActionHref = (string) ($launchPlanPrimaryAction['href'] ?? route('founder.tasks'));
     $launchPlanActionLabel = (string) ($launchPlanPrimaryAction['label'] ?? 'Start first action');
-    $launchPlanActionText = trim((string) ($nextTask['title'] ?? $launchPlanState['weekly_focus'] ?? 'Open the next step in your launch plan.'));
-    $launchPlanActionDescription = trim((string) ($nextTask['description'] ?? $launchPlanState['summary'] ?? ''));
-    $nextTaskIndex = $nextTask ? array_search($nextTask, $taskEntries, true) : false;
-    $launchPlanActionWeek = 'Week ' . max(1, (int) ceil(((is_int($nextTaskIndex) ? $nextTaskIndex : 0) + 1) / 2));
-    $launchPlanActionTime = $nextTask && !empty($nextTask['available_on'])
-        ? 'Available ' . \Carbon\Carbon::parse($nextTask['available_on'])->format('M j')
-        : 'Follow the highest-impact next step';
-    $launchPlanPhases = [];
-    $globalWeekNumber = 1;
-
-    foreach ($launchMilestones as $milestoneIndex => $milestone) {
-        $milestoneTitle = trim((string) ($milestone['title'] ?? ('Phase ' . ($milestoneIndex + 1))));
-        $milestoneObjective = trim((string) ($milestone['objective'] ?? ''));
-        $milestoneMetric = trim((string) ($milestone['north_star_metric'] ?? ''));
-        $milestoneHours = (int) ($milestone['estimated_hours'] ?? 0);
-        $milestoneTasks = collect($taskEntries)
-            ->filter(function ($task) use ($milestoneTitle) {
-                return strcasecmp(trim((string) ($task['milestone'] ?? '')), $milestoneTitle) === 0;
-            })
-            ->values();
-
-        $taskChunks = $milestoneTasks->isNotEmpty()
-            ? $milestoneTasks->chunk(2)
-            : collect([collect([])]);
-
-        $weeks = [];
-        foreach ($taskChunks as $chunkIndex => $chunk) {
-            $actionLines = $chunk->map(function ($task) {
-                $title = trim((string) ($task['title'] ?? ''));
-                $description = trim((string) ($task['description'] ?? ''));
-
-                return $description !== ''
-                    ? $title . ' — ' . $description
-                    : $title;
-            })->filter()->values()->all();
-
-            if (empty($actionLines) && $milestoneObjective !== '') {
-                $actionLines[] = $milestoneObjective;
-            }
-
-            $sections = [];
-            if ($chunkIndex === 0 && $milestoneObjective !== '') {
-                $sections[] = ['label' => 'Goal', 'acts' => [$milestoneObjective]];
-            }
-            if (!empty($actionLines)) {
-                $sections[] = ['label' => 'Actions', 'acts' => $actionLines];
-            }
-            if ($chunkIndex === 0 && $milestoneMetric !== '') {
-                $sections[] = ['label' => 'Success metric', 'acts' => [$milestoneMetric]];
-            }
-
-            $tools = $chunk->map(function ($task) {
-                $label = trim((string) ($task['cta_label'] ?? ''));
-                return $label !== '' ? $label : null;
-            })->filter()->unique()->values()->all();
-
-            $kpis = array_values(array_filter([
-                $milestoneMetric !== '' ? ['value' => $milestoneMetric, 'label' => 'North star'] : null,
-                $milestoneHours > 0 ? ['value' => $milestoneHours . 'h', 'label' => 'Planned'] : null,
-            ]));
-
-            $weeks[] = [
-                'number' => 'Week ' . $globalWeekNumber,
-                'goal' => $chunkIndex === 0 ? ($milestoneTitle !== '' ? $milestoneTitle : 'Launch phase') : ('Keep executing ' . $milestoneTitle),
-                'sections' => $sections,
-                'tools' => $tools,
-                'kpis' => $kpis,
-            ];
-
-            $globalWeekNumber++;
-        }
-
-        $phaseStartWeek = max(1, $globalWeekNumber - count($weeks));
-        $phaseEndWeek = max($phaseStartWeek, $globalWeekNumber - 1);
-        $phaseWeekLabel = $phaseStartWeek === $phaseEndWeek
-            ? ('Wk ' . $phaseStartWeek)
-            : ('Wks ' . $phaseStartWeek . '–' . $phaseEndWeek);
-
-        $launchPlanPhases[] = [
-            'label' => 'Phase ' . ($milestoneIndex + 1),
-            'sub' => $phaseWeekLabel . ' · ' . ($milestoneTitle !== '' ? $milestoneTitle : 'Launch phase'),
-            'title' => $milestoneTitle !== '' ? $milestoneTitle : ('Phase ' . ($milestoneIndex + 1)),
-            'objective' => $milestoneObjective,
-            'weeks' => $weeks,
-        ];
-    }
-
-    if (empty($launchPlanPhases) && $launchPlanReady) {
-        $launchPlanPhases[] = [
-            'label' => 'Phase 1',
-            'sub' => 'Wk 1 · Launch plan',
-            'title' => 'Launch plan',
-            'objective' => (string) ($launchPlanState['weekly_focus'] ?? ''),
-            'weeks' => [[
-                'number' => 'Week 1',
-                'goal' => (string) ($launchPlanState['weekly_focus'] ?? 'Start with the highest-impact next step.'),
-                'sections' => [[
-                    'label' => 'Focus',
-                    'acts' => array_values(array_filter([
-                        (string) ($launchPlanState['summary'] ?? ''),
-                        (string) ($launchPlanState['weekly_focus'] ?? ''),
-                    ])),
-                ]],
-                'tools' => [],
-                'kpis' => collect($launchPlanState['north_star_metrics'] ?? [])
-                    ->filter()
-                    ->take(2)
-                    ->map(fn ($metric) => ['value' => (string) $metric, 'label' => 'North star'])
-                    ->values()
-                    ->all(),
-            ]],
-        ];
-    }
+    $launchPlanActionText = trim((string) ($launchPlanPrimaryAction['text'] ?? $launchPlanState['weekly_focus'] ?? 'Open the next step in your launch plan.'));
+    $launchPlanActionDescription = trim((string) ($launchPlanPrimaryAction['description'] ?? $launchPlanState['summary'] ?? ''));
+    $launchPlanActionWeek = (string) ($launchPlanPrimaryAction['week'] ?? 'Week 1');
+    $launchPlanActionTime = (string) ($launchPlanPrimaryAction['time'] ?? 'Follow the highest-impact next step');
+    $launchPlanPhases = array_values((array) ($launchPlanState['phases'] ?? []));
 @endphp
 
 @section('head')

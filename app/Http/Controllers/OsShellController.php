@@ -293,6 +293,10 @@ class OsShellController extends Controller
             ]);
         }
 
+        if ($this->companyIntelligenceWizardState($user)['is_complete']) {
+            $this->ensureFounderLaunchPlanReady($user);
+        }
+
         return view('os.dashboard', [
             'pageTitle' => 'Founder Dashboard',
             'dashboard' => $founderDashboardService->build($user),
@@ -3586,6 +3590,107 @@ class OsShellController extends Controller
             ->with('error', 'Complete Company Intelligence before using the rest of Hatchers OS.');
     }
 
+    private function ensureFounderLaunchPlanReady(Founder $founder): array
+    {
+        $founder->loadMissing([
+            'company.intelligence',
+            'company.businessBrief',
+            'company.icpProfiles',
+            'company.verticalBlueprint',
+            'businessBrief',
+            'icpProfiles',
+            'weeklyState',
+            'launchSystems',
+        ]);
+
+        $company = $founder->company;
+        if (!$company) {
+            return ['ok' => false, 'reason' => 'missing_company'];
+        }
+
+        $existing = $founder->launchSystems()
+            ->whereNotNull('launch_strategy_json')
+            ->latest('id')
+            ->first();
+
+        if ($existing && !empty($existing->launch_strategy_json)) {
+            $launchChatTaskCount = $founder->actionPlans()
+                ->where('context', 'task')
+                ->where('metadata_json->source', 'launch_chat')
+                ->count();
+
+            if ($launchChatTaskCount === 0) {
+                $strategy = is_array($existing->launch_strategy_json) ? $existing->launch_strategy_json : [];
+                $tasks = array_values((array) ($strategy['tasks'] ?? []));
+                if ($tasks !== []) {
+                    $this->seedFounderLaunchPlanTasksFromStrategy($founder, $strategy, $tasks);
+                }
+            }
+
+            return ['ok' => true, 'created' => false, 'launch_system_id' => $existing->id];
+        }
+
+        if (!$this->companyIntelligenceWizardState($founder)['is_complete']) {
+            return ['ok' => false, 'reason' => 'company_intelligence_incomplete'];
+        }
+
+        $signupProfile = $this->launchPlanSignupProfileFromFounderContext($founder, $company);
+        $deducedProfile = $this->launchPlanDeducedProfileFromFounderContext($founder, $company, $signupProfile);
+        $blueprint = $this->upsertVerticalBlueprint((string) $deducedProfile['vertical_blueprint']);
+        $launchPlan = $this->buildFounderLaunchPlan($signupProfile, $deducedProfile, $blueprint);
+
+        DB::transaction(function () use ($founder, $company, $signupProfile, $deducedProfile, $blueprint, $launchPlan) {
+            $this->persistFounderLaunchPlanArtifacts($founder, $company, $signupProfile, $deducedProfile, $blueprint, $launchPlan, false);
+        });
+
+        $this->syncFounderBusinessContextModels($founder->fresh(), $company->fresh());
+        app(FounderModuleSyncService::class)->syncFounder(
+            $founder->fresh(['company.intelligence', 'company.businessBrief', 'company.icpProfiles']),
+            'all'
+        );
+
+        return ['ok' => true, 'created' => true];
+    }
+
+    private function seedFounderLaunchPlanTasksFromStrategy(Founder $founder, array $launchPlan, array $tasks): void
+    {
+        FounderActionPlan::query()
+            ->where('founder_id', $founder->id)
+            ->where('context', 'task')
+            ->where('metadata_json->source', 'launch_chat')
+            ->delete();
+
+        foreach ($tasks as $index => $task) {
+            FounderActionPlan::create([
+                'founder_id' => $founder->id,
+                'title' => (string) ($task['title'] ?? 'Launch task'),
+                'description' => (string) ($task['description'] ?? ''),
+                'platform' => (string) ($task['platform'] ?? 'os'),
+                'context' => 'task',
+                'priority' => max(45, 95 - ($index * 3)),
+                'status' => 'pending',
+                'cta_label' => (string) ($task['cta_label'] ?? 'Open'),
+                'cta_url' => (string) ($task['cta_url'] ?? route('founder.tasks')),
+                'available_on' => $task['available_on'] ?? now()->toDateString(),
+                'metadata_json' => [
+                    'source' => 'launch_chat',
+                    'milestone' => (string) ($task['milestone'] ?? ''),
+                    'north_star_metric' => (string) ($task['north_star_metric'] ?? ''),
+                ],
+            ]);
+        }
+
+        FounderWeeklyState::updateOrCreate(
+            ['founder_id' => $founder->id],
+            [
+                'weekly_focus' => (string) ($launchPlan['weekly_focus'] ?? ''),
+                'open_tasks' => count($tasks),
+                'weekly_progress_percent' => 0,
+                'state_updated_at' => now(),
+            ]
+        );
+    }
+
     private function syncFounderBusinessContextModels(Founder $founder, Company $company): void
     {
         $company->loadMissing('intelligence', 'verticalBlueprint', 'businessBrief', 'icpProfiles');
@@ -6842,149 +6947,7 @@ class OsShellController extends Controller
         $launchPlan = $this->buildFounderLaunchPlan($signupProfile, $deducedProfile, $blueprint);
 
         DB::transaction(function () use ($founder, $company, $signupProfile, $deducedProfile, $blueprint, $launchPlan) {
-            $projectName = trim((string) ($signupProfile['company_name'] ?? ''));
-
-            $founder->forceFill([
-                'full_name' => $projectName !== '' && trim((string) $founder->full_name) === $this->placeholderFounderNameFromEmail((string) $founder->email)
-                    ? $this->placeholderFounderNameFromEmail((string) $founder->email)
-                    : (string) $founder->full_name,
-            ])->save();
-
-            $company->forceFill([
-                'company_name' => $projectName !== '' ? $projectName : (string) $company->company_name,
-                'business_model' => (string) $signupProfile['business_model'],
-                'vertical_blueprint_id' => $blueprint->id,
-                'industry' => (string) ($deducedProfile['industry'] ?? ''),
-                'stage' => (string) $signupProfile['stage'],
-                'primary_city' => (string) ($deducedProfile['primary_city'] ?? ''),
-                'service_radius' => (string) ($deducedProfile['service_radius'] ?? ''),
-                'primary_goal' => (string) $signupProfile['primary_growth_goal'],
-                'launch_stage' => 'launch_plan_ready',
-                'website_generation_status' => 'queued',
-                'website_status' => 'not_started',
-                'company_brief' => (string) $signupProfile['company_description'],
-            ])->save();
-
-            FounderBusinessBrief::updateOrCreate(
-                ['founder_id' => $founder->id, 'company_id' => $company->id],
-                [
-                    'vertical_blueprint_id' => $blueprint->id,
-                    'business_name' => (string) $company->company_name,
-                    'business_summary' => (string) $signupProfile['company_description'],
-                    'problem_solved' => (string) ($deducedProfile['problem_solved'] ?? ''),
-                    'core_offer' => (string) ($deducedProfile['core_offer'] ?? ''),
-                    'business_type_detail' => (string) $blueprint->name,
-                    'location_city' => (string) ($deducedProfile['primary_city'] ?? ''),
-                    'location_country' => (string) ($deducedProfile['location_country'] ?? ''),
-                    'service_radius' => (string) ($deducedProfile['service_radius'] ?? ''),
-                    'delivery_scope' => (string) ($deducedProfile['service_radius'] ?? ''),
-                    'proof_points' => (string) ($deducedProfile['differentiators'] ?? ''),
-                    'founder_story' => (string) $signupProfile['company_description'],
-                    'constraints_json' => [
-                        'known_blockers' => (string) $signupProfile['known_blockers'],
-                        'budget_strategy' => (string) $signupProfile['budget_strategy'],
-                        'time_commitment' => (string) $signupProfile['time_commitment'],
-                        'hours_per_week' => (int) $launchPlan['pace']['hours_per_week'],
-                    ],
-                    'status' => 'captured',
-                ]
-            );
-
-            FounderIcpProfile::updateOrCreate(
-                ['founder_id' => $founder->id, 'company_id' => $company->id],
-                [
-                    'primary_icp_name' => (string) ($deducedProfile['primary_icp_name'] ?? 'Ideal customer'),
-                    'pain_points_json' => array_values((array) ($deducedProfile['pain_points'] ?? [])),
-                    'desired_outcomes_json' => array_values((array) ($deducedProfile['desired_outcomes'] ?? [])),
-                    'buying_triggers_json' => array_values((array) ($deducedProfile['desired_outcomes'] ?? [])),
-                    'objections_json' => array_values((array) ($deducedProfile['objections'] ?? [])),
-                    'price_sensitivity' => 'unknown',
-                    'primary_channels_json' => $launchPlan['channels'],
-                    'local_area_focus_json' => array_values(array_filter([(string) ($deducedProfile['primary_city'] ?? '')])),
-                    'language_style' => (string) ($deducedProfile['brand_voice'] ?? ''),
-                ]
-            );
-
-            CompanyIntelligence::updateOrCreate(
-                ['company_id' => $company->id],
-                [
-                    'target_audience' => (string) ($deducedProfile['target_audience'] ?? ''),
-                    'ideal_customer_profile' => (string) $signupProfile['ideal_customer_profile'],
-                    'primary_icp_name' => (string) ($deducedProfile['primary_icp_name'] ?? ''),
-                    'problem_solved' => (string) ($deducedProfile['problem_solved'] ?? ''),
-                    'brand_voice' => (string) ($deducedProfile['brand_voice'] ?? ''),
-                    'differentiators' => (string) ($deducedProfile['differentiators'] ?? ''),
-                    'content_goals' => implode(', ', array_values((array) ($launchPlan['north_star_metrics'] ?? []))),
-                    'visual_style' => (string) $launchPlan['visual_direction'],
-                    'core_offer' => (string) ($deducedProfile['core_offer'] ?? ''),
-                    'primary_growth_goal' => (string) $signupProfile['primary_growth_goal'],
-                    'known_blockers' => (string) $signupProfile['known_blockers'],
-                    'objections' => implode(', ', array_values((array) ($deducedProfile['objections'] ?? []))),
-                    'buying_triggers' => implode(', ', array_values((array) ($deducedProfile['desired_outcomes'] ?? []))),
-                    'local_market_notes' => $this->localMarketNotesFromProfile($deducedProfile),
-                    'last_summary' => (string) $launchPlan['summary'],
-                    'intelligence_updated_at' => now(),
-                ]
-            );
-
-            FounderLaunchSystem::updateOrCreate(
-                ['founder_id' => $founder->id, 'company_id' => $company->id],
-                [
-                    'vertical_blueprint_id' => $blueprint->id,
-                    'status' => 'ready',
-                    'selected_engine' => (string) $blueprint->engine,
-                    'launch_strategy_json' => $launchPlan,
-                    'funnel_blocks_json' => $launchPlan['assets'],
-                    'offer_stack_json' => $launchPlan['offer_stack'],
-                    'acquisition_system_json' => [
-                        'channel_strategy' => $launchPlan['channel_strategy'],
-                        'budget_strategy' => $signupProfile['budget_strategy'],
-                        'channels' => $launchPlan['channels'],
-                    ],
-                    'applied_at' => now(),
-                    'last_reviewed_at' => now(),
-                ]
-            );
-
-            FounderActionPlan::query()
-                ->where('founder_id', $founder->id)
-                ->where('context', 'task')
-                ->where(function ($query) {
-                    $query->where('title', 'Complete your founder chat')
-                        ->orWhere('metadata_json->source', 'launch_chat');
-                })
-                ->delete();
-
-            foreach ($launchPlan['tasks'] as $index => $task) {
-                FounderActionPlan::create([
-                    'founder_id' => $founder->id,
-                    'title' => (string) $task['title'],
-                    'description' => (string) $task['description'],
-                    'platform' => (string) $task['platform'],
-                    'context' => 'task',
-                    'priority' => max(45, 95 - ($index * 3)),
-                    'status' => 'pending',
-                    'cta_label' => (string) $task['cta_label'],
-                    'cta_url' => (string) $task['cta_url'],
-                    'available_on' => $task['available_on'] ?? now()->toDateString(),
-                    'metadata_json' => [
-                        'source' => 'launch_chat',
-                        'milestone' => (string) $task['milestone'],
-                        'north_star_metric' => (string) $task['north_star_metric'],
-                    ],
-                ]);
-            }
-
-            FounderWeeklyState::updateOrCreate(
-                ['founder_id' => $founder->id],
-                [
-                    'weekly_focus' => (string) $launchPlan['weekly_focus'],
-                    'open_tasks' => count($launchPlan['tasks']),
-                    'weekly_progress_percent' => 0,
-                    'state_updated_at' => now(),
-                ]
-            );
-
+            $this->persistFounderLaunchPlanArtifacts($founder, $company, $signupProfile, $deducedProfile, $blueprint, $launchPlan, true);
             $this->syncFounderBusinessContextModels($founder, $company);
         });
 
@@ -7312,6 +7275,8 @@ class OsShellController extends Controller
             ];
         }
 
+        $launchPlanEnsureResult = $this->ensureFounderLaunchPlanReady($founder);
+
         $founder->loadMissing([
             'company.intelligence',
             'company.businessBrief',
@@ -7410,6 +7375,9 @@ class OsShellController extends Controller
                 'buying_triggers' => (string) ($intelligence?->buying_triggers ?? ''),
                 'local_market_notes' => (string) ($intelligence?->local_market_notes ?? ''),
                 'last_summary' => (string) ($intelligence?->last_summary ?? ''),
+                'launch_plan_status' => ($launchPlanEnsureResult['ok'] ?? false)
+                    ? (($launchPlanEnsureResult['created'] ?? false) ? 'generated_now' : 'ready')
+                    : (string) ($launchPlanEnsureResult['reason'] ?? 'missing'),
             ],
             'onboarding_memory' => [
                 'founder_story' => (string) ($businessBrief?->founder_story ?? ''),
@@ -8996,7 +8964,7 @@ class OsShellController extends Controller
             $launchPlan['summary'] = trim((string) ($launchPlan['summary'] ?? '') . ' The founder has shown repeated interest in campaign execution, so the next sprint should include a stronger campaign angle handoff.');
         }
 
-        return $launchPlan;
+        return $this->authorLaunchPlanPresentation($launchPlan);
     }
 
     private function splitIntelligenceCsv(string $value): array
@@ -11354,16 +11322,440 @@ class OsShellController extends Controller
             ->values()
             ->all();
 
+        $milestones = array_values((array) ($strategy['milestones'] ?? []));
+        $pace = is_array($strategy['pace'] ?? null) ? $strategy['pace'] : [];
+
         return [
             'is_ready' => !empty($strategy),
             'title' => (string) ($strategy['title'] ?? 'Your launch plan'),
             'summary' => (string) ($strategy['summary'] ?? ''),
             'weekly_focus' => (string) ($strategy['weekly_focus'] ?? ''),
             'north_star_metrics' => array_values((array) ($strategy['north_star_metrics'] ?? [])),
-            'milestones' => array_values((array) ($strategy['milestones'] ?? [])),
-            'pace' => is_array($strategy['pace'] ?? null) ? $strategy['pace'] : [],
+            'milestones' => $milestones,
+            'pace' => $pace,
             'tasks' => $tasks,
+            'next_action' => is_array($strategy['next_action'] ?? null) && !empty($strategy['next_action'])
+                ? $strategy['next_action']
+                : $this->launchPlanNextActionState($tasks, $strategy),
+            'phases' => is_array($strategy['phases'] ?? null) && !empty($strategy['phases'])
+                ? array_values((array) $strategy['phases'])
+                : $this->launchPlanPhasesState($milestones, $tasks, $strategy),
         ];
+    }
+
+    private function launchPlanNextActionState(array $tasks, array $strategy): array
+    {
+        $nextTask = collect($tasks)
+            ->first(fn (array $task) => ($task['status'] ?? 'pending') !== 'completed')
+            ?? ($tasks[0] ?? null);
+
+        $destination = $this->launchPlanTaskDestination($nextTask);
+        $taskIndex = $nextTask ? array_search($nextTask, $tasks, true) : false;
+
+        return [
+            'label' => (string) ($destination['label'] ?? 'Start first action'),
+            'href' => (string) ($destination['href'] ?? route('founder.tasks')),
+            'text' => trim((string) ($nextTask['title'] ?? ($strategy['weekly_focus'] ?? 'Open the next step in your launch plan.'))),
+            'description' => trim((string) ($nextTask['description'] ?? ($strategy['summary'] ?? ''))),
+            'week' => 'Week ' . max(1, (int) ceil(((is_int($taskIndex) ? $taskIndex : 0) + 1) / 2)),
+            'time' => $nextTask && !empty($nextTask['available_on'])
+                ? 'Available ' . \Illuminate\Support\Carbon::parse((string) $nextTask['available_on'])->format('M j')
+                : 'Follow the highest-impact next step',
+        ];
+    }
+
+    private function launchPlanPhasesState(array $milestones, array $tasks, array $strategy): array
+    {
+        $phases = [];
+        $globalWeekNumber = 1;
+
+        foreach ($milestones as $milestoneIndex => $milestone) {
+            $milestoneTitle = trim((string) ($milestone['title'] ?? ('Phase ' . ($milestoneIndex + 1))));
+            $milestoneObjective = trim((string) ($milestone['objective'] ?? ''));
+            $milestoneMetric = trim((string) ($milestone['north_star_metric'] ?? ''));
+            $milestoneHours = (int) ($milestone['estimated_hours'] ?? 0);
+            $milestoneTasks = collect($tasks)
+                ->filter(function (array $task) use ($milestoneTitle) {
+                    return strcasecmp(trim((string) ($task['milestone'] ?? '')), $milestoneTitle) === 0;
+                })
+                ->values();
+
+            $taskChunks = $milestoneTasks->isNotEmpty()
+                ? $milestoneTasks->chunk(2)
+                : collect([collect([])]);
+
+            $weeks = [];
+            foreach ($taskChunks as $chunkIndex => $chunk) {
+                $actionLines = $chunk->map(function (array $task) {
+                    $title = trim((string) ($task['title'] ?? ''));
+                    $description = trim((string) ($task['description'] ?? ''));
+
+                    return $description !== '' ? ($title . ' — ' . $description) : $title;
+                })->filter()->values()->all();
+
+                if (empty($actionLines) && $milestoneObjective !== '') {
+                    $actionLines[] = $milestoneObjective;
+                }
+
+                $sections = [];
+                if ($chunkIndex === 0 && $milestoneObjective !== '') {
+                    $sections[] = ['label' => 'Goal', 'acts' => [$milestoneObjective]];
+                }
+                if (!empty($actionLines)) {
+                    $sections[] = ['label' => 'Actions', 'acts' => $actionLines];
+                }
+                if ($chunkIndex === 0 && $milestoneMetric !== '') {
+                    $sections[] = ['label' => 'Success metric', 'acts' => [$milestoneMetric]];
+                }
+
+                $tools = $chunk->map(function (array $task) {
+                    $label = trim((string) ($task['cta_label'] ?? ''));
+                    return $label !== '' ? $label : null;
+                })->filter()->unique()->values()->all();
+
+                $kpis = array_values(array_filter([
+                    $milestoneMetric !== '' ? ['value' => $milestoneMetric, 'label' => 'North star'] : null,
+                    $milestoneHours > 0 ? ['value' => $milestoneHours . 'h', 'label' => 'Planned'] : null,
+                ]));
+
+                $weeks[] = [
+                    'number' => 'Week ' . $globalWeekNumber,
+                    'goal' => $chunkIndex === 0
+                        ? ($milestoneTitle !== '' ? $milestoneTitle : 'Launch phase')
+                        : ('Keep executing ' . $milestoneTitle),
+                    'sections' => $sections,
+                    'tools' => $tools,
+                    'kpis' => $kpis,
+                ];
+
+                $globalWeekNumber++;
+            }
+
+            $phaseStartWeek = max(1, $globalWeekNumber - count($weeks));
+            $phaseEndWeek = max($phaseStartWeek, $globalWeekNumber - 1);
+            $phaseWeekLabel = $phaseStartWeek === $phaseEndWeek
+                ? ('Wk ' . $phaseStartWeek)
+                : ('Wks ' . $phaseStartWeek . '–' . $phaseEndWeek);
+
+            $phases[] = [
+                'label' => 'Phase ' . ($milestoneIndex + 1),
+                'sub' => $phaseWeekLabel . ' · ' . ($milestoneTitle !== '' ? $milestoneTitle : 'Launch phase'),
+                'title' => $milestoneTitle !== '' ? $milestoneTitle : ('Phase ' . ($milestoneIndex + 1)),
+                'objective' => $milestoneObjective,
+                'weeks' => $weeks,
+            ];
+        }
+
+        if ($phases !== []) {
+            return $phases;
+        }
+
+        return [[
+            'label' => 'Phase 1',
+            'sub' => 'Wk 1 · Launch plan',
+            'title' => 'Launch plan',
+            'objective' => (string) ($strategy['weekly_focus'] ?? ''),
+            'weeks' => [[
+                'number' => 'Week 1',
+                'goal' => (string) ($strategy['weekly_focus'] ?? 'Start with the highest-impact next step.'),
+                'sections' => [[
+                    'label' => 'Focus',
+                    'acts' => array_values(array_filter([
+                        (string) ($strategy['summary'] ?? ''),
+                        (string) ($strategy['weekly_focus'] ?? ''),
+                    ])),
+                ]],
+                'tools' => [],
+                'kpis' => collect($strategy['north_star_metrics'] ?? [])
+                    ->filter()
+                    ->take(2)
+                    ->map(fn ($metric) => ['value' => (string) $metric, 'label' => 'North star'])
+                    ->values()
+                    ->all(),
+            ]],
+        ]];
+    }
+
+    private function launchPlanTaskDestination(?array $task): array
+    {
+        if (!$task) {
+            return [
+                'label' => 'Start first action',
+                'href' => route('founder.tasks'),
+            ];
+        }
+
+        $ctaUrl = trim((string) ($task['cta_url'] ?? ''));
+        $label = trim((string) ($task['cta_label'] ?? ''));
+        $haystack = strtolower(trim(implode(' ', array_filter([
+            (string) ($task['title'] ?? ''),
+            (string) ($task['description'] ?? ''),
+            (string) ($task['milestone'] ?? ''),
+        ]))));
+
+        if ($ctaUrl !== '') {
+            return [
+                'label' => $label !== '' ? $label : $this->launchPlanTaskActionLabel($haystack),
+                'href' => $ctaUrl,
+            ];
+        }
+
+        if (str_contains($haystack, 'website') || str_contains($haystack, 'landing page') || str_contains($haystack, 'page copy')) {
+            return ['label' => 'Build with AI', 'href' => route('website')];
+        }
+        if (str_contains($haystack, 'campaign') || str_contains($haystack, 'content') || str_contains($haystack, 'social')) {
+            return ['label' => 'Write with AI', 'href' => route('founder.marketing')];
+        }
+        if (str_contains($haystack, 'product') || str_contains($haystack, 'pricing') || str_contains($haystack, 'checkout') || str_contains($haystack, 'commerce')) {
+            return ['label' => 'Open Commerce', 'href' => route('founder.commerce')];
+        }
+
+        return [
+            'label' => $this->launchPlanTaskActionLabel($haystack),
+            'href' => route('founder.tasks'),
+        ];
+    }
+
+    private function launchPlanTaskActionLabel(string $haystack): string
+    {
+        if (str_contains($haystack, 'write') || str_contains($haystack, 'copy') || str_contains($haystack, 'message') || str_contains($haystack, 'caption')) {
+            return 'Write with AI';
+        }
+        if (str_contains($haystack, 'build') || str_contains($haystack, 'page') || str_contains($haystack, 'website') || str_contains($haystack, 'offer')) {
+            return 'Build with AI';
+        }
+        if (str_contains($haystack, 'campaign') || str_contains($haystack, 'content') || str_contains($haystack, 'social')) {
+            return 'Open Marketing';
+        }
+        if (str_contains($haystack, 'product') || str_contains($haystack, 'pricing') || str_contains($haystack, 'checkout') || str_contains($haystack, 'commerce')) {
+            return 'Open Commerce';
+        }
+
+        return 'Continue in Hatchers';
+    }
+
+    private function launchPlanSignupProfileFromFounderContext(Founder $founder, Company $company): array
+    {
+        $intelligence = $company->intelligence;
+        $businessBrief = $founder->businessBrief ?? $company->businessBrief;
+        $icpProfile = $founder->icpProfiles->sortByDesc('updated_at')->first()
+            ?? $company->icpProfiles()->latest()->first();
+        $constraints = is_array($businessBrief?->constraints_json ?? null) ? $businessBrief->constraints_json : [];
+
+        $businessDescription = trim((string) ($businessBrief?->business_summary
+            ?? $company->company_brief
+            ?? $intelligence?->problem_solved
+            ?? ''));
+        $idealCustomer = trim((string) ($intelligence?->ideal_customer_profile
+            ?? $intelligence?->primary_icp_name
+            ?? $icpProfile?->primary_icp_name
+            ?? ''));
+
+        return [
+            'company_name' => trim((string) ($company->company_name ?? '')),
+            'company_description' => $businessDescription,
+            'ideal_customer_profile' => $idealCustomer,
+            'business_model' => (string) ($company->business_model ?? 'service'),
+            'stage' => (string) ($company->stage ?? 'idea'),
+            'primary_growth_goal' => (string) ($intelligence?->primary_growth_goal ?? 'Build a stronger brand presence'),
+            'known_blockers' => (string) ($intelligence?->known_blockers ?? ($constraints['known_blockers'] ?? 'No clear offer yet')),
+            'budget_strategy' => (string) ($constraints['budget_strategy'] ?? 'organic'),
+            'time_commitment' => (string) ($constraints['time_commitment'] ?? 'mid'),
+        ];
+    }
+
+    private function launchPlanDeducedProfileFromFounderContext(Founder $founder, Company $company, array $signupProfile): array
+    {
+        $intelligence = $company->intelligence;
+        $businessBrief = $founder->businessBrief ?? $company->businessBrief;
+        $icpProfile = $founder->icpProfiles->sortByDesc('updated_at')->first()
+            ?? $company->icpProfiles()->latest()->first();
+        $fallback = $this->fallbackFounderSignupProfile($signupProfile);
+
+        $blueprintCode = (string) ($company->verticalBlueprint->code
+            ?? data_get($businessBrief?->constraints_json, 'vertical_blueprint')
+            ?? $fallback['vertical_blueprint']);
+        if (!array_key_exists($blueprintCode, $this->verticalBlueprintDefinitions())) {
+            $blueprintCode = $fallback['vertical_blueprint'];
+        }
+
+        return $this->normalizeFounderSignupProfile($signupProfile, array_merge($fallback, [
+            'vertical_blueprint' => $blueprintCode,
+            'industry' => (string) ($company->industry ?? $fallback['industry']),
+            'target_audience' => (string) ($intelligence?->target_audience ?? $fallback['target_audience']),
+            'primary_icp_name' => (string) ($intelligence?->primary_icp_name ?? $icpProfile?->primary_icp_name ?? $fallback['primary_icp_name']),
+            'problem_solved' => (string) ($intelligence?->problem_solved ?? $businessBrief?->problem_solved ?? $fallback['problem_solved']),
+            'brand_voice' => (string) ($intelligence?->brand_voice ?? $fallback['brand_voice']),
+            'differentiators' => (string) ($intelligence?->differentiators ?? $businessBrief?->proof_points ?? $fallback['differentiators']),
+            'core_offer' => (string) ($intelligence?->core_offer ?? $businessBrief?->core_offer ?? $fallback['core_offer']),
+            'pain_points' => is_array($icpProfile?->pain_points_json ?? null) ? $icpProfile->pain_points_json : ($fallback['pain_points'] ?? []),
+            'desired_outcomes' => is_array($icpProfile?->desired_outcomes_json ?? null) ? $icpProfile->desired_outcomes_json : ($fallback['desired_outcomes'] ?? []),
+            'objections' => is_array($icpProfile?->objections_json ?? null) ? $icpProfile->objections_json : ($fallback['objections'] ?? []),
+            'primary_city' => (string) ($company->primary_city ?? $fallback['primary_city']),
+            'service_radius' => (string) ($company->service_radius ?? $fallback['service_radius']),
+            'location_country' => (string) ($businessBrief?->location_country ?? ''),
+        ]));
+    }
+
+    private function persistFounderLaunchPlanArtifacts(
+        Founder $founder,
+        Company $company,
+        array $signupProfile,
+        array $deducedProfile,
+        VerticalBlueprint $blueprint,
+        array $launchPlan,
+        bool $deleteOnboardingPromptTask
+    ): void {
+        $projectName = trim((string) ($signupProfile['company_name'] ?? ''));
+
+        $founder->forceFill([
+            'full_name' => $projectName !== '' && trim((string) $founder->full_name) === $this->placeholderFounderNameFromEmail((string) $founder->email)
+                ? $this->placeholderFounderNameFromEmail((string) $founder->email)
+                : (string) $founder->full_name,
+        ])->save();
+
+        $existingConstraints = is_array($founder->businessBrief?->constraints_json ?? null) ? $founder->businessBrief->constraints_json : [];
+
+        $company->forceFill([
+            'company_name' => $projectName !== '' ? $projectName : (string) $company->company_name,
+            'business_model' => (string) $signupProfile['business_model'],
+            'vertical_blueprint_id' => $blueprint->id,
+            'industry' => (string) ($deducedProfile['industry'] ?? ''),
+            'stage' => (string) $signupProfile['stage'],
+            'primary_city' => (string) ($deducedProfile['primary_city'] ?? ''),
+            'service_radius' => (string) ($deducedProfile['service_radius'] ?? ''),
+            'primary_goal' => (string) $signupProfile['primary_growth_goal'],
+            'launch_stage' => 'launch_plan_ready',
+            'website_generation_status' => 'queued',
+            'website_status' => 'not_started',
+            'company_brief' => (string) $signupProfile['company_description'],
+        ])->save();
+
+        FounderBusinessBrief::updateOrCreate(
+            ['founder_id' => $founder->id, 'company_id' => $company->id],
+            [
+                'vertical_blueprint_id' => $blueprint->id,
+                'business_name' => (string) $company->company_name,
+                'business_summary' => (string) $signupProfile['company_description'],
+                'problem_solved' => (string) ($deducedProfile['problem_solved'] ?? ''),
+                'core_offer' => (string) ($deducedProfile['core_offer'] ?? ''),
+                'business_type_detail' => (string) $blueprint->name,
+                'location_city' => (string) ($deducedProfile['primary_city'] ?? ''),
+                'location_country' => (string) ($deducedProfile['location_country'] ?? ''),
+                'service_radius' => (string) ($deducedProfile['service_radius'] ?? ''),
+                'delivery_scope' => (string) ($deducedProfile['service_radius'] ?? ''),
+                'proof_points' => (string) ($deducedProfile['differentiators'] ?? ''),
+                'founder_story' => (string) $signupProfile['company_description'],
+                'constraints_json' => array_merge($existingConstraints, [
+                    'known_blockers' => (string) $signupProfile['known_blockers'],
+                    'budget_strategy' => (string) $signupProfile['budget_strategy'],
+                    'time_commitment' => (string) $signupProfile['time_commitment'],
+                    'hours_per_week' => (int) $launchPlan['pace']['hours_per_week'],
+                    'vertical_blueprint' => (string) ($deducedProfile['vertical_blueprint'] ?? ''),
+                ]),
+                'status' => 'captured',
+            ]
+        );
+
+        FounderIcpProfile::updateOrCreate(
+            ['founder_id' => $founder->id, 'company_id' => $company->id],
+            [
+                'primary_icp_name' => (string) ($deducedProfile['primary_icp_name'] ?? 'Ideal customer'),
+                'pain_points_json' => array_values((array) ($deducedProfile['pain_points'] ?? [])),
+                'desired_outcomes_json' => array_values((array) ($deducedProfile['desired_outcomes'] ?? [])),
+                'buying_triggers_json' => array_values((array) ($deducedProfile['desired_outcomes'] ?? [])),
+                'objections_json' => array_values((array) ($deducedProfile['objections'] ?? [])),
+                'price_sensitivity' => 'unknown',
+                'primary_channels_json' => $launchPlan['channels'],
+                'local_area_focus_json' => array_values(array_filter([(string) ($deducedProfile['primary_city'] ?? '')])),
+                'language_style' => (string) ($deducedProfile['brand_voice'] ?? ''),
+            ]
+        );
+
+        CompanyIntelligence::updateOrCreate(
+            ['company_id' => $company->id],
+            [
+                'target_audience' => (string) ($deducedProfile['target_audience'] ?? ''),
+                'ideal_customer_profile' => (string) $signupProfile['ideal_customer_profile'],
+                'primary_icp_name' => (string) ($deducedProfile['primary_icp_name'] ?? ''),
+                'problem_solved' => (string) ($deducedProfile['problem_solved'] ?? ''),
+                'brand_voice' => (string) ($deducedProfile['brand_voice'] ?? ''),
+                'differentiators' => (string) ($deducedProfile['differentiators'] ?? ''),
+                'content_goals' => implode(', ', array_values((array) ($launchPlan['north_star_metrics'] ?? []))),
+                'visual_style' => (string) $launchPlan['visual_direction'],
+                'core_offer' => (string) ($deducedProfile['core_offer'] ?? ''),
+                'primary_growth_goal' => (string) $signupProfile['primary_growth_goal'],
+                'known_blockers' => (string) $signupProfile['known_blockers'],
+                'objections' => implode(', ', array_values((array) ($deducedProfile['objections'] ?? []))),
+                'buying_triggers' => implode(', ', array_values((array) ($deducedProfile['desired_outcomes'] ?? []))),
+                'local_market_notes' => $this->localMarketNotesFromProfile($deducedProfile),
+                'last_summary' => (string) $launchPlan['summary'],
+                'intelligence_updated_at' => now(),
+            ]
+        );
+
+        FounderLaunchSystem::updateOrCreate(
+            ['founder_id' => $founder->id, 'company_id' => $company->id],
+            [
+                'vertical_blueprint_id' => $blueprint->id,
+                'status' => 'ready',
+                'selected_engine' => (string) $blueprint->engine,
+                'launch_strategy_json' => $launchPlan,
+                'funnel_blocks_json' => $launchPlan['assets'],
+                'offer_stack_json' => $launchPlan['offer_stack'],
+                'acquisition_system_json' => [
+                    'channel_strategy' => $launchPlan['channel_strategy'],
+                    'budget_strategy' => $signupProfile['budget_strategy'],
+                    'channels' => $launchPlan['channels'],
+                ],
+                'applied_at' => now(),
+                'last_reviewed_at' => now(),
+            ]
+        );
+
+        FounderActionPlan::query()
+            ->where('founder_id', $founder->id)
+            ->where('context', 'task')
+            ->where(function ($query) use ($deleteOnboardingPromptTask) {
+                if ($deleteOnboardingPromptTask) {
+                    $query->where('title', 'Complete your founder chat')
+                        ->orWhere('metadata_json->source', 'launch_chat');
+                    return;
+                }
+
+                $query->where('metadata_json->source', 'launch_chat');
+            })
+            ->delete();
+
+        foreach ($launchPlan['tasks'] as $index => $task) {
+            FounderActionPlan::create([
+                'founder_id' => $founder->id,
+                'title' => (string) $task['title'],
+                'description' => (string) $task['description'],
+                'platform' => (string) $task['platform'],
+                'context' => 'task',
+                'priority' => max(45, 95 - ($index * 3)),
+                'status' => 'pending',
+                'cta_label' => (string) $task['cta_label'],
+                'cta_url' => (string) $task['cta_url'],
+                'available_on' => $task['available_on'] ?? now()->toDateString(),
+                'metadata_json' => [
+                    'source' => 'launch_chat',
+                    'milestone' => (string) $task['milestone'],
+                    'north_star_metric' => (string) $task['north_star_metric'],
+                ],
+            ]);
+        }
+
+        FounderWeeklyState::updateOrCreate(
+            ['founder_id' => $founder->id],
+            [
+                'weekly_focus' => (string) $launchPlan['weekly_focus'],
+                'open_tasks' => count($launchPlan['tasks']),
+                'weekly_progress_percent' => 0,
+                'state_updated_at' => now(),
+            ]
+        );
     }
 
     private function uniqueFounderUsernameFromSeed(string $seed): string
@@ -11608,7 +12000,7 @@ class OsShellController extends Controller
             }
         }
 
-        return [
+        $launchPlan = [
             'title' => $stage === 'idea'
                 ? 'Idea-to-demand launch plan'
                 : 'Growth sprint launch plan',
@@ -11642,6 +12034,148 @@ class OsShellController extends Controller
                 ? 'Sharp direct-response visuals with one clear CTA and channel-specific creative assets.'
                 : 'Trust-building visuals with credibility, human proof, and practical clarity over hype.',
         ];
+
+        return $this->authorLaunchPlanPresentation($launchPlan);
+    }
+
+    private function authorLaunchPlanPresentation(array $launchPlan): array
+    {
+        $milestones = array_values((array) ($launchPlan['milestones'] ?? []));
+        $tasks = array_values((array) ($launchPlan['tasks'] ?? []));
+        $effectiveHoursPerWeek = max(1, (int) data_get($launchPlan, 'pace.effective_hours_per_week', data_get($launchPlan, 'pace.hours_per_week', 4)));
+
+        $phases = [];
+        $globalWeekNumber = 1;
+
+        foreach ($milestones as $milestoneIndex => $milestone) {
+            $milestoneTitle = trim((string) ($milestone['title'] ?? ('Phase ' . ($milestoneIndex + 1))));
+            $milestoneObjective = trim((string) ($milestone['objective'] ?? ''));
+            $milestoneMetric = trim((string) ($milestone['north_star_metric'] ?? ''));
+            $milestoneHours = max(1, (int) ($milestone['estimated_hours'] ?? $effectiveHoursPerWeek));
+            $milestoneTasks = collect($tasks)
+                ->filter(fn (array $task) => strcasecmp(trim((string) ($task['milestone'] ?? '')), $milestoneTitle) === 0)
+                ->values();
+
+            $weekSpan = max(1, (int) ceil($milestoneHours / $effectiveHoursPerWeek));
+            $chunkSize = max(1, (int) ceil(max($milestoneTasks->count(), 1) / $weekSpan));
+            $taskChunks = $milestoneTasks->isNotEmpty()
+                ? $milestoneTasks->chunk($chunkSize)
+                : collect([collect([])]);
+
+            $weeks = [];
+            foreach ($taskChunks as $chunkIndex => $chunk) {
+                $phaseWeekNumber = $globalWeekNumber;
+                $weekGoal = $chunkIndex === 0
+                    ? ($milestoneObjective !== '' ? $milestoneObjective : $milestoneTitle)
+                    : ('Advance ' . $milestoneTitle . ' through execution and follow-up.');
+
+                $sections = [];
+                if ($chunkIndex === 0 && $milestoneObjective !== '') {
+                    $sections[] = [
+                        'label' => 'Goal',
+                        'acts' => [$milestoneObjective],
+                    ];
+                }
+
+                $actionLines = $chunk->map(function (array $task) {
+                    $title = trim((string) ($task['title'] ?? ''));
+                    $description = trim((string) ($task['description'] ?? ''));
+
+                    return $description !== '' ? ($title . ' — ' . $description) : $title;
+                })->filter()->values()->all();
+
+                if ($actionLines !== []) {
+                    $sections[] = [
+                        'label' => 'Actions',
+                        'acts' => $actionLines,
+                    ];
+                }
+
+                if ($milestoneMetric !== '') {
+                    $sections[] = [
+                        'label' => 'Success metric',
+                        'acts' => [$milestoneMetric],
+                    ];
+                }
+
+                $tools = $chunk->map(function (array $task) {
+                    $label = trim((string) ($task['cta_label'] ?? ''));
+                    return $label !== '' ? $label : null;
+                })->filter()->unique()->values()->all();
+
+                $kpis = array_values(array_filter([
+                    $milestoneMetric !== '' ? ['value' => $milestoneMetric, 'label' => 'North star'] : null,
+                    $milestoneHours > 0 ? ['value' => $milestoneHours . 'h', 'label' => 'Planned'] : null,
+                ]));
+
+                $weeks[] = [
+                    'number' => 'Week ' . $phaseWeekNumber,
+                    'goal' => $weekGoal,
+                    'sections' => $sections,
+                    'tools' => $tools,
+                    'kpis' => $kpis,
+                ];
+
+                foreach ($chunk as $chunkTaskIndex => $task) {
+                    $taskLookupIndex = array_search($task, $tasks, true);
+                    if (is_int($taskLookupIndex)) {
+                        $tasks[$taskLookupIndex]['phase_index'] = $milestoneIndex + 1;
+                        $tasks[$taskLookupIndex]['week_number'] = $phaseWeekNumber;
+                        $tasks[$taskLookupIndex]['week_goal'] = $weekGoal;
+                        $tasks[$taskLookupIndex]['week_position'] = $chunkTaskIndex + 1;
+                    }
+                }
+
+                $globalWeekNumber++;
+            }
+
+            $phaseStartWeek = max(1, $globalWeekNumber - count($weeks));
+            $phaseEndWeek = max($phaseStartWeek, $globalWeekNumber - 1);
+            $phaseWeekLabel = $phaseStartWeek === $phaseEndWeek
+                ? ('Wk ' . $phaseStartWeek)
+                : ('Wks ' . $phaseStartWeek . '–' . $phaseEndWeek);
+
+            $phases[] = [
+                'label' => 'Phase ' . ($milestoneIndex + 1),
+                'sub' => $phaseWeekLabel . ' · ' . ($milestoneTitle !== '' ? $milestoneTitle : 'Launch phase'),
+                'title' => $milestoneTitle !== '' ? $milestoneTitle : ('Phase ' . ($milestoneIndex + 1)),
+                'objective' => $milestoneObjective,
+                'weeks' => $weeks,
+            ];
+        }
+
+        if ($phases === []) {
+            $phases[] = [
+                'label' => 'Phase 1',
+                'sub' => 'Wk 1 · Launch plan',
+                'title' => 'Launch plan',
+                'objective' => (string) ($launchPlan['weekly_focus'] ?? ''),
+                'weeks' => [[
+                    'number' => 'Week 1',
+                    'goal' => (string) ($launchPlan['weekly_focus'] ?? 'Start with the highest-impact next step.'),
+                    'sections' => [[
+                        'label' => 'Focus',
+                        'acts' => array_values(array_filter([
+                            (string) ($launchPlan['summary'] ?? ''),
+                            (string) ($launchPlan['weekly_focus'] ?? ''),
+                        ])),
+                    ]],
+                    'tools' => [],
+                    'kpis' => collect($launchPlan['north_star_metrics'] ?? [])
+                        ->filter()
+                        ->take(2)
+                        ->map(fn ($metric) => ['value' => (string) $metric, 'label' => 'North star'])
+                        ->values()
+                        ->all(),
+                ]],
+            ];
+        }
+
+        $launchPlan['tasks'] = $tasks;
+        $launchPlan['phases'] = $phases;
+        $launchPlan['next_action'] = $this->launchPlanNextActionState($tasks, $launchPlan);
+
+        return $launchPlan;
     }
 
     private function milestoneTasksForLaunchPlan(string $milestoneTitle, array $signupProfile, array $deducedProfile, array $channels, string $budgetStrategy): array
