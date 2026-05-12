@@ -7332,6 +7332,7 @@ class OsShellController extends Controller
         $durableAssistantMemory = is_array($businessBrief?->constraints_json['assistant_memory'] ?? null)
             ? $businessBrief->constraints_json['assistant_memory']
             : [];
+        $taskAssistContext = $this->localAssistantTaskAssistContext($message);
 
         $prompt = [
             'task' => 'Act as the local Hatchers founder mentor and operating agent. Coach the founder like a practical growth mentor, ask clarifying questions when needed, and only suggest actions that the OS can actually help with.',
@@ -7347,6 +7348,7 @@ class OsShellController extends Controller
                 'When onboarding fields are incomplete, guide the founder to complete the missing business details and refer back to the onboarding answers already captured.',
                 'Do not mention APIs, internal system fallbacks, or remote app dependencies.',
                 'Keep the answer compact but useful: direct answer first, then concrete next moves.',
+                'When the user message is a task-launch brief, reply in a clear operator format: what this task means, the first draft or structure, and the exact next move inside Hatchers.',
                 'If appropriate, suggest up to three workspace actions the founder can take next.',
             ],
             'founder' => [
@@ -7421,6 +7423,7 @@ class OsShellController extends Controller
             'strategic_decisions' => $this->localAssistantStrategicDecisions($threadMeta, $durableAssistantMemory),
             'tool_interests' => $this->localAssistantToolInterests($threadMeta, $durableAssistantMemory),
             'user_message' => $message,
+            'task_assist_context' => $taskAssistContext,
             'response_schema' => [
                 'reply' => 'string',
                 'actions' => [
@@ -7497,6 +7500,39 @@ class OsShellController extends Controller
         $companyName = trim((string) ($company?->company_name ?? 'your business'));
         $growthGoal = trim((string) ($intelligence?->primary_growth_goal ?? 'get more customers'));
         $blockers = trim((string) ($intelligence?->known_blockers ?? ''));
+        $taskAssistContext = $this->localAssistantTaskAssistContext($message);
+
+        if ($taskAssistContext['is_task_assist']) {
+            $taskLabel = trim((string) ($taskAssistContext['task'] ?? 'this task'));
+            $taskContext = trim((string) ($taskAssistContext['context'] ?? ''));
+            $deliverable = trim((string) ($taskAssistContext['deliverable'] ?? ''));
+            $reply = "Here’s how I’d handle {$taskLabel}.\n\n"
+                . "What this means:\n"
+                . ($taskContext !== '' ? $taskContext : "This should move {$companyName} closer to {$growthGoal}.") . "\n\n"
+                . "First useful output:\n"
+                . ($deliverable !== '' ? $deliverable : 'Start with the clearest draft or structure we can produce right now, then tighten it around the offer and customer pain.') . "\n\n"
+                . "Exact next move in Hatchers:\n"
+                . ($nextTaskLabel !== '' ? "Open the task flow, use this as the first draft, and then move to: {$nextTaskLabel}." : 'Use this draft as the starting point, then update the matching workspace or task record.');
+
+            return [
+                'ok' => true,
+                'reply' => $reply,
+                'actions' => array_values(array_filter([
+                    [
+                        'title' => 'Open Tasks',
+                        'reason' => 'Return to the main execution queue.',
+                        'cta' => 'Open Tasks',
+                        'platform' => 'tasks',
+                    ],
+                    str_contains(strtolower($taskLabel . ' ' . $taskContext), 'website') ? [
+                        'title' => 'Build My Website',
+                        'reason' => 'Open the website workspace for the next implementation step.',
+                        'cta' => 'Open Website',
+                        'platform' => 'website',
+                    ] : null,
+                ])),
+            ];
+        }
 
         if (in_array($normalizedMessage, ['hi', 'hello', 'hey', 'hello!', 'hey!'], true)) {
             $reply = "Hi {$founder->full_name}, I’m here and I’ve still got the context for {$companyName}. "
@@ -7618,6 +7654,62 @@ class OsShellController extends Controller
             'ok' => true,
             'reply' => $reply,
             'actions' => array_values(array_filter((array) ($response['actions'] ?? []), fn ($action) => is_array($action))),
+        ];
+    }
+
+    private function localAssistantTaskAssistContext(string $message): array
+    {
+        $lines = preg_split('/\r\n|\r|\n/', trim($message)) ?: [];
+        $task = '';
+        $context = '';
+        $deliverable = '';
+        $phase = '';
+        $milestone = '';
+        $weekGoal = '';
+
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if ($line === '') {
+                continue;
+            }
+
+            if (str_starts_with($line, 'Task: ')) {
+                $task = trim(substr($line, 6));
+                continue;
+            }
+            if (str_starts_with($line, 'Context: ')) {
+                $context = trim(substr($line, 9));
+                continue;
+            }
+            if (str_starts_with($line, 'Expected deliverable: ')) {
+                $deliverable = trim(substr($line, 22));
+                continue;
+            }
+            if (str_starts_with($line, 'Launch phase: ')) {
+                $phase = trim(substr($line, 14));
+                continue;
+            }
+            if (str_starts_with($line, 'Milestone: ')) {
+                $milestone = trim(substr($line, 11));
+                continue;
+            }
+            if (str_starts_with($line, 'Week goal: ')) {
+                $weekGoal = trim(substr($line, 11));
+                continue;
+            }
+        }
+
+        $isTaskAssist = str_contains($message, 'Help me complete this founder task inside Hatchers AI OS.')
+            || str_contains($message, 'Help me complete this founder task inside Hatchers.');
+
+        return [
+            'is_task_assist' => $isTaskAssist,
+            'task' => $task,
+            'context' => $context,
+            'deliverable' => $deliverable,
+            'phase' => $phase,
+            'milestone' => $milestone,
+            'week_goal' => $weekGoal,
         ];
     }
 
@@ -11316,7 +11408,7 @@ class OsShellController extends Controller
                     'north_star_metric' => (string) data_get($task->metadata_json, 'north_star_metric', ''),
                     'status' => (string) ($task->status ?? 'pending'),
                     'cta_label' => (string) ($task->cta_label ?? 'Open'),
-                    'cta_url' => (string) ($task->cta_url ?? '/tasks'),
+                    'cta_url' => (string) ($task->cta_url ?? route('founder.tasks')),
                 ];
             })
             ->values()
@@ -11492,8 +11584,13 @@ class OsShellController extends Controller
             (string) ($task['description'] ?? ''),
             (string) ($task['milestone'] ?? ''),
         ]))));
+        $assistantPrompt = $this->launchPlanTaskAssistantPrompt($task, $haystack);
 
-        if ($ctaUrl !== '') {
+        if (str_contains($haystack, 'campaign') || str_contains($haystack, 'content sequence') || str_contains($haystack, 'social media campaign')) {
+            return ['label' => 'Open Campaign Studio', 'href' => route('workspace.launch', ['module' => 'atlas', 'target' => '/campaign-studio'])];
+        }
+
+        if ($ctaUrl !== '' && !in_array($ctaUrl, ['/ai-tools', '/website', '/marketing'], true)) {
             return [
                 'label' => $label !== '' ? $label : $this->launchPlanTaskActionLabel($haystack),
                 'href' => $ctaUrl,
@@ -11501,19 +11598,69 @@ class OsShellController extends Controller
         }
 
         if (str_contains($haystack, 'website') || str_contains($haystack, 'landing page') || str_contains($haystack, 'page copy')) {
-            return ['label' => 'Build with AI', 'href' => route('website')];
+            return ['label' => 'Build with AI', 'href' => route('dashboard', ['assistant' => 1, 'assistant_prompt' => $assistantPrompt])];
         }
         if (str_contains($haystack, 'campaign') || str_contains($haystack, 'content') || str_contains($haystack, 'social')) {
-            return ['label' => 'Write with AI', 'href' => route('founder.marketing')];
+            if (str_contains($haystack, 'campaign') || str_contains($haystack, 'content sequence')) {
+                return ['label' => 'Open Campaign Studio', 'href' => route('workspace.launch', ['module' => 'atlas', 'target' => '/campaign-studio'])];
+            }
+
+            return ['label' => 'Write with AI', 'href' => route('dashboard', ['assistant' => 1, 'assistant_prompt' => $assistantPrompt])];
         }
         if (str_contains($haystack, 'product') || str_contains($haystack, 'pricing') || str_contains($haystack, 'checkout') || str_contains($haystack, 'commerce')) {
-            return ['label' => 'Open Commerce', 'href' => route('founder.commerce')];
+            return ['label' => 'Build with AI', 'href' => route('dashboard', ['assistant' => 1, 'assistant_prompt' => $assistantPrompt])];
         }
 
         return [
             'label' => $this->launchPlanTaskActionLabel($haystack),
-            'href' => route('founder.tasks'),
+            'href' => route('dashboard', ['assistant' => 1, 'assistant_prompt' => $assistantPrompt]),
         ];
+    }
+
+    private function launchPlanTaskAssistantPrompt(array $task, string $haystack): string
+    {
+        $title = trim((string) ($task['title'] ?? ''));
+        $description = trim((string) ($task['description'] ?? ''));
+        $milestone = trim((string) ($task['milestone'] ?? ''));
+        $phase = trim((string) ($task['phase_label'] ?? $task['phase'] ?? ''));
+        $weekNumber = trim((string) ($task['week_number'] ?? ''));
+        $weekGoal = trim((string) ($task['week_goal'] ?? ''));
+        $toolHint = trim((string) ($task['cta_label'] ?? ''));
+        $deliverableHint = $this->launchPlanTaskDeliverableHint($haystack);
+
+        return implode("\n", array_values(array_filter([
+            'Help me complete this founder task inside Hatchers AI OS.',
+            $phase !== '' ? ('Launch phase: ' . $phase) : null,
+            $milestone !== '' ? ('Milestone: ' . $milestone) : null,
+            $weekNumber !== '' ? ('Week: ' . $weekNumber) : null,
+            $weekGoal !== '' ? ('Week goal: ' . $weekGoal) : null,
+            'Task: ' . $title,
+            $description !== '' ? ('Context: ' . $description) : null,
+            $toolHint !== '' ? ('Suggested Hatchers tool: ' . $toolHint) : null,
+            $deliverableHint !== '' ? ('Expected deliverable: ' . $deliverableHint) : null,
+            'Please do this in chat now: explain what the task means, draft the first useful output if possible, and tell me the exact next step to take inside Hatchers.',
+        ])));
+    }
+
+    private function launchPlanTaskDeliverableHint(string $haystack): string
+    {
+        if (str_contains($haystack, 'headline') || str_contains($haystack, 'copy') || str_contains($haystack, 'caption') || str_contains($haystack, 'message')) {
+            return 'Draft the copy directly so the founder can use it immediately.';
+        }
+
+        if (str_contains($haystack, 'website') || str_contains($haystack, 'landing page') || str_contains($haystack, 'offer page')) {
+            return 'Outline the page structure, core message, CTA, and what should change in the website workspace.';
+        }
+
+        if (str_contains($haystack, 'offer') || str_contains($haystack, 'pricing') || str_contains($haystack, 'product')) {
+            return 'Clarify the offer, pricing, and positioning so it becomes easier to sell.';
+        }
+
+        if (str_contains($haystack, 'outreach') || str_contains($haystack, 'lead') || str_contains($haystack, 'prospect') || str_contains($haystack, 'follow-up')) {
+            return 'Write the outreach assets and recommend the next contact step.';
+        }
+
+        return 'Give a practical execution plan and draft any part that can be completed right now.';
     }
 
     private function launchPlanTaskActionLabel(string $haystack): string
@@ -12187,21 +12334,21 @@ class OsShellController extends Controller
                     'description' => 'Prepare a short script focused on the pain points, current alternatives, and moments that trigger buying intent.',
                     'platform' => 'os',
                     'cta_label' => 'Open Tasks',
-                    'cta_url' => '/tasks',
+                    'cta_url' => route('founder.tasks'),
                 ],
                 [
                     'title' => 'List 10 ideal people to interview',
                     'description' => 'Build a named list of likely buyers who match ' . (string) ($deducedProfile['primary_icp_name'] ?? 'the core ICP') . ' and schedule outreach.',
                     'platform' => 'os',
                     'cta_label' => 'Open First 100',
-                    'cta_url' => '/first-100',
+                    'cta_url' => route('founder.first-100'),
                 ],
                 [
                     'title' => 'Run the first discovery calls',
                     'description' => 'Capture repeated pains, exact language, objections, and proof that the problem is urgent enough to solve.',
                     'platform' => 'os',
                     'cta_label' => 'Open Inbox',
-                    'cta_url' => '/inbox',
+                    'cta_url' => route('founder.inbox'),
                 ],
             ],
             'Lean MVP setup' => [
@@ -12210,21 +12357,21 @@ class OsShellController extends Controller
                     'description' => 'Create a simple page that presents the problem, the promise, the starter offer, and one conversion action.',
                     'platform' => 'servio',
                     'cta_label' => 'Open Website',
-                    'cta_url' => '/website',
+                    'cta_url' => route('website'),
                 ],
                 [
                     'title' => 'Set up lead capture and CTA logic',
                     'description' => 'Choose one CTA flow and connect forms, booking, or checkout so demand can be measured cleanly.',
                     'platform' => 'servio',
                     'cta_label' => 'Open Website',
-                    'cta_url' => '/website',
+                    'cta_url' => route('website'),
                 ],
                 [
                     'title' => 'Create the first social proof assets',
                     'description' => 'Prepare the minimum social page, intro copy, and credibility blocks needed to make the MVP trustworthy.',
                     'platform' => 'atlas',
                     'cta_label' => 'Open AI Studio',
-                    'cta_url' => '/ai-tools',
+                    'cta_url' => route('founder.ai-tools'),
                 ],
             ],
             'Demand validation' => [
@@ -12235,21 +12382,21 @@ class OsShellController extends Controller
                         : 'Start direct outreach and organic content using one clear message and one CTA.',
                     'platform' => 'os',
                     'cta_label' => 'Open Marketing',
-                    'cta_url' => '/marketing',
+                    'cta_url' => route('founder.marketing'),
                 ],
                 [
                     'title' => 'Track every lead response',
                     'description' => 'Measure discoverability through real signals: replies, bookings, opt-ins, and conversions.',
                     'platform' => 'os',
                     'cta_label' => 'Open First 100',
-                    'cta_url' => '/first-100',
+                    'cta_url' => route('founder.first-100'),
                 ],
                 [
                     'title' => 'Refine the page from real objections',
                     'description' => 'Use what prospects actually say to sharpen the headline, CTA, and offer stack before scaling.',
                     'platform' => 'servio',
                     'cta_label' => 'Open Website',
-                    'cta_url' => '/website',
+                    'cta_url' => route('website'),
                 ],
             ],
             'Positioning reset' => [
@@ -12258,14 +12405,14 @@ class OsShellController extends Controller
                     'description' => 'Refine the offer, differentiators, and best customer so every downstream asset stays consistent.',
                     'platform' => 'os',
                     'cta_label' => 'Open Tasks',
-                    'cta_url' => '/tasks',
+                    'cta_url' => route('founder.tasks'),
                 ],
                 [
                     'title' => 'Write the direct-response message',
                     'description' => 'Turn the main pain, desired outcome, and objections into a clear promise and practical CTA.',
                     'platform' => 'atlas',
                     'cta_label' => 'Open AI Studio',
-                    'cta_url' => '/ai-tools',
+                    'cta_url' => route('founder.ai-tools'),
                 ],
             ],
             'Asset buildout' => [
@@ -12274,14 +12421,14 @@ class OsShellController extends Controller
                     'description' => 'Create the website, conversion sections, service or product pages, and supporting content blocks.',
                     'platform' => 'servio',
                     'cta_label' => 'Open Website',
-                    'cta_url' => '/website',
+                    'cta_url' => route('website'),
                 ],
                 [
                     'title' => 'Set up the primary channel presence',
                     'description' => 'Publish the core social or outreach assets required for the first acquisition sprint.',
                     'platform' => 'os',
                     'cta_label' => 'Open Marketing',
-                    'cta_url' => '/marketing',
+                    'cta_url' => route('founder.marketing'),
                 ],
             ],
             default => [
@@ -12290,14 +12437,14 @@ class OsShellController extends Controller
                     'description' => 'Use ' . implode(', ', $channels) . ' as the focused channel mix and chase the first real lead or booking signals.',
                     'platform' => 'os',
                     'cta_label' => 'Open Marketing',
-                    'cta_url' => '/marketing',
+                    'cta_url' => route('founder.marketing'),
                 ],
                 [
                     'title' => 'Track outcomes weekly',
                     'description' => 'Review the north-star metric weekly and adjust only what affects qualified leads, bookings, or first sales.',
                     'platform' => 'os',
                     'cta_label' => 'Open Tasks',
-                    'cta_url' => '/tasks',
+                    'cta_url' => route('founder.tasks'),
                 ],
             ],
         };

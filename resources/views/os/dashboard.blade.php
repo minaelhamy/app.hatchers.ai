@@ -45,6 +45,18 @@
     $launchPlanActionWeek = (string) ($launchPlanPrimaryAction['week'] ?? 'Week 1');
     $launchPlanActionTime = (string) ($launchPlanPrimaryAction['time'] ?? 'Follow the highest-impact next step');
     $launchPlanPhases = array_values((array) ($launchPlanState['phases'] ?? []));
+    $launchPlanActionWorkspaceKey = '';
+    if ($launchPlanActionHref === route('founder.tasks')) {
+        $launchPlanActionWorkspaceKey = 'tasks';
+    } elseif ($launchPlanActionHref === route('website')) {
+        $launchPlanActionWorkspaceKey = 'build-my-website';
+    } elseif ($launchPlanActionHref === route('founder.commerce')) {
+        $launchPlanActionWorkspaceKey = 'commerce';
+    } elseif ($launchPlanActionHref === route('founder.marketing')) {
+        $launchPlanActionWorkspaceKey = 'marketing';
+    } elseif (str_contains($launchPlanActionHref, '/campaign-studio')) {
+        $launchPlanActionWorkspaceKey = 'campaign-studio';
+    }
 @endphp
 
 @section('head')
@@ -1502,7 +1514,7 @@
                                     <h2 class="lp-title">{{ $launchPlanState['title'] ?: 'Your launch plan' }}</h2>
                                     <div class="lp-duration">{{ $durationLabel }}</div>
                                 </div>
-                                <a class="new-project-btn" href="{{ $launchPlanActionHref }}">⚡ {{ $launchPlanActionLabel }}</a>
+                                <a class="new-project-btn" href="{{ $launchPlanActionHref }}" @if($launchPlanActionWorkspaceKey !== '') data-dashboard-open-app="{{ $launchPlanActionWorkspaceKey }}" @endif>⚡ {{ $launchPlanActionLabel }}</a>
                             </div>
 
                             <div class="lp-next-action" id="launchPlanNextAction">
@@ -1516,7 +1528,7 @@
                                         @endif
                                     </div>
                                 </div>
-                                <a class="lp-next-btn" href="{{ $launchPlanActionHref }}">{{ $launchPlanActionLabel }} →</a>
+                                <a class="lp-next-btn" href="{{ $launchPlanActionHref }}" @if($launchPlanActionWorkspaceKey !== '') data-dashboard-open-app="{{ $launchPlanActionWorkspaceKey }}" @endif>{{ $launchPlanActionLabel }} →</a>
                             </div>
 
                             <div class="lp-tabs" role="tablist" aria-label="Launch plan phases">
@@ -1660,6 +1672,9 @@
             const sidepane = document.getElementById('sidepane');
             const leftRail = document.getElementById('leftRail');
             const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+            const pageUrl = new URL(window.location.href);
+            const assistantBootPrompt = pageUrl.searchParams.get('assistant_prompt') || '';
+            const shouldBootAssistant = pageUrl.searchParams.get('assistant') === '1' && assistantBootPrompt.trim() !== '';
 
             let chatState = 'closed';
             let threadKey = null;
@@ -2017,11 +2032,13 @@
                 }, 10000);
             }
 
-            async function sendFreeformChat() {
+            async function sendFreeformChat(forcedMessage = null) {
                 if (onboarding.processing) return;
-                const value = chatInput.value.trim();
+                const value = (forcedMessage ?? chatInput.value).trim();
                 if (!value) return;
-                chatInput.value = '';
+                if (forcedMessage === null) {
+                    chatInput.value = '';
+                }
 
                 if (onboardingNeeded && steps[onboarding.currentStep]) {
                     onboarding.answers[onboarding.currentStep] = value;
@@ -2121,6 +2138,15 @@
                         }
                     });
                 });
+
+                document.querySelectorAll('[data-dashboard-open-app]').forEach((link) => {
+                    link.addEventListener('click', (event) => {
+                        const appKey = link.getAttribute('data-dashboard-open-app') || '';
+                        if (!appKey || !window.HatchersOsDesktop?.openApp) return;
+                        event.preventDefault();
+                        window.HatchersOsDesktop.openApp(appKey);
+                    });
+                });
             }
 
             chatFab?.addEventListener('click', () => {
@@ -2152,6 +2178,16 @@
             }
 
             initLaunchPlanWorkspace();
+
+            if (shouldBootAssistant && !onboardingNeeded) {
+                setTimeout(() => {
+                    setChatState('panel');
+                    sendFreeformChat(assistantBootPrompt);
+                    pageUrl.searchParams.delete('assistant');
+                    pageUrl.searchParams.delete('assistant_prompt');
+                    window.history.replaceState({}, '', pageUrl.toString());
+                }, 220);
+            }
         })();
     </script>
 @endsection

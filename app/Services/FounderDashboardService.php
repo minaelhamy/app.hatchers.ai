@@ -138,7 +138,7 @@ class FounderDashboardService
         $taskCards = [];
         foreach ($taskActions->take(3) as $index => $action) {
             $isCompleted = $action->completed_at !== null || in_array((string) $action->status, ['completed', 'complete', 'done'], true);
-            $taskDestination = $this->taskWorkspaceDestination($action);
+            $taskDestination = $this->taskWorkspaceDestination($action, $founder, $company, $execution);
             $taskCards[] = [
                 'id' => $action->id,
                 'label' => 'Task',
@@ -230,7 +230,7 @@ class FounderDashboardService
         ];
     }
 
-    private function taskWorkspaceDestination(FounderActionPlan $action): array
+    private function taskWorkspaceDestination(FounderActionPlan $action, Founder $founder, $company, array $execution): array
     {
         $metadata = is_array($action->metadata_json) ? $action->metadata_json : [];
         $platform = strtolower(trim((string) ($metadata['platform'] ?? '')));
@@ -239,7 +239,16 @@ class FounderDashboardService
         $description = trim((string) $this->actionSummary($action));
         $haystack = strtolower(trim($title . ' ' . $description));
 
-        if ($ctaUrl !== '') {
+        $assistantPrompt = $this->taskAssistantPrompt($action, $description, $founder, $company, $execution, $metadata);
+
+        if (str_contains($haystack, 'campaign') || str_contains($haystack, 'content sequence') || str_contains($haystack, 'social media campaign')) {
+            return [
+                'label' => 'Open Campaign Studio',
+                'href' => route('workspace.launch', ['module' => 'atlas', 'target' => '/campaign-studio']),
+            ];
+        }
+
+        if ($ctaUrl !== '' && !$this->isLegacyAiTaskUrl($ctaUrl)) {
             return [
                 'label' => $this->taskWorkspaceLabelForText($haystack),
                 'href' => $ctaUrl,
@@ -247,15 +256,19 @@ class FounderDashboardService
         }
 
         if ($platform === 'servio' || str_contains($haystack, 'website') || str_contains($haystack, 'landing page') || str_contains($haystack, 'page copy')) {
-            return ['label' => 'Build with AI', 'href' => route('website')];
+            return ['label' => 'Build with AI', 'href' => route('dashboard', ['assistant' => 1, 'assistant_prompt' => $assistantPrompt])];
         }
 
         if ($platform === 'bazaar' || str_contains($haystack, 'product') || str_contains($haystack, 'pricing') || str_contains($haystack, 'offer page') || str_contains($haystack, 'checkout')) {
-            return ['label' => 'Open Commerce', 'href' => route('founder.commerce')];
+            return ['label' => 'Build with AI', 'href' => route('dashboard', ['assistant' => 1, 'assistant_prompt' => $assistantPrompt])];
         }
 
-        if ($platform === 'atlas' || str_contains($haystack, 'campaign') || str_contains($haystack, 'post') || str_contains($haystack, 'social') || str_contains($haystack, 'content')) {
-            return ['label' => 'Write with AI', 'href' => route('founder.marketing')];
+        if ($platform === 'atlas' || str_contains($haystack, 'post') || str_contains($haystack, 'social') || str_contains($haystack, 'content')) {
+            if (str_contains($haystack, 'campaign') || str_contains($haystack, 'content sequence')) {
+                return ['label' => 'Open Campaign Studio', 'href' => route('workspace.launch', ['module' => 'atlas', 'target' => '/campaign-studio'])];
+            }
+
+            return ['label' => 'Write with AI', 'href' => route('dashboard', ['assistant' => 1, 'assistant_prompt' => $assistantPrompt])];
         }
 
         if (str_contains($haystack, 'lead') || str_contains($haystack, 'customer') || str_contains($haystack, 'outreach') || str_contains($haystack, 'prospect') || str_contains($haystack, 'follow-up')) {
@@ -264,7 +277,7 @@ class FounderDashboardService
 
         return [
             'label' => $this->taskWorkspaceLabelForText($haystack),
-            'href' => route('dashboard'),
+            'href' => route('dashboard', ['assistant' => 1, 'assistant_prompt' => $assistantPrompt]),
         ];
     }
 
@@ -279,6 +292,67 @@ class FounderDashboardService
         }
 
         return 'Continue with AI';
+    }
+
+    private function taskAssistantPrompt(
+        FounderActionPlan $action,
+        string $description,
+        Founder $founder,
+        $company,
+        array $execution,
+        array $metadata
+    ): string
+    {
+        $companyName = trim((string) ($company?->company_name ?? 'my business'));
+        $weeklyFocus = trim((string) ($execution['weekly_focus'] ?? ''));
+        $milestone = trim((string) ($metadata['milestone'] ?? $metadata['launch_milestone'] ?? ''));
+        $weekGoal = trim((string) ($metadata['week_goal'] ?? $metadata['weekly_goal'] ?? ''));
+        $phase = trim((string) ($metadata['phase_label'] ?? $metadata['phase'] ?? ''));
+        $toolHint = trim((string) ($action->cta_label ?? $metadata['tool_hint'] ?? ''));
+        $deliverableType = $this->taskAssistantDeliverableHint(strtolower(trim((string) $action->title . ' ' . $description)));
+
+        $parts = array_values(array_filter([
+            'Help me complete this founder task inside Hatchers AI OS.',
+            'Founder: ' . trim((string) $founder->full_name),
+            'Business: ' . $companyName,
+            $weeklyFocus !== '' ? ('Weekly focus: ' . $weeklyFocus) : null,
+            $phase !== '' ? ('Launch phase: ' . $phase) : null,
+            $milestone !== '' ? ('Milestone: ' . $milestone) : null,
+            $weekGoal !== '' ? ('Week goal: ' . $weekGoal) : null,
+            'Task: ' . trim((string) $action->title),
+            $description !== '' ? ('Context: ' . trim($description)) : null,
+            $toolHint !== '' ? ('Suggested Hatchers tool: ' . $toolHint) : null,
+            $deliverableType !== '' ? ('Expected deliverable: ' . $deliverableType) : null,
+            'Please do this in chat now: explain what the task really means, produce the first useful draft or structure if possible, and tell me the exact next step to take inside Hatchers.',
+        ]));
+
+        return implode("\n", $parts);
+    }
+
+    private function taskAssistantDeliverableHint(string $haystack): string
+    {
+        if (str_contains($haystack, 'headline') || str_contains($haystack, 'copy') || str_contains($haystack, 'caption') || str_contains($haystack, 'message')) {
+            return 'Draft the copy directly and make it ready to use.';
+        }
+
+        if (str_contains($haystack, 'website') || str_contains($haystack, 'landing page') || str_contains($haystack, 'offer page')) {
+            return 'Outline the page structure, core message, CTA, and what should change in the website workspace.';
+        }
+
+        if (str_contains($haystack, 'offer') || str_contains($haystack, 'pricing') || str_contains($haystack, 'product')) {
+            return 'Clarify the offer, pricing, and positioning so it is easier to sell.';
+        }
+
+        if (str_contains($haystack, 'outreach') || str_contains($haystack, 'lead') || str_contains($haystack, 'prospect') || str_contains($haystack, 'follow-up')) {
+            return 'Write the outreach assets and recommend the next contact step.';
+        }
+
+        return 'Give a practical execution plan and draft any part that can be completed right now.';
+    }
+
+    private function isLegacyAiTaskUrl(string $url): bool
+    {
+        return in_array($url, ['/ai-tools', '/website', '/marketing'], true);
     }
 
     private function buildGuidedPath($company, array $execution, array $commerceOperations, array $revenueOs): array
