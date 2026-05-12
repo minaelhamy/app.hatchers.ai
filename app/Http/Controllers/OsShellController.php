@@ -7521,6 +7521,10 @@ class OsShellController extends Controller
         $company = $founder->company;
         $intelligence = $company?->intelligence;
         $nextTask = $this->assistantNextPendingTaskSummary($founder);
+        $nextTaskLabel = trim((string) ($nextTask['title'] ?? ''));
+        if ($nextTaskLabel !== '' && trim((string) ($nextTask['description'] ?? '')) !== '') {
+            $nextTaskLabel .= ' — ' . trim((string) $nextTask['description']);
+        }
         $normalizedMessage = strtolower(trim($message));
         $companyName = trim((string) ($company?->company_name ?? 'your business'));
         $growthGoal = trim((string) ($intelligence?->primary_growth_goal ?? 'get more customers'));
@@ -7529,14 +7533,14 @@ class OsShellController extends Controller
         if (in_array($normalizedMessage, ['hi', 'hello', 'hey', 'hello!', 'hey!'], true)) {
             $reply = "Hi {$founder->full_name}, I’m here and I’ve still got the context for {$companyName}. "
                 . "Right now our focus is {$growthGoal}."
-                . ($nextTask !== '' ? " The next best move is: {$nextTask}." : '')
+                . ($nextTaskLabel !== '' ? " The next best move is: {$nextTaskLabel}." : '')
                 . " If you want, I can help you tighten the offer, improve the website, or break the next task into simpler steps.";
 
             return [
                 'ok' => true,
                 'reply' => $reply,
                 'actions' => array_values(array_filter([
-                    $nextTask !== '' ? [
+                    $nextTaskLabel !== '' ? [
                         'title' => 'Open Tasks',
                         'reason' => 'See the next recommended task.',
                         'cta' => 'Review tasks',
@@ -7555,7 +7559,7 @@ class OsShellController extends Controller
         $reply = "I’m still here with your launch context for {$companyName}, but the live model reply failed just now. "
             . "Based on what I know, I’d keep the focus on {$growthGoal}."
             . ($blockers !== '' ? " The main blocker I’m tracking is {$blockers}." : '')
-            . ($nextTask !== '' ? " The clearest next step is: {$nextTask}." : '')
+            . ($nextTaskLabel !== '' ? " The clearest next step is: {$nextTaskLabel}." : '')
             . " If you want, tell me whether you want help with the offer, the website, or the next task and I’ll guide you from there.";
 
         return [
