@@ -331,7 +331,7 @@ class AtlasIntelligenceService
     {
         $query = FounderConversationThread::query()
             ->where('founder_id', $founder->id)
-            ->where('source_channel', 'atlas_assistant');
+            ->whereIn('source_channel', ['os_assistant', 'atlas_assistant']);
 
         if (trim((string) $threadKey) !== '') {
             $query->where('thread_key', (string) $threadKey);

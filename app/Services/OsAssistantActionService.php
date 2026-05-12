@@ -2218,7 +2218,10 @@ class OsAssistantActionService
     {
         $query = FounderConversationThread::query()
             ->where('founder_id', $founder->id)
-            ->where('thread_key', 'like', 'atlas-assistant%');
+            ->where(function ($query) {
+                $query->where('thread_key', 'like', 'os-assistant%')
+                    ->orWhere('thread_key', 'like', 'atlas-assistant%');
+            });
 
         if ($threadKey !== '') {
             $query->where('thread_key', $threadKey);

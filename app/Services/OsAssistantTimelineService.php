@@ -4,11 +4,15 @@ namespace App\Services;
 
 use App\Models\Founder;
 use App\Models\FounderConversationThread;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 
 class OsAssistantTimelineService
 {
-    private const THREAD_KEY_PREFIX = 'atlas-assistant';
+    private const THREAD_KEY_PREFIX = 'os-assistant';
+    private const LEGACY_THREAD_KEY_PREFIX = 'atlas-assistant';
+    private const SOURCE_CHANNEL = 'os_assistant';
+    private const LEGACY_SOURCE_CHANNEL = 'atlas_assistant';
 
     public function timeline(Founder $founder, ?string $threadKey = null, int $limit = 12): array
     {
@@ -51,7 +55,10 @@ class OsAssistantTimelineService
     {
         return FounderConversationThread::query()
             ->where('founder_id', $founder->id)
-            ->where('thread_key', 'like', self::THREAD_KEY_PREFIX . '%')
+            ->where(function ($query) {
+                $query->where('thread_key', 'like', self::THREAD_KEY_PREFIX . '%')
+                    ->orWhere('thread_key', 'like', self::LEGACY_THREAD_KEY_PREFIX . '%');
+            })
             ->orderByDesc('last_activity_at')
             ->orderByDesc('updated_at')
             ->limit($limit)
@@ -119,18 +126,18 @@ class OsAssistantTimelineService
 
         $thread->fill([
             'company_id' => $founder->company?->id,
-            'source_channel' => 'atlas_assistant',
+            'source_channel' => self::SOURCE_CHANNEL,
             'status' => 'open',
             'latest_message' => trim($reply),
             'last_activity_at' => $now,
-            'meta_json' => array_merge($meta, [
+            'meta_json' => $this->withStructuredMemory(array_merge($meta, [
                 'workspace' => 'founder_os',
                 'assistant_mode' => 'founder_mentor',
                 'last_page' => $currentPage,
                 'label' => $this->buildLabel($isNewThread, $meta, $message),
                 'pinned_plan' => $this->extractPinnedPlan($reply, $actions),
                 'messages' => $messages->take(-20)->values()->all(),
-            ]),
+            ]), $message, $reply, $currentPage, $actions),
         ]);
 
         $thread->save();
@@ -147,7 +154,7 @@ class OsAssistantTimelineService
 
         $thread->fill([
             'company_id' => $founder->company?->id,
-            'source_channel' => 'atlas_assistant',
+            'source_channel' => self::SOURCE_CHANNEL,
             'status' => 'open',
             'latest_message' => '',
             'last_activity_at' => now(),
@@ -203,10 +210,10 @@ class OsAssistantTimelineService
         $thread->forceFill([
             'latest_message' => trim($reply),
             'last_activity_at' => $now,
-            'meta_json' => array_merge($meta, [
+            'meta_json' => $this->withStructuredMemory(array_merge($meta, [
                 'last_page' => $currentPage,
                 'messages' => $messages->take(-20)->values()->all(),
-            ]),
+            ]), null, $reply, $currentPage, $actions),
         ])->save();
 
         return $thread;
@@ -216,7 +223,10 @@ class OsAssistantTimelineService
     {
         $query = FounderConversationThread::query()
             ->where('founder_id', $founder->id)
-            ->where('thread_key', 'like', self::THREAD_KEY_PREFIX . '%');
+            ->where(function ($query) {
+                $query->where('thread_key', 'like', self::THREAD_KEY_PREFIX . '%')
+                    ->orWhere('thread_key', 'like', self::LEGACY_THREAD_KEY_PREFIX . '%');
+            });
 
         if (trim((string) $threadKey) !== '') {
             return (clone $query)
@@ -281,5 +291,141 @@ class OsAssistantTimelineService
             'steps' => $steps,
             'updated_at' => now()->toIso8601String(),
         ];
+    }
+
+    private function withStructuredMemory(
+        array $meta,
+        ?string $message,
+        string $reply,
+        string $currentPage,
+        array $actions = []
+    ): array {
+        $concerns = collect(Arr::wrap($meta['recurring_concerns'] ?? []))
+            ->filter(fn ($value) => is_string($value) && trim($value) !== '');
+        $decisions = collect(Arr::wrap($meta['strategic_decisions'] ?? []))
+            ->filter(fn ($value) => is_string($value) && trim($value) !== '');
+        $toolInterests = collect(Arr::wrap($meta['tool_interests'] ?? []))
+            ->filter(fn ($value) => is_string($value) && trim($value) !== '');
+
+        foreach ($this->extractConcernSignals($message) as $concern) {
+            $concerns->push($concern);
+        }
+
+        foreach ($this->extractDecisionSignals($message) as $decision) {
+            $decisions->push($decision);
+        }
+
+        foreach ($this->extractToolInterests($message, $reply, $currentPage, $actions) as $interest) {
+            $toolInterests->push($interest);
+        }
+
+        $meta['recurring_concerns'] = $concerns
+            ->map(fn ($value) => trim((string) $value))
+            ->filter()
+            ->unique()
+            ->take(-8)
+            ->values()
+            ->all();
+
+        $meta['strategic_decisions'] = $decisions
+            ->map(fn ($value) => trim((string) $value))
+            ->filter()
+            ->unique()
+            ->take(-8)
+            ->values()
+            ->all();
+
+        $meta['tool_interests'] = $toolInterests
+            ->map(fn ($value) => trim((string) $value))
+            ->filter()
+            ->unique()
+            ->take(-8)
+            ->values()
+            ->all();
+
+        return $meta;
+    }
+
+    private function extractConcernSignals(?string $message): array
+    {
+        $text = Str::lower(trim((string) $message));
+        if ($text === '') {
+            return [];
+        }
+
+        $signals = [];
+        $matches = [
+            'offer clarity' => ['offer', 'messaging', 'headline', 'positioning'],
+            'getting customers' => ['customer', 'lead', 'leads', 'sales', 'clients'],
+            'website quality' => ['website', 'landing page', 'page copy', 'hero'],
+            'campaign planning' => ['campaign', 'post', 'content', 'grid'],
+            'time and focus' => ['overwhelmed', 'time', 'stuck', 'priority', 'priorities'],
+            'pricing and conversion' => ['price', 'pricing', 'conversion', 'close', 'closing'],
+        ];
+
+        foreach ($matches as $label => $keywords) {
+            foreach ($keywords as $keyword) {
+                if (str_contains($text, $keyword)) {
+                    $signals[] = $label;
+                    break;
+                }
+            }
+        }
+
+        return array_values(array_unique($signals));
+    }
+
+    private function extractDecisionSignals(?string $message): array
+    {
+        $text = trim((string) $message);
+        if ($text === '') {
+            return [];
+        }
+
+        $normalized = Str::lower($text);
+        $decisionStarts = ['yes', 'approved', 'build my website', 'publish my website', 'rebuild my website', 'organic', 'paid', 'post', 'grid', 'content sequence'];
+        foreach ($decisionStarts as $start) {
+            if ($normalized === $start || str_starts_with($normalized, $start . ' ')) {
+                return [Str::limit($text, 140, '...')];
+            }
+        }
+
+        return [];
+    }
+
+    private function extractToolInterests(?string $message, string $reply, string $currentPage, array $actions = []): array
+    {
+        $signals = [];
+        $text = Str::lower(trim((string) $message . ' ' . $reply . ' ' . $currentPage));
+        $map = [
+            'campaign_studio' => ['campaign studio', 'campaign', 'post', 'grid', 'content sequence'],
+            'build_my_website' => ['build my website', 'website', 'landing page'],
+            'tasks' => ['task', 'tasks', 'milestone'],
+            'servio' => ['servio', 'booking', 'service'],
+            'bazaar' => ['bazaar', 'product', 'storefront'],
+            'company_intelligence' => ['company intelligence', 'icp', 'ideal customer', 'brand voice', 'offer'],
+        ];
+
+        foreach ($map as $label => $keywords) {
+            foreach ($keywords as $keyword) {
+                if (str_contains($text, $keyword)) {
+                    $signals[] = $label;
+                    break;
+                }
+            }
+        }
+
+        foreach ($actions as $action) {
+            if (!is_array($action)) {
+                continue;
+            }
+
+            $workspace = trim((string) ($action['os_workspace_key'] ?? ''));
+            if ($workspace !== '') {
+                $signals[] = $workspace;
+            }
+        }
+
+        return array_values(array_unique($signals));
     }
 }

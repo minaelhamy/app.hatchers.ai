@@ -1685,7 +1685,10 @@
             $weeklyState = $authUser->weeklyState;
             $commercialSummary = $authUser->commercialSummary;
             $assistantThread = $authUser->conversationThreads()
-                ->where('thread_key', 'like', 'atlas-assistant%')
+                ->where(function ($query) {
+                    $query->where('thread_key', 'like', 'os-assistant%')
+                        ->orWhere('thread_key', 'like', 'atlas-assistant%');
+                })
                 ->orderByDesc('last_activity_at')
                 ->orderByDesc('updated_at')
                 ->first();
@@ -1700,7 +1703,10 @@
                 'label' => (string) ($assistantThreadMeta['label'] ?? 'New founder chat'),
             ];
             $assistantThreads = $authUser->conversationThreads()
-                ->where('thread_key', 'like', 'atlas-assistant%')
+                ->where(function ($query) {
+                    $query->where('thread_key', 'like', 'os-assistant%')
+                        ->orWhere('thread_key', 'like', 'atlas-assistant%');
+                })
                 ->orderByDesc('last_activity_at')
                 ->orderByDesc('updated_at')
                 ->limit(8)
@@ -2253,7 +2259,7 @@
                     const data = await response.json();
                     if (!response.ok || !data.success) {
                         addBubble('atlas', data.error || 'Hatchers AI could not respond right now.');
-                        if (status) status.textContent = 'Atlas is temporarily unavailable.';
+                        if (status) status.textContent = 'Atlas could not respond right now.';
                     } else {
                         currentThreadKey = data.thread_key || currentThreadKey;
                         setThreadSelection(currentThreadKey);

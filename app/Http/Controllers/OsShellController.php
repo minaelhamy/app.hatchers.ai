@@ -7003,7 +7003,10 @@ class OsShellController extends Controller
             'Growth approach: ' . (string) $signupProfile['budget_strategy'],
             'Time commitment: ' . (string) $signupProfile['time_commitment'],
         ]));
-        $reply = 'Your launch plan is ready. Hatchers mapped the milestones, tasks, channels, and website path based on your answers. If you want, I can build and publish your first website next.';
+        $websitePrompt = $this->assistantWebsiteBuildPromptFromPreferences(
+            $this->assistantStoredOperatingPreferences($founder, $company)
+        );
+        $reply = 'Your launch plan is ready. Hatchers mapped the milestones, tasks, channels, and website path based on your answers. ' . $websitePrompt;
         $timeline->record(
             $founder,
             null,
@@ -7022,7 +7025,7 @@ class OsShellController extends Controller
             'reply' => $reply,
             'launch_plan' => $launchPlan,
             'ask_for_website_build' => true,
-            'website_prompt' => 'Do you want me to build and publish your website now?',
+            'website_prompt' => $websitePrompt,
         ]);
     }
 
@@ -7122,7 +7125,6 @@ class OsShellController extends Controller
 
     public function assistantChat(
         Request $request,
-        AtlasIntelligenceService $atlas,
         OsAssistantActionService $actionService,
         OsAssistantTimelineService $timeline,
         FounderNotificationService $founderNotificationService
@@ -7208,14 +7210,6 @@ class OsShellController extends Controller
                     'commercialSummary',
                     'moduleSnapshots',
                 ]);
-
-                $atlas->syncFounderMutation($founder, [
-                    'role' => $actionResult['actor_role'] ?? '',
-                    'action' => $actionResult['action_type'] ?? 'os_write_action',
-                    'field' => $actionResult['field'] ?? '',
-                    'value' => $actionResult['value'] ?? '',
-                    'sync_summary' => $actionResult['sync_summary'] ?? 'Atlas completed a confirmed Hatchers OS write action.',
-                ]);
             }
 
             $mappedActions = $this->mapAssistantActionsToOs($actionResult['actions'] ?? []);
@@ -7238,41 +7232,18 @@ class OsShellController extends Controller
             ]);
         }
 
-        $result = $atlas->chatFromOs($founder, $message, $currentPage, $threadKey !== '' ? $threadKey : null);
+        $result = $this->localAssistantReply(
+            $founder,
+            $message,
+            $currentPage,
+            $threadKey !== '' ? $threadKey : null
+        );
 
         if (!$result['ok']) {
-            $fallbackResult = $this->localAssistantFallbackReply(
-                $founder,
-                $message,
-                $currentPage,
-                $threadKey !== '' ? $threadKey : null
-            );
-
-            if (!$fallbackResult['ok']) {
-                return response()->json([
-                    'success' => false,
-                    'error' => $result['error'] ?? $fallbackResult['error'] ?? 'Atlas could not respond right now.',
-                ], 502);
-            }
-
-            $mappedActions = $this->mapAssistantActionsToOs($fallbackResult['actions'] ?? []);
-            $thread = $timeline->record(
-                $founder,
-                $threadKey !== '' ? $threadKey : null,
-                $currentPage,
-                $message,
-                (string) ($fallbackResult['reply'] ?? ''),
-                $mappedActions
-            );
-
             return response()->json([
-                'success' => true,
-                'reply' => $fallbackResult['reply'] ?? '',
-                'actions' => $mappedActions,
-                'auto_open_action' => null,
-                'refresh' => false,
-                'thread_key' => (string) $thread->thread_key,
-            ]);
+                'success' => false,
+                'error' => $result['error'] ?? 'The Hatchers assistant could not respond right now.',
+            ], 502);
         }
 
         $mappedActions = $this->mapAssistantActionsToOs($result['actions'] ?? []);
@@ -7284,6 +7255,7 @@ class OsShellController extends Controller
             (string) ($result['reply'] ?? ''),
             $mappedActions
         );
+        $this->persistAssistantStrategicMemory($founder, $thread);
 
         return response()->json([
             'success' => true,
@@ -7295,7 +7267,7 @@ class OsShellController extends Controller
         ]);
     }
 
-    private function localAssistantFallbackReply(
+    private function localAssistantReply(
         Founder $founder,
         string $message,
         string $currentPage,
@@ -7306,19 +7278,28 @@ class OsShellController extends Controller
         if (!$openAi->hasApiKey()) {
             return [
                 'ok' => false,
-                'error' => 'Atlas is temporarily unavailable, and the local Hatchers fallback is not configured yet.',
+                'error' => 'The Hatchers assistant is not configured yet.',
             ];
         }
 
         $founder->loadMissing([
             'company.intelligence',
+            'company.businessBrief',
+            'company.icpProfiles',
             'weeklyState',
             'commercialSummary',
             'actionPlans',
+            'businessBrief',
+            'icpProfiles',
+            'launchSystems',
+            'moduleSnapshots',
         ]);
 
         $company = $founder->company;
         $intelligence = $company?->intelligence;
+        $businessBrief = $founder->businessBrief ?? $company?->businessBrief;
+        $icpProfile = $founder->icpProfiles->sortByDesc('updated_at')->first() ?? $company?->icpProfiles?->sortByDesc('updated_at')->first();
+        $launchSystem = $founder->launchSystems->sortByDesc(fn (FounderLaunchSystem $system) => $system->last_reviewed_at ?? $system->updated_at)->first();
         $weeklyState = $founder->weeklyState;
         $commercialSummary = $founder->commercialSummary;
         $recentTasks = $founder->actionPlans()
@@ -7338,13 +7319,13 @@ class OsShellController extends Controller
 
         $thread = FounderConversationThread::query()
             ->where('founder_id', $founder->id)
-            ->where('source_channel', 'atlas_assistant')
+            ->whereIn('source_channel', ['os_assistant', 'atlas_assistant'])
             ->when(trim((string) $threadKey) !== '', fn ($query) => $query->where('thread_key', (string) $threadKey))
             ->orderByDesc('last_activity_at')
             ->orderByDesc('updated_at')
             ->first();
 
-        $memory = collect(is_array($thread?->meta_json['messages'] ?? null) ? $thread->meta_json['messages'] : [])
+        $memoryMessages = collect(is_array($thread?->meta_json['messages'] ?? null) ? $thread->meta_json['messages'] : [])
             ->take(-6)
             ->map(fn (array $entry): array => [
                 'type' => (string) ($entry['type'] ?? ''),
@@ -7352,43 +7333,95 @@ class OsShellController extends Controller
             ])
             ->values()
             ->all();
+        $threadMeta = is_array($thread?->meta_json ?? null) ? $thread->meta_json : [];
+        $durableAssistantMemory = is_array($businessBrief?->constraints_json['assistant_memory'] ?? null)
+            ? $businessBrief->constraints_json['assistant_memory']
+            : [];
 
         $prompt = [
-            'task' => 'Reply as the Hatchers founder mentor when Atlas is unavailable. Be conversational, helpful, and action-oriented.',
+            'task' => 'Act as the local Hatchers founder mentor and operating agent. Coach the founder like a practical growth mentor, ask clarifying questions when needed, and only suggest actions that the OS can actually help with.',
+            'mentor_brief' => $this->localAssistantMentorBrief(),
             'instructions' => [
                 'Return valid JSON only.',
-                'Act like a practical mentor using direct-response and offer-clarity thinking.',
-                'Give a direct answer first, then short next actions.',
-                'Ask one useful follow-up question when it helps.',
-                'If appropriate, suggest up to two workspace actions.',
-                'Do not mention system outages, fallbacks, APIs, or internal failures.',
+                'Be conversational, warm, commercially sharp, and founder-friendly.',
+                'Blend Alex Hormozi style offer/value clarity with Sabri Suby style direct-response, lead generation, and conversion thinking.',
+                'Prioritise organic customer acquisition, clearer offers, stronger proof, better follow-up, and practical execution before fancy tactics.',
+                'Use the founder context, company intelligence, launch plan, task state, commercial metrics, and prior conversation memory before giving advice.',
+                'When important information is missing, ask one targeted question instead of guessing.',
+                'When the founder asks for help using a Hatchers tool, explain how to use the relevant tool and suggest the right next OS action.',
+                'When onboarding fields are incomplete, guide the founder to complete the missing business details and refer back to the onboarding answers already captured.',
+                'Do not mention APIs, internal system fallbacks, or remote app dependencies.',
+                'Keep the answer compact but useful: direct answer first, then concrete next moves.',
+                'If appropriate, suggest up to three workspace actions the founder can take next.',
             ],
             'founder' => [
                 'name' => (string) $founder->full_name,
                 'username' => (string) $founder->username,
+                'email' => (string) $founder->email,
             ],
             'company' => [
                 'company_name' => (string) ($company?->company_name ?? ''),
                 'business_model' => (string) ($company?->business_model ?? ''),
                 'industry' => (string) ($company?->industry ?? ''),
+                'stage' => (string) ($company?->stage ?? ''),
+                'primary_city' => (string) ($company?->primary_city ?? ''),
+                'service_radius' => (string) ($company?->service_radius ?? ''),
                 'company_brief' => (string) ($company?->company_brief ?? ''),
+                'problem_solved' => (string) ($intelligence?->problem_solved ?? ''),
                 'target_audience' => (string) ($intelligence?->target_audience ?? ''),
                 'ideal_customer_profile' => (string) ($intelligence?->ideal_customer_profile ?? ''),
+                'primary_icp_name' => (string) ($intelligence?->primary_icp_name ?? ''),
                 'brand_voice' => (string) ($intelligence?->brand_voice ?? ''),
                 'core_offer' => (string) ($intelligence?->core_offer ?? ''),
+                'differentiators' => (string) ($intelligence?->differentiators ?? ''),
                 'primary_growth_goal' => (string) ($intelligence?->primary_growth_goal ?? ''),
                 'known_blockers' => (string) ($intelligence?->known_blockers ?? ''),
+                'objections' => (string) ($intelligence?->objections ?? ''),
+                'buying_triggers' => (string) ($intelligence?->buying_triggers ?? ''),
+                'local_market_notes' => (string) ($intelligence?->local_market_notes ?? ''),
+                'last_summary' => (string) ($intelligence?->last_summary ?? ''),
             ],
+            'onboarding_memory' => [
+                'founder_story' => (string) ($businessBrief?->founder_story ?? ''),
+                'business_summary' => (string) ($businessBrief?->business_summary ?? ''),
+                'problem_solved' => (string) ($businessBrief?->problem_solved ?? ''),
+                'proof_points' => (string) ($businessBrief?->proof_points ?? ''),
+                'constraints' => is_array($businessBrief?->constraints_json ?? null) ? $businessBrief->constraints_json : [],
+                'assistant_memory' => $durableAssistantMemory,
+                'icp_name' => (string) ($icpProfile?->primary_icp_name ?? ''),
+                'pain_points' => array_values((array) ($icpProfile?->pain_points_json ?? [])),
+                'desired_outcomes' => array_values((array) ($icpProfile?->desired_outcomes_json ?? [])),
+                'objections' => array_values((array) ($icpProfile?->objections_json ?? [])),
+                'primary_channels' => array_values((array) ($icpProfile?->primary_channels_json ?? [])),
+            ],
+            'launch_plan' => $this->localAssistantLaunchPlanSummary($launchSystem),
             'execution' => [
                 'weekly_focus' => (string) ($weeklyState?->weekly_focus ?? ''),
                 'open_tasks' => (int) ($weeklyState?->open_tasks ?? 0),
                 'completed_tasks' => (int) ($weeklyState?->completed_tasks ?? 0),
+                'weekly_progress_percent' => (int) ($weeklyState?->weekly_progress_percent ?? 0),
+                'recent_tasks' => $recentTasks,
+                'next_pending_task' => $this->assistantNextPendingTaskSummary($founder),
+            ],
+            'commercial' => [
+                'business_model' => (string) ($commercialSummary?->business_model ?? ''),
+                'product_count' => (int) ($commercialSummary?->product_count ?? 0),
+                'service_count' => (int) ($commercialSummary?->service_count ?? 0),
+                'order_count' => (int) ($commercialSummary?->order_count ?? 0),
+                'booking_count' => (int) ($commercialSummary?->booking_count ?? 0),
+                'customer_count' => (int) ($commercialSummary?->customer_count ?? 0),
                 'gross_revenue' => (float) ($commercialSummary?->gross_revenue ?? 0),
                 'currency' => (string) ($commercialSummary?->currency ?? 'USD'),
-                'recent_tasks' => $recentTasks,
             ],
+            'module_state' => $this->localAssistantModuleState($founder),
+            'workspace_capabilities' => $this->localAssistantWorkspaceCapabilities(),
+            'workspace_playbooks' => $this->localAssistantWorkspacePlaybooks(),
+            'operating_guidance' => $this->localAssistantOperatingGuidance($durableAssistantMemory, $threadMeta),
             'current_page' => $currentPage,
-            'conversation_memory' => $memory,
+            'conversation_memory' => $memoryMessages,
+            'recurring_concerns' => $this->localAssistantRecurringConcerns($memoryMessages, $threadMeta, $durableAssistantMemory),
+            'strategic_decisions' => $this->localAssistantStrategicDecisions($threadMeta, $durableAssistantMemory),
+            'tool_interests' => $this->localAssistantToolInterests($threadMeta, $durableAssistantMemory),
             'user_message' => $message,
             'response_schema' => [
                 'reply' => 'string',
@@ -7416,7 +7449,7 @@ class OsShellController extends Controller
         if ($reply === '') {
             return [
                 'ok' => false,
-                'error' => 'Hatchers could not generate a fallback reply right now.',
+                'error' => 'The Hatchers assistant could not generate a reply right now.',
             ];
         }
 
@@ -7425,6 +7458,291 @@ class OsShellController extends Controller
             'reply' => $reply,
             'actions' => array_values(array_filter((array) ($response['actions'] ?? []), fn ($action) => is_array($action))),
         ];
+    }
+
+    private function localAssistantMentorBrief(): array
+    {
+        return [
+            'mentor_style' => 'Practical founder mentor who combines Alex Hormozi value/offer thinking with Sabri Suby direct-response, lead-generation, and conversion methodology.',
+            'principles' => [
+                'Make the offer clearer, stronger, and more desirable before adding complexity.',
+                'Prefer organic lead generation, outreach, proof, follow-up, and compelling calls to action before paid growth unless the founder asks for paid.',
+                'Use simple, commercial language. Focus on customer pain, promised outcome, proof, objections, risk reduction, and urgency.',
+                'Always anchor advice to real execution inside Hatchers OS tools, launch plan, and current founder constraints.',
+                'Ask good diagnostic questions when the offer, customer, or channel is unclear.',
+            ],
+        ];
+    }
+
+    private function localAssistantLaunchPlanSummary(?FounderLaunchSystem $launchSystem): array
+    {
+        $strategy = is_array($launchSystem?->launch_strategy_json ?? null) ? $launchSystem->launch_strategy_json : [];
+
+        return [
+            'status' => (string) ($launchSystem?->status ?? ''),
+            'engine' => (string) ($launchSystem?->selected_engine ?? ''),
+            'summary' => (string) ($strategy['summary'] ?? ''),
+            'weekly_focus' => (string) ($strategy['weekly_focus'] ?? ''),
+            'north_star_metrics' => array_values((array) ($strategy['north_star_metrics'] ?? [])),
+            'channels' => array_values((array) ($strategy['channels'] ?? [])),
+            'milestones' => collect((array) ($strategy['milestones'] ?? []))
+                ->map(fn ($milestone) => is_array($milestone) ? [
+                    'title' => (string) ($milestone['title'] ?? ''),
+                    'objective' => (string) ($milestone['objective'] ?? ''),
+                    'metric' => (string) ($milestone['metric'] ?? ''),
+                ] : null)
+                ->filter()
+                ->values()
+                ->all(),
+            'offer_stack' => array_values((array) ($strategy['offer_stack'] ?? $launchSystem?->offer_stack_json ?? [])),
+            'assets' => collect((array) ($strategy['assets'] ?? []))
+                ->map(fn ($asset) => is_array($asset) ? [
+                    'type' => (string) ($asset['type'] ?? ''),
+                    'name' => (string) ($asset['name'] ?? ''),
+                    'purpose' => (string) ($asset['purpose'] ?? ''),
+                ] : $asset)
+                ->values()
+                ->all(),
+        ];
+    }
+
+    private function localAssistantModuleState(Founder $founder): array
+    {
+        return $founder->moduleSnapshots
+            ->sortByDesc('snapshot_updated_at')
+            ->take(5)
+            ->map(function ($snapshot): array {
+                $payload = is_array($snapshot->payload_json ?? null) ? $snapshot->payload_json : [];
+                $summary = is_array($payload['summary'] ?? null) ? $payload['summary'] : [];
+                $keyCounts = is_array($payload['key_counts'] ?? null) ? $payload['key_counts'] : [];
+
+                return [
+                    'module' => (string) ($snapshot->module ?? ''),
+                    'readiness_score' => (int) ($snapshot->readiness_score ?? 0),
+                    'updated_at' => optional($snapshot->snapshot_updated_at)->toIso8601String(),
+                    'summary' => [
+                        'headline' => (string) ($summary['headline'] ?? ''),
+                        'status' => (string) ($summary['status'] ?? ''),
+                        'gross_revenue' => (float) ($summary['gross_revenue'] ?? 0),
+                        'currency' => (string) ($summary['currency'] ?? 'USD'),
+                        'order_count' => (int) ($keyCounts['order_count'] ?? 0),
+                        'booking_count' => (int) ($keyCounts['booking_count'] ?? 0),
+                        'customer_count' => (int) ($keyCounts['customer_count'] ?? 0),
+                    ],
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    private function localAssistantWorkspaceCapabilities(): array
+    {
+        return [
+            'dashboard_chat' => 'Guide the founder conversationally, capture onboarding answers, refine plans, and trigger real OS actions.',
+            'build_my_website' => 'Build, rebuild, review, and publish the founder website. Useful when the founder wants messaging, offers, FAQs, blogs, and website structure improved.',
+            'campaign_studio' => 'Generate campaign briefs and help the founder choose between posts, grids, and content sequences for execution.',
+            'servio' => 'Manage service business websites, bookings, offers, and operational service flows.',
+            'bazaar' => 'Manage products, storefront operations, catalog structure, orders, and product commerce.',
+            'tasks' => 'Create, break down, tighten, complete, and reorder tasks tied to the launch plan.',
+            'company_intelligence' => 'Update target audience, ICP, offer, blockers, proof, objections, visual direction, and market notes.',
+            'launch_plan' => 'Refine milestones, execution order, weekly focus, and task generation based on founder constraints and goals.',
+            'search' => 'Find relevant workspaces or records when the founder is unsure where something lives.',
+            'notifications' => 'Review recent OS updates, website build status, and milestone alerts.',
+        ];
+    }
+
+    private function localAssistantWorkspacePlaybooks(): array
+    {
+        return [
+            'campaign_studio' => [
+                'when_to_use' => 'Use when the founder wants to generate demand through organic campaign content, choose a campaign angle, or turn an offer into posts, grids, or content sequences.',
+                'how_to_guide' => [
+                    'Clarify the offer, audience, and promised outcome first.',
+                    'Recommend one campaign angle tied to pain, proof, or transformation.',
+                    'Help the founder choose between post, grid, or content sequence depending on depth and urgency.',
+                    'If the founder is ready, suggest opening Campaign Studio and creating the brief.',
+                ],
+            ],
+            'build_my_website' => [
+                'when_to_use' => 'Use when the founder needs a clearer offer, better messaging, stronger website copy, or wants the system to build/rebuild/publish the website.',
+                'how_to_guide' => [
+                    'Tighten the offer and ICP before triggering a rebuild when possible.',
+                    'Tell the founder which parts of the website are most likely to improve, like hero, offer stack, FAQs, services, or founder story.',
+                    'Ask for approval before building or rebuilding the website.',
+                ],
+            ],
+            'company_intelligence' => [
+                'when_to_use' => 'Use when the founder is unclear on target audience, ICP, offer, differentiators, blockers, brand voice, or local market.',
+                'how_to_guide' => [
+                    'Ask direct diagnostic questions.',
+                    'Push toward specific customer pain, desired outcome, objections, and proof.',
+                    'Encourage concrete language the rest of the OS can reuse.',
+                ],
+            ],
+            'tasks' => [
+                'when_to_use' => 'Use when the founder needs the next best move, wants to break down work, or wants to close/reopen tasks.',
+                'how_to_guide' => [
+                    'Tie each task to a milestone and commercial outcome.',
+                    'Break fuzzy tasks into narrow execution steps.',
+                    'Suggest the next task after one is completed.',
+                ],
+            ],
+            'servio_bazaar' => [
+                'when_to_use' => 'Use when the founder asks about service bookings, product sales, storefronts, orders, or revenue flow.',
+                'how_to_guide' => [
+                    'Use Servio for service-led businesses and Bazaar for product-led businesses.',
+                    'Reference current bookings, orders, and revenue from the commercial summary when advising.',
+                    'Prioritise fixing the core offer and conversion path before adding complexity.',
+                ],
+            ],
+        ];
+    }
+
+    private function localAssistantRecurringConcerns(array $memoryMessages, array $threadMeta = [], array $durableAssistantMemory = []): array
+    {
+        $derived = collect($memoryMessages)
+            ->filter(fn (array $entry): bool => ($entry['type'] ?? '') === 'user')
+            ->pluck('text')
+            ->map(function (string $text): string {
+                $normalized = trim(preg_replace('/\s+/', ' ', strip_tags($text)));
+                if ($normalized === '') {
+                    return '';
+                }
+
+                return Str::limit($normalized, 140, '...');
+            })
+            ->filter()
+            ->unique()
+            ->take(-3)
+            ->values();
+
+        return collect(array_values((array) ($durableAssistantMemory['recurring_concerns'] ?? [])))
+            ->merge(array_values((array) ($threadMeta['recurring_concerns'] ?? [])))
+            ->merge($derived)
+            ->filter()
+            ->unique()
+            ->take(-6)
+            ->values()
+            ->all();
+    }
+
+    private function localAssistantStrategicDecisions(array $threadMeta = [], array $durableAssistantMemory = []): array
+    {
+        return collect(array_values((array) ($durableAssistantMemory['strategic_decisions'] ?? [])))
+            ->merge(array_values((array) ($threadMeta['strategic_decisions'] ?? [])))
+            ->filter()
+            ->unique()
+            ->take(-8)
+            ->values()
+            ->all();
+    }
+
+    private function localAssistantToolInterests(array $threadMeta = [], array $durableAssistantMemory = []): array
+    {
+        return collect(array_values((array) ($durableAssistantMemory['tool_interests'] ?? [])))
+            ->merge(array_values((array) ($threadMeta['tool_interests'] ?? [])))
+            ->filter()
+            ->unique()
+            ->take(-8)
+            ->values()
+            ->all();
+    }
+
+    private function localAssistantOperatingGuidance(array $durableAssistantMemory = [], array $threadMeta = []): array
+    {
+        $decisions = $this->localAssistantStrategicDecisions($threadMeta, $durableAssistantMemory);
+        $concerns = $this->localAssistantRecurringConcerns([], $threadMeta, $durableAssistantMemory);
+        $toolInterests = $this->localAssistantToolInterests($threadMeta, $durableAssistantMemory);
+
+        $guidance = [
+            'respect_previous_decisions' => $decisions,
+            'watch_for_recurring_concerns' => $concerns,
+            'lean_into_tool_interests' => $toolInterests,
+            'rules' => [],
+        ];
+
+        $joinedDecisions = Str::lower(implode(' | ', $decisions));
+        $joinedConcerns = Str::lower(implode(' | ', $concerns));
+
+        if (str_contains($joinedDecisions, 'organic')) {
+            $guidance['rules'][] = 'Keep the advice focused on organic outreach, direct-response messaging, proof, follow-up, and no paid-ad assumption unless the founder changes direction.';
+        }
+
+        if (str_contains($joinedDecisions, 'paid')) {
+            $guidance['rules'][] = 'The founder has shown interest in paid growth, but still keep the offer, audience, and conversion path clear before recommending spend.';
+        }
+
+        if (str_contains($joinedConcerns, 'offer clarity')) {
+            $guidance['rules'][] = 'Offer clarity is a recurring concern. Push toward a simpler, sharper, more decision-ready offer before suggesting more channels.';
+        }
+
+        if (str_contains($joinedConcerns, 'website quality')) {
+            $guidance['rules'][] = 'Website quality keeps coming up. When relevant, steer toward Build My Website with concrete suggestions for what to improve.';
+        }
+
+        if (in_array('campaign_studio', $toolInterests, true)) {
+            $guidance['rules'][] = 'The founder keeps circling campaign work. When they ask about getting customers, suggest a campaign angle and explain when Campaign Studio is the right next step.';
+        }
+
+        if (in_array('tasks', $toolInterests, true)) {
+            $guidance['rules'][] = 'The founder responds well to task-based guidance. Suggest the next best task and offer to break it down.';
+        }
+
+        return $guidance;
+    }
+
+    private function assistantNextPendingTaskSummary(Founder $founder): array
+    {
+        $task = $this->assistantNextPendingTask($founder);
+        if (!$task) {
+            return [];
+        }
+
+        return [
+            'title' => (string) $task->title,
+            'description' => (string) $task->description,
+            'platform' => (string) ($task->platform ?? ''),
+            'milestone' => (string) ($task->metadata_json['milestone'] ?? ''),
+            'north_star_metric' => (string) ($task->metadata_json['north_star_metric'] ?? ''),
+            'cta_label' => (string) ($task->cta_label ?? ''),
+            'cta_url' => (string) ($task->cta_url ?? ''),
+        ];
+    }
+
+    private function persistAssistantStrategicMemory(Founder $founder, FounderConversationThread $thread): void
+    {
+        $meta = is_array($thread->meta_json ?? null) ? $thread->meta_json : [];
+        $assistantMemory = [
+            'recurring_concerns' => array_values((array) ($meta['recurring_concerns'] ?? [])),
+            'strategic_decisions' => array_values((array) ($meta['strategic_decisions'] ?? [])),
+            'tool_interests' => array_values((array) ($meta['tool_interests'] ?? [])),
+            'updated_at' => now()->toIso8601String(),
+        ];
+
+        if (
+            empty($assistantMemory['recurring_concerns']) &&
+            empty($assistantMemory['strategic_decisions']) &&
+            empty($assistantMemory['tool_interests'])
+        ) {
+            return;
+        }
+
+        $businessBrief = $founder->businessBrief;
+        $company = $founder->company;
+        if (!$businessBrief && $company) {
+            $businessBrief = $company->businessBrief;
+        }
+
+        if (!$businessBrief) {
+            return;
+        }
+
+        $constraints = is_array($businessBrief->constraints_json ?? null) ? $businessBrief->constraints_json : [];
+        $constraints['assistant_memory'] = $assistantMemory;
+
+        $businessBrief->forceFill([
+            'constraints_json' => $constraints,
+        ])->save();
     }
 
     private function executeAssistantWebsiteBuildAction(
@@ -7441,9 +7759,12 @@ class OsShellController extends Controller
             ]);
         }
 
+        $preferences = $this->assistantStoredOperatingPreferences($founder, $company);
+        $buildFocusSentence = $this->assistantWebsiteBuildFocusSentence($preferences);
+
         if (in_array((string) ($company->website_generation_status ?? ''), ['in_progress', 'ready_for_review'], true)) {
             return array_merge($actionResult, [
-                'reply' => 'We are already working on your website. I will keep watching for the publish result and share the live link here as soon as it is ready.',
+                'reply' => 'We are already working on your website.' . $buildFocusSentence . ' I will keep watching for the publish result and share the live link here as soon as it is ready.',
                 'actions' => [[
                     'title' => 'Build My Website',
                     'platform' => 'os',
@@ -7471,7 +7792,7 @@ class OsShellController extends Controller
         $this->startFounderWebsiteBuildPipeline($founder->fresh(['company']), $founderNotificationService, $engineLabel, $isImprovementPass);
 
         return array_merge($actionResult, [
-            'reply' => 'Perfect. I am building and publishing your website now. I will reply here with the live link as soon as the website is ready.',
+            'reply' => 'Perfect. I am building and publishing your website now.' . $buildFocusSentence . ' I will reply here with the live link as soon as the website is ready.',
             'actions' => [[
                 'title' => 'Build My Website',
                 'platform' => 'os',
@@ -7517,8 +7838,11 @@ class OsShellController extends Controller
             ], 422);
         }
 
+        $preferences = $this->assistantStoredOperatingPreferences($founder, $company);
+        $buildFocusSentence = $this->assistantWebsiteBuildFocusSentence($preferences);
+
         if (in_array((string) ($company->website_generation_status ?? ''), ['in_progress', 'ready_for_review'], true)) {
-            $reply = 'We are already working on your website. I will keep watching for the publish result and share the live link here as soon as it is ready.';
+            $reply = 'We are already working on your website.' . $buildFocusSentence . ' I will keep watching for the publish result and share the live link here as soon as it is ready.';
             $timeline->appendAssistantMessage(
                 $founder,
                 trim((string) ($validated['thread_key'] ?? '')) ?: null,
@@ -7558,7 +7882,7 @@ class OsShellController extends Controller
         $engineLabel = $this->websiteBuildEngineLabel($company, 'auto');
         $this->startFounderWebsiteBuildPipeline($founder->fresh(['company']), $founderNotificationService, $engineLabel, $isImprovementPass);
 
-        $reply = 'Perfect. I am building and publishing your website now. I will reply here with the live link as soon as the website is ready.';
+        $reply = 'Perfect. I am building and publishing your website now.' . $buildFocusSentence . ' I will reply here with the live link as soon as the website is ready.';
         $timeline->appendAssistantMessage(
             $founder,
             trim((string) ($validated['thread_key'] ?? '')) ?: null,
@@ -7601,7 +7925,7 @@ class OsShellController extends Controller
                 'founder_id' => $founder->id,
                 'title' => $step,
                 'description' => 'Created directly by Atlas from chat plan: ' . $title,
-                'platform' => 'atlas_assistant',
+                'platform' => 'os_assistant',
                 'priority' => max(40, 82 - ($index * 6)),
                 'status' => 'pending',
                 'cta_label' => 'Open Tasks',
@@ -7646,6 +7970,8 @@ class OsShellController extends Controller
         $signupProfile = $this->launchPlanSignupProfileFromCurrentState($company, $launchSystem, $focus);
         $deducedProfile = $this->launchPlanDeducedProfileFromCurrentState($company);
         $launchPlan = $this->buildFounderLaunchPlan($signupProfile, $deducedProfile, $blueprint);
+        $preferences = $this->assistantStoredOperatingPreferences($founder, $company);
+        $launchPlan = $this->applyAssistantOperatingPreferencesToLaunchPlan($launchPlan, $preferences, $signupProfile, $deducedProfile);
 
         if ($focus !== '') {
             $launchPlan['summary'] = trim($launchPlan['summary'] . ' Atlas refined this version around: ' . $focus . '.');
@@ -7779,16 +8105,21 @@ class OsShellController extends Controller
                 'platform' => 'lms',
                 'url' => route('founder.tasks'),
             ];
+            $formatReason = trim((string) ($campaignBrief['format_reason'] ?? ''));
+            $formatReasonText = $formatReason !== '' ? ' I am leaning that way because ' . $formatReason . '.' : '';
 
             return array_merge($actionResult, [
-                'reply' => 'Done. I refined your launch plan, created a campaign brief called "' . $campaignBrief['title'] . '", and I am opening Campaign Studio next so we can choose the best format. I would test this angle first: ' . $campaignBrief['angle'] . '. Three strong directions I see are: 1. ' . ($campaignIdeas[0] ?? 'lead with the core problem') . ' 2. ' . ($campaignIdeas[1] ?? 'show the offer outcome clearly') . ' 3. ' . ($campaignIdeas[2] ?? 'use one direct call to action') . ' Which one feels most aligned right now: post, grid, or a broader content sequence?',
+                'reply' => 'Done. I refined your launch plan, created a campaign brief called "' . $campaignBrief['title'] . '", and I am opening Campaign Studio next so we can choose the best format. I would test this angle first: ' . $campaignBrief['angle'] . $formatReasonText . ' Three strong directions I see are: 1. ' . ($campaignIdeas[0] ?? 'lead with the core problem') . ' 2. ' . ($campaignIdeas[1] ?? 'show the offer outcome clearly') . ' 3. ' . ($campaignIdeas[2] ?? 'use one direct call to action') . ' Which one feels most aligned right now: post, grid, or a broader content sequence?',
                 'actions' => $actions,
                 'sync_summary' => 'Atlas refined the launch plan, generated a campaign brief, and prepared Campaign Studio in Hatchers OS.',
             ]);
         }
 
+        $formatReason = trim((string) ($campaignBrief['format_reason'] ?? ''));
+        $formatReasonText = $formatReason !== '' ? ' I am leaning that way because ' . $formatReason . '.' : '';
+
         return array_merge($actionResult, [
-            'reply' => 'I refined your launch plan and refreshed the next OS tasks. I also drafted the campaign angle conceptually, but I could not save the Atlas campaign brief yet. The strongest next move is still to open Campaign Studio and choose whether this should start as a post, grid, or content sequence. My first three angle ideas would be: 1. ' . ($campaignIdeas[0] ?? 'lead with the core problem') . ' 2. ' . ($campaignIdeas[1] ?? 'show the offer outcome clearly') . ' 3. ' . ($campaignIdeas[2] ?? 'use one direct call to action') . '.',
+            'reply' => 'I refined your launch plan and refreshed the next OS tasks. I also drafted the campaign angle conceptually, but I could not save the Atlas campaign brief yet. The strongest next move is still to open Campaign Studio and choose whether this should start as a post, grid, or content sequence.' . $formatReasonText . ' My first three angle ideas would be: 1. ' . ($campaignIdeas[0] ?? 'lead with the core problem') . ' 2. ' . ($campaignIdeas[1] ?? 'show the offer outcome clearly') . ' 3. ' . ($campaignIdeas[2] ?? 'use one direct call to action') . '.',
             'actions' => $actions,
             'sync_summary' => 'Atlas refined the launch plan and prepared Campaign Studio, but campaign brief creation still needs follow-up.',
         ]);
@@ -7805,13 +8136,24 @@ class OsShellController extends Controller
             'actions' => [],
             'sync_summary' => '',
         ]);
-        $areas = $this->assistantWebsiteRefreshAreas((string) ($actionResult['field'] ?? ''));
+        $preferences = $this->assistantStoredOperatingPreferences($founder, $founder->company);
+        $areas = $this->assistantWebsiteRefreshAreas((string) ($actionResult['field'] ?? ''), $preferences);
         $areasText = empty($areas)
             ? 'headline, offer, and proof blocks'
             : implode(', ', $areas);
+        $preferenceNote = [];
+        if (($preferences['offer_clarity_priority'] ?? false) === true) {
+            $preferenceNote[] = 'sharpen the offer before expanding the page';
+        }
+        if (($preferences['website_quality_priority'] ?? false) === true) {
+            $preferenceNote[] = 'improve the conversion path and page clarity, not just visual changes';
+        }
+        $preferenceSentence = empty($preferenceNote)
+            ? 'The strongest thing to watch next is whether the positioning feels sharper and easier to say yes to, not just different.'
+            : 'Because of your earlier priorities, I am pushing this refresh to ' . implode(' and ', $preferenceNote) . '.';
 
         return array_merge($actionResult, [
-            'reply' => 'Done. I updated "' . $fieldLabel . '" and I am regenerating your website copy now so the live messaging reflects the new direction. I would expect the biggest changes to show up in the ' . $areasText . '. The strongest thing to watch next is whether the positioning feels sharper and easier to say yes to, not just different. I will reopen Build My Website for you so you can review the refreshed version.',
+            'reply' => 'Done. I updated "' . $fieldLabel . '" and I am regenerating your website copy now so the live messaging reflects the new direction. I would expect the biggest changes to show up in the ' . $areasText . '. ' . $preferenceSentence . ' I will reopen Build My Website for you so you can review the refreshed version.',
             'actions' => [[
                 'title' => 'Build My Website',
                 'platform' => 'os',
@@ -7823,13 +8165,8 @@ class OsShellController extends Controller
 
     private function executeAssistantTaskCloseGuidanceAction(Founder $founder, array $actionResult): array
     {
-        $nextTask = FounderActionPlan::query()
-            ->where('founder_id', $founder->id)
-            ->where('context', 'task')
-            ->whereNotIn('status', ['completed', 'complete', 'done'])
-            ->orderByDesc('priority')
-            ->orderBy('available_on')
-            ->first();
+        $preferences = $this->assistantStoredOperatingPreferences($founder, $founder->company);
+        $nextTask = $this->assistantNextPendingTask($founder);
 
         if (!$nextTask) {
             return array_merge($actionResult, [
@@ -7843,9 +8180,10 @@ class OsShellController extends Controller
         }
 
         $milestone = trim((string) data_get($nextTask->metadata_json, 'milestone', ''));
+        $whyNext = $this->assistantPreferredTaskReason($nextTask, $preferences);
 
         return array_merge($actionResult, [
-            'reply' => 'Done. I closed that task for you. The next task I would move to is "' . $nextTask->title . '". It matters because ' . trim((string) ($nextTask->description ?? 'it is the next leverage point in the plan')) . ($milestone !== '' ? ' It belongs to the milestone "' . $milestone . '".' : '') . ' My advice is to keep this one narrow and finishable in one work block. Want me to tighten that task or break it into smaller execution steps?',
+            'reply' => 'Done. I closed that task for you. The next task I would move to is "' . $nextTask->title . '". ' . $whyNext . ' It matters because ' . trim((string) ($nextTask->description ?? 'it is the next leverage point in the plan')) . ($milestone !== '' ? ' It belongs to the milestone "' . $milestone . '".' : '') . ' My advice is to keep this one narrow and finishable in one work block. Want me to tighten that task or break it into smaller execution steps?',
             'actions' => [[
                 'title' => 'Open Tasks',
                 'platform' => 'lms',
@@ -7857,6 +8195,7 @@ class OsShellController extends Controller
     private function executeAssistantTaskBreakdownAction(Founder $founder, array $actionResult): array
     {
         $task = $this->assistantNextPendingTask($founder);
+        $preferences = $this->assistantStoredOperatingPreferences($founder, $founder->company);
         if (!$task) {
             return array_merge($actionResult, [
                 'reply' => 'I am ready to break the work down, but there is no pending task to expand right now. Want me to create the next tasks from your current goal instead?',
@@ -7868,7 +8207,7 @@ class OsShellController extends Controller
             ]);
         }
 
-        $steps = $this->assistantExecutionStepsForTask($task);
+        $steps = $this->assistantExecutionStepsForTask($task, $preferences);
         $metadata = is_array($task->metadata_json) ? $task->metadata_json : [];
         $metadata['execution_steps'] = $steps;
         $metadata['assistant_refined_at'] = now()->toIso8601String();
@@ -7883,7 +8222,7 @@ class OsShellController extends Controller
         ])->save();
 
         return array_merge($actionResult, [
-            'reply' => 'Done. I broke "' . $task->title . '" into smaller execution steps for you. I would work them in this order: 1. ' . ($steps[0] ?? 'clarify the outcome') . ' 2. ' . ($steps[1] ?? 'build the first visible asset') . ' 3. ' . ($steps[2] ?? 'ship and review'). ' My advice is to finish step one in the next work block before touching the rest.',
+            'reply' => 'Done. I broke "' . $task->title . '" into smaller execution steps for you. ' . $this->assistantPreferredTaskReason($task, $preferences) . ' I would work them in this order: 1. ' . ($steps[0] ?? 'clarify the outcome') . ' 2. ' . ($steps[1] ?? 'build the first visible asset') . ' 3. ' . ($steps[2] ?? 'ship and review'). ' My advice is to finish step one in the next work block before touching the rest.',
             'actions' => [[
                 'title' => 'Open Tasks',
                 'platform' => 'lms',
@@ -7896,6 +8235,7 @@ class OsShellController extends Controller
     private function executeAssistantTaskTightenAction(Founder $founder, array $actionResult): array
     {
         $task = $this->assistantNextPendingTask($founder);
+        $preferences = $this->assistantStoredOperatingPreferences($founder, $founder->company);
         if (!$task) {
             return array_merge($actionResult, [
                 'reply' => 'I can tighten the next task, but there is no pending task to reshape right now. Want me to create the next tasks from your current goal instead?',
@@ -7907,7 +8247,7 @@ class OsShellController extends Controller
             ]);
         }
 
-        $tightened = $this->assistantTightenedTaskCopy($task);
+        $tightened = $this->assistantTightenedTaskCopy($task, $preferences);
         $metadata = is_array($task->metadata_json) ? $task->metadata_json : [];
         $metadata['assistant_refined_at'] = now()->toIso8601String();
         $metadata['assistant_refine_mode'] = 'tighten';
@@ -7919,7 +8259,7 @@ class OsShellController extends Controller
         ])->save();
 
         return array_merge($actionResult, [
-            'reply' => 'Done. I tightened that task into a cleaner work block: "' . $tightened['title'] . '". The goal now is not to make it bigger, but to make it easier to finish in one sitting. If you want, I can break it into smaller execution steps next.',
+            'reply' => 'Done. I tightened that task into a cleaner work block: "' . $tightened['title'] . '". ' . $this->assistantPreferredTaskReason($task, $preferences) . ' The goal now is not to make it bigger, but to make it easier to finish in one sitting. If you want, I can break it into smaller execution steps next.',
             'actions' => [[
                 'title' => 'Open Tasks',
                 'platform' => 'lms',
@@ -7971,20 +8311,62 @@ class OsShellController extends Controller
 
     private function assistantNextPendingTask(Founder $founder): ?FounderActionPlan
     {
-        return FounderActionPlan::query()
+        $preferences = $this->assistantStoredOperatingPreferences($founder, $founder->company);
+
+        $tasks = FounderActionPlan::query()
             ->where('founder_id', $founder->id)
             ->where('context', 'task')
             ->whereNotIn('status', ['completed', 'complete', 'done'])
             ->orderByDesc('priority')
             ->orderBy('available_on')
+            ->get();
+
+        if ($tasks->isEmpty()) {
+            return null;
+        }
+
+        return $tasks
+            ->sortByDesc(fn (FounderActionPlan $task) => $this->assistantTaskRelevanceScore($task, $preferences))
+            ->sortByDesc(fn (FounderActionPlan $task) => (int) $task->priority)
+            ->sortBy(fn (FounderActionPlan $task) => (string) ($task->available_on ?? '9999-12-31'))
             ->first();
     }
 
-    private function assistantExecutionStepsForTask(FounderActionPlan $task): array
+    private function assistantExecutionStepsForTask(FounderActionPlan $task, array $preferences = []): array
     {
         $title = trim((string) $task->title);
         $description = trim((string) ($task->description ?? ''));
         $shortContext = Str::limit($description !== '' ? $description : $title, 120, '...');
+
+        if (($preferences['offer_clarity_priority'] ?? false) === true && $this->assistantTaskMatchesKeywords($task, [
+            'offer', 'headline', 'message', 'cta', 'homepage', 'landing', 'website',
+        ])) {
+            return [
+                'Rewrite the promise for "' . $title . '" into one clear customer-facing sentence with one outcome and one buyer.',
+                'Strip away extra claims or choices so the CTA and value proposition are obvious in the first screen or first message.',
+                'Publish or test the sharper version and note which wording feels most direct and believable.',
+            ];
+        }
+
+        if (($preferences['organic_first'] ?? false) === true && $this->assistantTaskMatchesKeywords($task, [
+            'campaign', 'post', 'grid', 'content', 'social', 'email', 'outreach', 'lead',
+        ])) {
+            return [
+                'Name the pain point or buyer problem this asset should lead with before creating anything.',
+                'Draft one organic-first asset that uses a strong hook, one belief shift, and one proof point tied to ' . Str::lower($shortContext) . '.',
+                'Add one clear organic CTA, publish or queue it, then note what response signal you want to track next.',
+            ];
+        }
+
+        if (($preferences['website_quality_priority'] ?? false) === true && $this->assistantTaskMatchesKeywords($task, [
+            'website', 'homepage', 'page', 'copy', 'cta', 'funnel', 'service',
+        ])) {
+            return [
+                'Clarify what part of the conversion path this task should improve before editing the page.',
+                'Make one concrete change to the page or copy that removes confusion and strengthens the CTA.',
+                'Review the page as a buyer, tighten the weakest section, and confirm the next step is obvious.',
+            ];
+        }
 
         return [
             'Clarify the exact output for "' . $title . '" in one sentence before you start.',
@@ -7993,11 +8375,29 @@ class OsShellController extends Controller
         ];
     }
 
-    private function assistantTightenedTaskCopy(FounderActionPlan $task): array
+    private function assistantTightenedTaskCopy(FounderActionPlan $task, array $preferences = []): array
     {
         $title = trim((string) $task->title);
         $description = trim((string) ($task->description ?? ''));
         $normalizedTitle = Str::of($title)->replaceMatches('/\s+/', ' ')->trim()->value();
+
+        if (($preferences['offer_clarity_priority'] ?? false) === true && $this->assistantTaskMatchesKeywords($task, [
+            'offer', 'headline', 'message', 'cta', 'homepage', 'landing', 'website',
+        ])) {
+            return [
+                'title' => Str::limit('Rewrite the core offer and CTA', 68, ''),
+                'description' => 'Tighten this into one conversion-focused work block: rewrite the offer promise, sharpen the CTA, and remove anything that weakens message clarity. Finish with one buyer-facing version you can ship or test today.',
+            ];
+        }
+
+        if (($preferences['organic_first'] ?? false) === true && $this->assistantTaskMatchesKeywords($task, [
+            'campaign', 'post', 'grid', 'content', 'social', 'email', 'outreach', 'lead',
+        ])) {
+            return [
+                'title' => Str::limit('Draft one organic response asset', 68, ''),
+                'description' => 'Turn this into one organic-first execution block: create a single asset with one hook, one belief shift, one proof point, and one CTA. Do not expand scope beyond the first shippable post, email, or outreach draft.',
+            ];
+        }
 
         return [
             'title' => Str::limit($normalizedTitle, 68, ''),
@@ -8005,27 +8405,149 @@ class OsShellController extends Controller
         ];
     }
 
+    private function assistantTaskRelevanceScore(FounderActionPlan $task, array $preferences): int
+    {
+        $score = (int) $task->priority;
+
+        if (($preferences['offer_clarity_priority'] ?? false) === true && $this->assistantTaskMatchesKeywords($task, [
+            'offer', 'headline', 'message', 'cta', 'homepage', 'landing', 'website',
+        ])) {
+            $score += 120;
+        }
+
+        if (($preferences['website_quality_priority'] ?? false) === true && $this->assistantTaskMatchesKeywords($task, [
+            'website', 'homepage', 'page', 'copy', 'cta', 'funnel', 'service',
+        ])) {
+            $score += 100;
+        }
+
+        if (($preferences['campaign_studio_interest'] ?? false) === true && $this->assistantTaskMatchesKeywords($task, [
+            'campaign', 'post', 'grid', 'content', 'social',
+        ])) {
+            $score += 90;
+        }
+
+        if (($preferences['organic_first'] ?? false) === true && $this->assistantTaskMatchesKeywords($task, [
+            'outreach', 'lead', 'social', 'email', 'content', 'post', 'prospect',
+        ])) {
+            $score += 80;
+        }
+
+        if (($preferences['task_guidance_preference'] ?? false) === true && (string) $task->platform === 'os') {
+            $score += 20;
+        }
+
+        return $score;
+    }
+
+    private function assistantTaskMatchesKeywords(FounderActionPlan $task, array $keywords): bool
+    {
+        $haystack = Str::lower(trim((string) $task->title . ' ' . (string) ($task->description ?? '')));
+        foreach ($keywords as $keyword) {
+            if (str_contains($haystack, Str::lower($keyword))) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function assistantPreferredTaskReason(FounderActionPlan $task, array $preferences): string
+    {
+        if (($preferences['offer_clarity_priority'] ?? false) === true && $this->assistantTaskMatchesKeywords($task, [
+            'offer', 'headline', 'message', 'cta', 'homepage', 'landing', 'website',
+        ])) {
+            return 'Because offer clarity keeps surfacing as a founder concern, this is the strongest next leverage point.';
+        }
+
+        if (($preferences['website_quality_priority'] ?? false) === true && $this->assistantTaskMatchesKeywords($task, [
+            'website', 'homepage', 'page', 'copy', 'cta', 'funnel', 'service',
+        ])) {
+            return 'Because website quality is a current priority, this task is the fastest way to improve conversion clarity.';
+        }
+
+        if (($preferences['campaign_studio_interest'] ?? false) === true && $this->assistantTaskMatchesKeywords($task, [
+            'campaign', 'post', 'grid', 'content', 'social',
+        ])) {
+            return 'Because you have been leaning into campaign execution, this is the best next task to turn strategy into visible output.';
+        }
+
+        if (($preferences['organic_first'] ?? false) === true && $this->assistantTaskMatchesKeywords($task, [
+            'outreach', 'lead', 'social', 'email', 'content', 'post', 'prospect',
+        ])) {
+            return 'Because your current operating preference is organic-first growth, this task best supports that path.';
+        }
+
+        return 'This is the strongest next leverage point in the current plan.';
+    }
+
+    private function assistantWebsiteBuildPromptFromPreferences(array $preferences): string
+    {
+        if (($preferences['offer_clarity_priority'] ?? false) === true) {
+            return 'If you want, I can build and publish your first website next and use it to sharpen the offer, CTA, and buying path.';
+        }
+
+        if (($preferences['organic_first'] ?? false) === true) {
+            return 'If you want, I can build and publish your first website next and make it support your organic outreach and conversion path.';
+        }
+
+        if (($preferences['website_quality_priority'] ?? false) === true) {
+            return 'If you want, I can build and publish your first website next with extra focus on page clarity, conversion flow, and CTA strength.';
+        }
+
+        return 'If you want, I can build and publish your first website next.';
+    }
+
+    private function assistantWebsiteBuildFocusSentence(array $preferences): string
+    {
+        $areas = [];
+        if (($preferences['offer_clarity_priority'] ?? false) === true) {
+            $areas[] = 'offer clarity';
+            $areas[] = 'CTA strength';
+        }
+        if (($preferences['organic_first'] ?? false) === true) {
+            $areas[] = 'organic conversion flow';
+        }
+        if (($preferences['website_quality_priority'] ?? false) === true) {
+            $areas[] = 'page clarity';
+        }
+
+        $areas = array_values(array_unique($areas));
+        if ($areas === []) {
+            return '';
+        }
+
+        return ' I am weighting this build toward ' . implode(', ', $areas) . '.';
+    }
+
     private function assistantFirstCampaignAssetIdea(Founder $founder, string $campaignAngle): array
     {
         $company = $founder->company;
         $intelligence = $company?->intelligence;
+        $preferences = $this->assistantStoredOperatingPreferences($founder, $company);
         $icp = trim((string) ($intelligence?->primary_icp_name ?? $intelligence?->ideal_customer_profile ?? 'the right buyer'));
         $offer = trim((string) ($intelligence?->core_offer ?? 'your offer'));
         $problem = trim((string) ($intelligence?->problem_solved ?? $company?->company_brief ?? 'the core problem'));
 
         return match ($campaignAngle) {
             'grid' => [
-                'idea' => 'a 3-card grid: call out the problem, reframe the belief, then make "' . $offer . '" feel like the obvious next step for ' . $icp . '.',
+                'idea' => (($preferences['organic_first'] ?? false) === true
+                    ? 'a 3-card organic trust grid: call out the problem, reframe the belief, then make "' . $offer . '" feel like the obvious next step for ' . $icp . '.'
+                    : 'a 3-card grid: call out the problem, reframe the belief, then make "' . $offer . '" feel like the obvious next step for ' . $icp . '.'),
                 'task_title' => 'Draft first campaign grid',
                 'task_description' => 'Create the first 3-card campaign grid. Card 1 names the problem. Card 2 shifts the belief. Card 3 presents "' . $offer . '" with one CTA.',
             ],
             'content' => [
-                'idea' => 'a short content sequence that starts with the pain around ' . Str::lower(Str::limit($problem, 90, '...')) . ', then earns trust before asking for action.',
+                'idea' => (($preferences['organic_first'] ?? false) === true
+                    ? 'a short content sequence that starts with the pain around ' . Str::lower(Str::limit($problem, 90, '...')) . ', builds trust through proof, then asks for one clear next step.'
+                    : 'a short content sequence that starts with the pain around ' . Str::lower(Str::limit($problem, 90, '...')) . ', then earns trust before asking for action.'),
                 'task_title' => 'Draft first content sequence',
                 'task_description' => 'Write the first short content sequence: pain point, belief shift, proof, then CTA into "' . $offer . '".',
             ],
             default => [
-                'idea' => 'one direct-response post that names the problem, makes the offer concrete, and gives ' . $icp . ' one clean next step.',
+                'idea' => (($preferences['offer_clarity_priority'] ?? false) === true
+                    ? 'one direct-response post that simplifies the offer, names the problem clearly, and gives ' . $icp . ' one clean next step.'
+                    : 'one direct-response post that names the problem, makes the offer concrete, and gives ' . $icp . ' one clean next step.'),
                 'task_title' => 'Draft first campaign post',
                 'task_description' => 'Write the first direct-response post. Lead with the problem, frame "' . $offer . '" as the answer, and end with one clean CTA.',
             ],
@@ -8076,6 +8598,7 @@ class OsShellController extends Controller
         $intelligence = $company?->intelligence;
         $launchSystem = $founder->launchSystems()->latest('id')->first();
         $weeklyState = $founder->weeklyState;
+        $preferences = $this->assistantStoredOperatingPreferences($founder, $company);
 
         $companyName = trim((string) ($company?->company_name ?? 'Founder project'));
         $icp = trim((string) ($intelligence?->primary_icp_name ?? $intelligence?->ideal_customer_profile ?? 'ideal customers'));
@@ -8086,8 +8609,9 @@ class OsShellController extends Controller
             ->filter(fn ($metric) => trim((string) $metric) !== '')
             ->values()
             ->all();
+        [$resolvedCampaignAngle, $formatReason] = $this->assistantPreferredCampaignFormat($campaignAngle, $preferences, $focus);
 
-        $angle = match ($campaignAngle) {
+        $angle = match ($resolvedCampaignAngle) {
             'grid' => 'a multi-card grid that educates the right buyer and leads them into the offer',
             'post' => 'a single direct-response post that calls out the problem and pushes to the offer',
             'content' => 'a short content sequence that builds trust before asking for the next step',
@@ -8105,8 +8629,11 @@ class OsShellController extends Controller
                 'Offer: ' . $offer,
                 $weeklyFocus !== '' ? 'Current focus: ' . $weeklyFocus : null,
                 !empty($northStar) ? 'North-star metric: ' . $northStar[0] : null,
+                $formatReason !== '' ? 'Format rationale: ' . $formatReason : null,
                 'Creative direction: Build this around ' . $angle . '. Keep the message practical, direct, and conversion-focused. Lead with the problem, make the offer feel easy to say yes to, and use one clear CTA.',
             ]))),
+            'format_reason' => $formatReason,
+            'preferred_format' => $resolvedCampaignAngle,
         ];
     }
 
@@ -8114,6 +8641,7 @@ class OsShellController extends Controller
     {
         $company = $founder->company;
         $intelligence = $company?->intelligence;
+        $preferences = $this->assistantStoredOperatingPreferences($founder, $company);
         $icp = trim((string) ($intelligence?->primary_icp_name ?? $intelligence?->ideal_customer_profile ?? 'ideal customers'));
         $problem = trim((string) ($intelligence?->problem_solved ?? $company?->company_brief ?? 'a pressing customer problem'));
         $offer = trim((string) ($intelligence?->core_offer ?? 'the core offer'));
@@ -8128,17 +8656,48 @@ class OsShellController extends Controller
         if ($campaignAngle === 'grid') {
             $ideas[0] = 'Open with a problem card, then a belief-shift card, then a CTA card built for ' . $icp . '.';
         } elseif ($campaignAngle === 'post') {
-            $ideas[1] = 'Write one sharp post that names the problem, reframes it, and makes "' . $offer . '" feel like the obvious next step.';
+            $ideas[1] = (($preferences['offer_clarity_priority'] ?? false) === true)
+                ? 'Write one sharp post that simplifies the offer, reframes the problem, and makes "' . $offer . '" feel easy to say yes to.'
+                : 'Write one sharp post that names the problem, reframes it, and makes "' . $offer . '" feel like the obvious next step.';
         } elseif ($campaignAngle === 'content') {
-            $ideas[2] = 'Turn this into a short sequence: pain point, belief shift, proof, then CTA.';
+            $ideas[2] = (($preferences['organic_first'] ?? false) === true)
+                ? 'Turn this into a short organic trust sequence: pain point, belief shift, proof, then CTA.'
+                : 'Turn this into a short sequence: pain point, belief shift, proof, then CTA.';
         }
 
         return $ideas;
     }
 
-    private function assistantWebsiteRefreshAreas(string $field): array
+    private function assistantPreferredCampaignFormat(string $campaignAngle, array $preferences, string $focus = ''): array
     {
-        return match ($field) {
+        $normalized = trim(Str::lower($campaignAngle));
+        if (in_array($normalized, ['post', 'grid', 'content'], true)) {
+            return [$normalized, 'you already signaled that format explicitly'];
+        }
+
+        $focusText = Str::lower(trim($focus));
+        if (($preferences['organic_first'] ?? false) === true) {
+            if (preg_match('/educate|sequence|nurture|trust|story|content/', $focusText)) {
+                return ['content', 'you have been leaning organic-first and this focus benefits from trust-building over multiple touches'];
+            }
+
+            if (($preferences['campaign_studio_interest'] ?? false) === true) {
+                return ['grid', 'you prefer organic growth and repeated campaign work, so a grid is a strong bridge between trust and execution'];
+            }
+
+            return ['post', 'you are leaning organic-first, so a direct-response post is the fastest small test before building a larger content system'];
+        }
+
+        if (($preferences['offer_clarity_priority'] ?? false) === true) {
+            return ['post', 'offer clarity is still the main issue, so a single sharp post is the fastest way to test whether the message lands'];
+        }
+
+        return ['post', 'a single direct-response post is still the simplest first test before expanding into more assets'];
+    }
+
+    private function assistantWebsiteRefreshAreas(string $field, array $preferences = []): array
+    {
+        $areas = match ($field) {
             'company_name' => ['brand label', 'hero headline'],
             'company_brief' => ['hero message', 'founder story', 'about section'],
             'target_audience', 'ideal_customer_profile' => ['hero message', 'problem framing', 'service copy'],
@@ -8147,6 +8706,18 @@ class OsShellController extends Controller
             'primary_growth_goal', 'known_blockers' => ['CTA direction', 'offer framing', 'FAQ emphasis'],
             default => [],
         };
+
+        if (($preferences['offer_clarity_priority'] ?? false) === true) {
+            $areas[] = 'offer clarity';
+            $areas[] = 'CTA simplicity';
+        }
+
+        if (($preferences['website_quality_priority'] ?? false) === true) {
+            $areas[] = 'conversion path';
+            $areas[] = 'page clarity';
+        }
+
+        return array_values(array_unique($areas));
     }
 
     private function inferBudgetStrategyFromRefinementFocus(string $focus, string $fallback = 'organic'): string
@@ -8165,6 +8736,74 @@ class OsShellController extends Controller
         }
 
         return $fallback !== '' ? $fallback : 'organic';
+    }
+
+    private function assistantStoredOperatingPreferences(Founder $founder, ?Company $company = null): array
+    {
+        $businessBrief = $founder->businessBrief;
+        if (!$businessBrief && $company) {
+            $businessBrief = $company->businessBrief;
+        }
+
+        $assistantMemory = is_array($businessBrief?->constraints_json['assistant_memory'] ?? null)
+            ? $businessBrief->constraints_json['assistant_memory']
+            : [];
+
+        $joinedDecisions = Str::lower(implode(' | ', array_values((array) ($assistantMemory['strategic_decisions'] ?? []))));
+        $joinedConcerns = Str::lower(implode(' | ', array_values((array) ($assistantMemory['recurring_concerns'] ?? []))));
+        $toolInterests = array_values((array) ($assistantMemory['tool_interests'] ?? []));
+
+        return [
+            'organic_first' => str_contains($joinedDecisions, 'organic'),
+            'paid_interest' => str_contains($joinedDecisions, 'paid'),
+            'offer_clarity_priority' => str_contains($joinedConcerns, 'offer clarity'),
+            'website_quality_priority' => str_contains($joinedConcerns, 'website quality'),
+            'campaign_studio_interest' => in_array('campaign_studio', $toolInterests, true),
+            'task_guidance_preference' => in_array('tasks', $toolInterests, true),
+        ];
+    }
+
+    private function applyAssistantOperatingPreferencesToLaunchPlan(
+        array $launchPlan,
+        array $preferences,
+        array $signupProfile,
+        array $deducedProfile
+    ): array {
+        if (($preferences['organic_first'] ?? false) === true) {
+            $launchPlan['channels'] = ['website', 'social_content', 'direct_outreach', 'email_capture'];
+            $launchPlan['channel_strategy'] = 'Use organic outreach, direct-response content, proof, and follow-up to validate demand before spending on ads.';
+            $launchPlan['visual_direction'] = 'Trust-building visuals with clarity, proof, and practical next steps over hype.';
+        } elseif (($preferences['paid_interest'] ?? false) === true && ($signupProfile['budget_strategy'] ?? 'organic') !== 'organic') {
+            $launchPlan['channel_strategy'] = 'Use paid distribution only after the offer, audience, and conversion path are clear enough to convert efficiently.';
+        }
+
+        if (($preferences['offer_clarity_priority'] ?? false) === true) {
+            $firstMilestone = $launchPlan['milestones'][0] ?? null;
+            if (is_array($firstMilestone)) {
+                $launchPlan['milestones'][0]['objective'] = trim((string) ($firstMilestone['objective'] ?? '') . ' Start by sharpening the offer, promise, and why-now angle before expanding execution.');
+                $launchPlan['milestones'][0]['north_star_metric'] = 'Offer and message rewritten into one clear customer-facing angle';
+            }
+
+            $launchPlan['weekly_focus'] = 'Sharpen the core offer, the customer language, and the simplest path to a buying decision before adding more channels.';
+            $launchPlan['summary'] = trim((string) ($launchPlan['summary'] ?? '') . ' This version puts extra weight on offer clarity so the founder improves the first buying decision before scaling activity.');
+
+            array_unshift($launchPlan['tasks'], [
+                'title' => 'Rewrite the core offer in one sentence',
+                'description' => 'Clarify who the offer is for, what painful problem it solves, what result it creates, and what the clean next step is.',
+                'platform' => 'os',
+                'cta_label' => 'Open Tasks',
+                'cta_url' => route('founder.tasks'),
+                'milestone' => (string) ($launchPlan['milestones'][0]['title'] ?? 'Positioning reset'),
+                'north_star_metric' => (string) ($launchPlan['milestones'][0]['north_star_metric'] ?? 'Offer and message rewritten into one clear customer-facing angle'),
+                'available_on' => now()->toDateString(),
+            ]);
+        }
+
+        if (($preferences['campaign_studio_interest'] ?? false) === true) {
+            $launchPlan['summary'] = trim((string) ($launchPlan['summary'] ?? '') . ' The founder has shown repeated interest in campaign execution, so the next sprint should include a stronger campaign angle handoff.');
+        }
+
+        return $launchPlan;
     }
 
     private function splitIntelligenceCsv(string $value): array
@@ -8298,7 +8937,7 @@ class OsShellController extends Controller
                 'founder_id' => $founder->id,
                 'title' => $step,
                 'description' => 'Created from Atlas assistant plan: ' . $title,
-                'platform' => 'atlas_assistant',
+                'platform' => 'os_assistant',
                 'priority' => max(40, 82 - ($index * 6)),
                 'status' => 'pending',
                 'cta_label' => 'Open Tasks',
