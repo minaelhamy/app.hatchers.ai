@@ -88,7 +88,7 @@ class OpenAiClientService
                     ];
                 }
 
-                $content = trim((string) data_get($response->json(), 'choices.0.message.content', ''));
+                $content = trim($this->extractContent($response, $model));
                 if ($content === '') {
                     $lastStatus = $response->status();
                     $lastError = 'OpenAI returned an empty response body.';
@@ -138,6 +138,26 @@ class OpenAiClientService
 
     private function buildPayload(string $model, string $systemPrompt, string $userPrompt, ?float $temperature): array
     {
+        if ($this->usesResponsesApi($model)) {
+            return [
+                'model' => $model,
+                'input' => [
+                    [
+                        'role' => 'system',
+                        'content' => [
+                            ['type' => 'input_text', 'text' => $systemPrompt],
+                        ],
+                    ],
+                    [
+                        'role' => 'user',
+                        'content' => [
+                            ['type' => 'input_text', 'text' => $userPrompt],
+                        ],
+                    ],
+                ],
+            ];
+        }
+
         $payload = [
             'model' => $model,
             'response_format' => ['type' => 'json_object'],
@@ -152,10 +172,46 @@ class OpenAiClientService
 
     private function sendRequest(array $payload, int $timeoutSeconds): Response
     {
+        $endpoint = $this->usesResponsesApi((string) ($payload['model'] ?? ''))
+            ? '/responses'
+            : '/chat/completions';
+
         return Http::withToken((string) config('services.openai.api_key', ''))
             ->acceptJson()
             ->timeout($timeoutSeconds)
-            ->post($this->baseUrl() . '/chat/completions', $payload);
+            ->post($this->baseUrl() . $endpoint, $payload);
+    }
+
+    private function extractContent(Response $response, string $model): string
+    {
+        if (!$this->usesResponsesApi($model)) {
+            return (string) data_get($response->json(), 'choices.0.message.content', '');
+        }
+
+        $json = $response->json();
+        $outputText = trim((string) data_get($json, 'output_text', ''));
+        if ($outputText !== '') {
+            return $outputText;
+        }
+
+        $chunks = [];
+        foreach ((array) data_get($json, 'output', []) as $outputItem) {
+            foreach ((array) data_get($outputItem, 'content', []) as $contentItem) {
+                $text = trim((string) ($contentItem['text'] ?? ''));
+                if ($text !== '') {
+                    $chunks[] = $text;
+                }
+            }
+        }
+
+        return trim(implode("\n", $chunks));
+    }
+
+    private function usesResponsesApi(string $model): bool
+    {
+        $normalized = strtolower(trim($model));
+
+        return str_starts_with($normalized, 'gpt-5');
     }
 
     private function shouldTryFallback(Response $response): bool
