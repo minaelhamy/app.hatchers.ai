@@ -7443,7 +7443,8 @@ class OsShellController extends Controller
             'chat_model',
             'gpt-5.5',
             null,
-            40
+            40,
+            true
         );
 
         $reply = trim((string) ($response['reply'] ?? ''));
@@ -7486,11 +7487,14 @@ class OsShellController extends Controller
     {
         $founder->loadMissing([
             'company.intelligence',
+            'launchSystems',
             'actionPlans' => fn ($query) => $query->latest()->limit(6),
         ]);
 
         $company = $founder->company;
         $intelligence = $company?->intelligence;
+        $launchSystem = $founder->launchSystems->sortByDesc(fn (FounderLaunchSystem $system) => $system->last_reviewed_at ?? $system->updated_at)->first();
+        $launchPlan = $this->localAssistantLaunchPlanSummary($launchSystem);
         $nextTask = $this->assistantNextPendingTaskSummary($founder);
         $nextTaskLabel = trim((string) ($nextTask['title'] ?? ''));
         if ($nextTaskLabel !== '' && trim((string) ($nextTask['description'] ?? '')) !== '') {
@@ -7560,6 +7564,44 @@ class OsShellController extends Controller
             ];
         }
 
+        if ($this->localAssistantAsksAboutLaunchPlan($normalizedMessage)) {
+            $milestones = array_values(array_filter(array_map(
+                static fn (array $milestone): string => trim((string) ($milestone['title'] ?? '')),
+                (array) ($launchPlan['milestones'] ?? [])
+            )));
+            $channels = array_values(array_filter((array) ($launchPlan['channels'] ?? [])));
+            $summary = trim((string) ($launchPlan['summary'] ?? ''));
+            $weeklyFocus = trim((string) ($launchPlan['weekly_focus'] ?? ''));
+
+            $replyParts = array_values(array_filter([
+                "Here’s how your launch plan is structured for {$companyName}.",
+                $summary !== '' ? $summary : null,
+                $weeklyFocus !== '' ? ('Right now the weekly focus is: ' . $weeklyFocus . '.') : null,
+                $milestones !== [] ? ('The main phases are: ' . implode('; ', array_slice($milestones, 0, 3)) . '.') : null,
+                $channels !== [] ? ('The main channels we’re leaning on are: ' . implode(', ', array_slice($channels, 0, 4)) . '.') : null,
+                $nextTaskLabel !== '' ? ('The very next move is: ' . $nextTaskLabel . '.') : null,
+            ]));
+
+            return [
+                'ok' => true,
+                'reply' => implode("\n\n", $replyParts),
+                'actions' => array_values(array_filter([
+                    [
+                        'title' => 'Open Tasks',
+                        'reason' => 'Go to the next execution step in the launch plan.',
+                        'cta' => 'Open Tasks',
+                        'platform' => 'tasks',
+                    ],
+                    [
+                        'title' => 'Improve Website',
+                        'reason' => 'Open the website workspace if you want to strengthen the offer and conversion path.',
+                        'cta' => 'Open Website',
+                        'platform' => 'website',
+                    ],
+                ])),
+            ];
+        }
+
         $reply = "I’m still here with your launch context for {$companyName}, but the live model reply failed just now. "
             . "Based on what I know, I’d keep the focus on {$growthGoal}."
             . ($blockers !== '' ? " The main blocker I’m tracking is {$blockers}." : '')
@@ -7584,6 +7626,16 @@ class OsShellController extends Controller
                 ],
             ],
         ];
+    }
+
+    private function localAssistantAsksAboutLaunchPlan(string $normalizedMessage): bool
+    {
+        return str_contains($normalizedMessage, 'launch plan')
+            || str_contains($normalizedMessage, 'my plan')
+            || str_contains($normalizedMessage, 'this plan')
+            || str_contains($normalizedMessage, 'roadmap')
+            || str_contains($normalizedMessage, 'what is the plan')
+            || str_contains($normalizedMessage, 'explain the plan');
     }
 
     private function localAssistantSlimFallbackReply(Founder $founder, string $message, string $currentPage): array
@@ -7631,7 +7683,8 @@ class OsShellController extends Controller
             'chat_model',
             'gpt-5.5',
             null,
-            30
+            30,
+            true
         );
 
         $reply = trim((string) ($response['reply'] ?? ''));

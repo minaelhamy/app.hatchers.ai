@@ -43,7 +43,8 @@ class OpenAiClientService
         string $configKey = 'chat_model',
         string $fallbackModel = 'gpt-5.5',
         ?float $temperature = null,
-        int $timeoutSeconds = 45
+        int $timeoutSeconds = 45,
+        bool $allowPlainTextReply = false
     ): array {
         if (!$this->hasApiKey()) {
             return [
@@ -97,6 +98,19 @@ class OpenAiClientService
 
                 $decoded = json_decode($content, true);
                 if (!is_array($decoded)) {
+                    if ($allowPlainTextReply) {
+                        return [
+                            'reply' => $content,
+                            'actions' => [],
+                            '_meta' => [
+                                'ok' => true,
+                                'model' => $model,
+                                'fallback_used' => $model !== $preferredModel,
+                                'plain_text_salvaged' => true,
+                            ],
+                        ];
+                    }
+
                     $lastStatus = $response->status();
                     $lastError = 'OpenAI returned a non-JSON assistant payload.';
                     continue;
@@ -204,7 +218,10 @@ class OpenAiClientService
     {
         $normalized = strtolower(trim($model));
 
-        return str_starts_with($normalized, 'gpt-5');
+        return str_contains($normalized, 'codex')
+            || str_starts_with($normalized, 'o1')
+            || str_starts_with($normalized, 'o3')
+            || str_starts_with($normalized, 'o4');
     }
 
     private function shouldTryFallback(Response $response): bool
