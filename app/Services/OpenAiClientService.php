@@ -141,6 +141,11 @@ class OpenAiClientService
         if ($this->usesResponsesApi($model)) {
             return [
                 'model' => $model,
+                'text' => [
+                    'format' => [
+                        'type' => 'json_object',
+                    ],
+                ],
                 'input' => [
                     [
                         'role' => 'system',
