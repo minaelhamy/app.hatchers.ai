@@ -1766,6 +1766,24 @@
                 return wrap;
             }
 
+            function parseAssistantBootTask(prompt) {
+                const raw = (prompt || '').trim();
+                if (!raw) return null;
+
+                const lines = raw.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+                const taskLine = lines.find((line) => line.startsWith('Task: ')) || '';
+                const milestoneLine = lines.find((line) => line.startsWith('Milestone: ')) || '';
+                const weekGoalLine = lines.find((line) => line.startsWith('Week goal: ')) || '';
+
+                const taskTitle = taskLine ? taskLine.replace(/^Task:\s*/, '').trim() : '';
+                const milestone = milestoneLine ? milestoneLine.replace(/^Milestone:\s*/, '').trim() : '';
+                const weekGoal = weekGoalLine ? weekGoalLine.replace(/^Week goal:\s*/, '').trim() : '';
+
+                if (!taskTitle) return null;
+
+                return { taskTitle, milestone, weekGoal };
+            }
+
             function renderAssistantActions(wrap, actions) {
                 if (!wrap || !Array.isArray(actions) || !actions.length) return;
                 const target = wrap.querySelector('.ai-text');
@@ -2047,7 +2065,9 @@
                     return;
                 }
 
-                appendBubble('user', value);
+                if (forcedMessage === null) {
+                    appendBubble('user', value);
+                }
                 try {
                     const response = await fetch(assistantEndpoint, {
                         method: 'POST',
@@ -2182,6 +2202,15 @@
             if (shouldBootAssistant && !onboardingNeeded) {
                 setTimeout(() => {
                     setChatState('panel');
+                    const bootTask = parseAssistantBootTask(assistantBootPrompt);
+                    if (bootTask) {
+                        const introParts = [
+                            `<strong>Working on: ${bootTask.taskTitle}</strong>`,
+                            bootTask.milestone ? `<span style="color: var(--text-muted);">This sits inside ${bootTask.milestone}.</span>` : '',
+                            bootTask.weekGoal ? `<span style="color: var(--text-muted);">Goal for this step: ${bootTask.weekGoal}</span>` : '<span style="color: var(--text-muted);">I’m opening the task context and preparing the first useful answer.</span>',
+                        ].filter(Boolean);
+                        appendBubble('ai', `<p>${introParts.join('</p><p>')}</p>`);
+                    }
                     sendFreeformChat(assistantBootPrompt);
                     pageUrl.searchParams.delete('assistant');
                     pageUrl.searchParams.delete('assistant_prompt');

@@ -248,13 +248,6 @@ class FounderDashboardService
             ];
         }
 
-        if ($ctaUrl !== '' && !$this->isLegacyAiTaskUrl($ctaUrl)) {
-            return [
-                'label' => $this->taskWorkspaceLabelForText($haystack),
-                'href' => $ctaUrl,
-            ];
-        }
-
         if ($platform === 'servio' || str_contains($haystack, 'website') || str_contains($haystack, 'landing page') || str_contains($haystack, 'page copy')) {
             return ['label' => 'Build with AI', 'href' => route('dashboard', ['assistant' => 1, 'assistant_prompt' => $assistantPrompt])];
         }
@@ -273,6 +266,13 @@ class FounderDashboardService
 
         if (str_contains($haystack, 'lead') || str_contains($haystack, 'customer') || str_contains($haystack, 'outreach') || str_contains($haystack, 'prospect') || str_contains($haystack, 'follow-up')) {
             return ['label' => 'Open Tasks', 'href' => route('founder.tasks')];
+        }
+
+        if ($ctaUrl !== '' && !$this->isLegacyAiTaskUrl($ctaUrl)) {
+            return [
+                'label' => $this->taskWorkspaceLabelForText($haystack),
+                'href' => $ctaUrl,
+            ];
         }
 
         return [
@@ -352,7 +352,17 @@ class FounderDashboardService
 
     private function isLegacyAiTaskUrl(string $url): bool
     {
-        return in_array($url, ['/ai-tools', '/website', '/marketing'], true);
+        $normalized = strtolower(trim($url));
+        $isCampaignStudio = str_contains($normalized, 'campaign-studio') || str_contains($normalized, 'target=%2fcampaign-studio');
+
+        return $normalized === '/ai-tools'
+            || $normalized === '/website'
+            || $normalized === '/marketing'
+            || str_contains($normalized, '/marketing')
+            || str_contains($normalized, '/ai-tools')
+            || str_contains($normalized, '/workspace/atlas')
+            || str_contains($normalized, 'module=atlas')
+            || (str_contains($normalized, 'atlas') && !$isCampaignStudio);
     }
 
     private function buildGuidedPath($company, array $execution, array $commerceOperations, array $revenueOs): array

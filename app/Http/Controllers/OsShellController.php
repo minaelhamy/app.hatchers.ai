@@ -3614,6 +3614,7 @@ class OsShellController extends Controller
             ->first();
 
         if ($existing && !empty($existing->launch_strategy_json)) {
+            $this->normalizeFounderTaskAssistantLinks($founder);
             $launchChatTaskCount = $founder->actionPlans()
                 ->where('context', 'task')
                 ->where('metadata_json->source', 'launch_chat')
@@ -3643,6 +3644,8 @@ class OsShellController extends Controller
             $this->persistFounderLaunchPlanArtifacts($founder, $company, $signupProfile, $deducedProfile, $blueprint, $launchPlan, false);
         });
 
+        $this->normalizeFounderTaskAssistantLinks($founder);
+
         $this->syncFounderBusinessContextModels($founder->fresh(), $company->fresh());
         app(FounderModuleSyncService::class)->syncFounder(
             $founder->fresh(['company.intelligence', 'company.businessBrief', 'company.icpProfiles']),
@@ -3650,6 +3653,45 @@ class OsShellController extends Controller
         );
 
         return ['ok' => true, 'created' => true];
+    }
+
+    private function normalizeFounderTaskAssistantLinks(Founder $founder): void
+    {
+        $founder->actionPlans()
+            ->where('context', 'task')
+            ->where(function ($query) {
+                $query->whereIn('cta_url', [
+                    route('founder.marketing'),
+                    route('founder.ai-tools'),
+                    '/marketing',
+                    '/ai-tools',
+                ])->orWhere('cta_url', 'like', '%atlas%')
+                  ->orWhere('cta_url', 'like', '%marketing%');
+            })
+            ->get()
+            ->each(function (FounderActionPlan $task): void {
+                $haystack = strtolower(trim(
+                    (string) $task->title . ' ' . (string) ($task->description ?? '')
+                ));
+
+                $isCampaignStudioTask = str_contains($haystack, 'campaign')
+                    || str_contains($haystack, 'content sequence')
+                    || str_contains($haystack, 'social media campaign');
+
+                if ($isCampaignStudioTask) {
+                    $task->forceFill([
+                        'cta_label' => 'Open Campaign Studio',
+                        'cta_url' => route('workspace.launch', ['module' => 'atlas', 'target' => '/campaign-studio']),
+                    ])->save();
+
+                    return;
+                }
+
+                $task->forceFill([
+                    'cta_label' => $this->launchPlanTaskActionLabel($haystack),
+                    'cta_url' => route('founder.ai-tools'),
+                ])->save();
+            });
     }
 
     private function seedFounderLaunchPlanTasksFromStrategy(Founder $founder, array $launchPlan, array $tasks): void
@@ -3963,16 +4005,16 @@ class OsShellController extends Controller
         $channelLabel = str_replace('-', ' ', ucfirst((string) $validated['content_channel']));
         $publishTargetLabel = $this->marketingPublishTargets()[(string) $validated['content_publish_target']] ?? ucfirst((string) $validated['content_publish_target']);
 
-        FounderActionPlan::create([
-            'founder_id' => $user->id,
-            'title' => (string) $validated['content_title'],
-            'description' => "Channel: {$channelLabel}\nGoal: {$validated['content_goal']}\nPublish target: {$publishTargetLabel}\n\n{$validated['content_brief']}",
-            'platform' => 'atlas',
-            'priority' => 68,
-            'status' => 'draft',
-            'cta_label' => 'Open Marketing',
-            'cta_url' => route('founder.marketing'),
-        ]);
+            FounderActionPlan::create([
+                'founder_id' => $user->id,
+                'title' => (string) $validated['content_title'],
+                'description' => "Channel: {$channelLabel}\nGoal: {$validated['content_goal']}\nPublish target: {$publishTargetLabel}\n\n{$validated['content_brief']}",
+                'platform' => 'atlas',
+                'priority' => 68,
+                'status' => 'draft',
+                'cta_label' => 'Open Campaign Studio',
+                'cta_url' => route('workspace.launch', ['module' => 'atlas', 'target' => '/campaign-studio']),
+            ]);
 
         $atlas->syncFounderMutation($user, [
             'role' => 'founder',
@@ -11643,13 +11685,6 @@ class OsShellController extends Controller
             return ['label' => 'Open Campaign Studio', 'href' => route('workspace.launch', ['module' => 'atlas', 'target' => '/campaign-studio'])];
         }
 
-        if ($ctaUrl !== '' && !in_array($ctaUrl, ['/ai-tools', '/website', '/marketing'], true)) {
-            return [
-                'label' => $label !== '' ? $label : $this->launchPlanTaskActionLabel($haystack),
-                'href' => $ctaUrl,
-            ];
-        }
-
         if (str_contains($haystack, 'website') || str_contains($haystack, 'landing page') || str_contains($haystack, 'page copy')) {
             return ['label' => 'Build with AI', 'href' => route('dashboard', ['assistant' => 1, 'assistant_prompt' => $assistantPrompt])];
         }
@@ -11662,6 +11697,13 @@ class OsShellController extends Controller
         }
         if (str_contains($haystack, 'product') || str_contains($haystack, 'pricing') || str_contains($haystack, 'checkout') || str_contains($haystack, 'commerce')) {
             return ['label' => 'Build with AI', 'href' => route('dashboard', ['assistant' => 1, 'assistant_prompt' => $assistantPrompt])];
+        }
+
+        if ($ctaUrl !== '' && !$this->launchPlanUsesAssistantInsteadOfCtaUrl($ctaUrl)) {
+            return [
+                'label' => $label !== '' ? $label : $this->launchPlanTaskActionLabel($haystack),
+                'href' => $ctaUrl,
+            ];
         }
 
         return [
@@ -11714,6 +11756,20 @@ class OsShellController extends Controller
         }
 
         return 'Give a practical execution plan and draft any part that can be completed right now.';
+    }
+
+    private function launchPlanUsesAssistantInsteadOfCtaUrl(string $ctaUrl): bool
+    {
+        $normalized = strtolower(trim($ctaUrl));
+
+        return $normalized === '/ai-tools'
+            || $normalized === '/website'
+            || $normalized === '/marketing'
+            || str_contains($normalized, '/marketing')
+            || str_contains($normalized, '/ai-tools')
+            || str_contains($normalized, '/workspace/atlas')
+            || str_contains($normalized, 'module=atlas')
+            || (str_contains($normalized, 'atlas') && !str_contains($normalized, 'campaign-studio'));
     }
 
     private function launchPlanTaskActionLabel(string $haystack): string
@@ -12434,8 +12490,8 @@ class OsShellController extends Controller
                         ? 'Set up and launch the first paid campaign with one offer, one audience, and one landing page.'
                         : 'Start direct outreach and organic content using one clear message and one CTA.',
                     'platform' => 'os',
-                    'cta_label' => 'Open Marketing',
-                    'cta_url' => route('founder.marketing'),
+                    'cta_label' => 'Continue with AI',
+                    'cta_url' => route('founder.ai-tools'),
                 ],
                 [
                     'title' => 'Track every lead response',
@@ -12480,8 +12536,8 @@ class OsShellController extends Controller
                     'title' => 'Set up the primary channel presence',
                     'description' => 'Publish the core social or outreach assets required for the first acquisition sprint.',
                     'platform' => 'os',
-                    'cta_label' => 'Open Marketing',
-                    'cta_url' => route('founder.marketing'),
+                    'cta_label' => 'Continue with AI',
+                    'cta_url' => route('founder.ai-tools'),
                 ],
             ],
             default => [
@@ -12489,8 +12545,8 @@ class OsShellController extends Controller
                     'title' => 'Launch the first acquisition sprint',
                     'description' => 'Use ' . implode(', ', $channels) . ' as the focused channel mix and chase the first real lead or booking signals.',
                     'platform' => 'os',
-                    'cta_label' => 'Open Marketing',
-                    'cta_url' => route('founder.marketing'),
+                    'cta_label' => 'Continue with AI',
+                    'cta_url' => route('founder.ai-tools'),
                 ],
                 [
                     'title' => 'Track outcomes weekly',
