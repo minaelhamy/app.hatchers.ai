@@ -11,6 +11,7 @@
     $projectName = trim((string) ($company?->company_name ?? 'New Project'));
     $hasProject = !empty($taskEntries) || strcasecmp($projectName, 'New Project') !== 0;
     $osEmbedMode = request()->boolean('os_embed');
+    $firstName = strtok((string) ($founder->full_name ?? 'Founder'), ' ') ?: 'Founder';
 @endphp
 
 @section('head')
@@ -68,6 +69,18 @@
             background: #fff;
             min-height: 100%;
         }
+        .empty-card-action {
+            display:inline-flex;
+            align-items:center;
+            gap:8px;
+            padding:10px 16px;
+            border-radius:999px;
+            background:#111110;
+            color:#fff;
+            text-decoration:none;
+            font-size:13px;
+            font-weight:600;
+        }
         @media (max-width: 980px) { .tasks-hello { font-size:36px; } .task-body { flex-direction:column; } }
     </style>
 @endsection
@@ -79,15 +92,12 @@
                 <div class="empty-card">
                     <div class="empty-label">Tasks</div>
                     <h2>No tasks yet</h2>
-                    <p>For us to generate a launch plan tailored to your business, you have to tell us more about your project.</p>
-                    <a class="new-project-btn" href="{{ route('dashboard') }}">
-                        <span class="plus">+</span>
-                        <span>New Project</span>
-                    </a>
+                    <p>Open your founder workspace, answer a few questions, and Hatchers will turn that into your first launch plan and weekly task list.</p>
+                    <a class="empty-card-action" href="{{ route('dashboard') }}">Open founder workspace</a>
                 </div>
             @else
                 <div class="tasks-stage">
-                    <h1 class="tasks-hello">Welcome back {{ strtok((string) ($founder->full_name ?? 'Founder'), ' ') }},</h1>
+                    <h1 class="tasks-hello">Welcome back {{ $firstName }},</h1>
                     <p class="tasks-sub">Here's what's on for you for this week:</p>
                     <div class="tasks-section-label">Tasks</div>
 
@@ -113,9 +123,9 @@
                                     <p class="task-desc">{{ $task['description'] ?? 'Continue this task from your founder workspace.' }}</p>
                                 </div>
                                 @if(empty($task['completed']))
-                                    <a class="task-cta" href="{{ route('dashboard') }}">
+                                    <a class="task-cta" href="{{ $task['cta_href'] ?? route('dashboard') }}">
                                         <span class="task-cta-spark">✦</span>
-                                        <span>{{ !empty($task['mentor_name']) ? 'Continue with AI' : 'Open in OS' }}</span>
+                                        <span>{{ $task['cta'] ?? (!empty($task['mentor_name']) ? 'Continue with AI' : 'Open in OS') }}</span>
                                     </a>
                                 @endif
                             </div>
@@ -147,15 +157,12 @@
                             <div class="empty-card">
                                 <div class="empty-label">Tasks</div>
                                 <h2>No tasks yet</h2>
-                                <p>For us to generate a launch plan tailored to your business, you have to tell us more about your project.</p>
-                                <a class="new-project-btn" href="{{ route('dashboard') }}">
-                                    <span class="plus">+</span>
-                                    <span>New Project</span>
-                                </a>
+                                <p>Open your founder workspace, answer a few questions, and Hatchers will turn that into your first launch plan and weekly task list.</p>
+                                <a class="empty-card-action" href="{{ route('dashboard') }}">Open founder workspace</a>
                             </div>
                         @else
                             <div class="tasks-stage">
-                                <h1 class="tasks-hello">Welcome back {{ strtok((string) ($founder->full_name ?? 'Founder'), ' ') }},</h1>
+                                <h1 class="tasks-hello">Welcome back {{ $firstName }},</h1>
                                 <p class="tasks-sub">Here's what's on for you for this week:</p>
                                 <div class="tasks-section-label">Tasks</div>
 
@@ -181,9 +188,9 @@
                                                 <p class="task-desc">{{ $task['description'] ?? 'Continue this task from your founder workspace.' }}</p>
                                             </div>
                                             @if(empty($task['completed']))
-                                                <a class="task-cta" href="{{ route('dashboard') }}">
+                                                <a class="task-cta" href="{{ $task['cta_href'] ?? route('dashboard') }}">
                                                     <span class="task-cta-spark">✦</span>
-                                                    <span>{{ !empty($task['mentor_name']) ? 'Continue with AI' : 'Open in OS' }}</span>
+                                                    <span>{{ $task['cta'] ?? (!empty($task['mentor_name']) ? 'Continue with AI' : 'Open in OS') }}</span>
                                                 </a>
                                             @endif
                                         </div>

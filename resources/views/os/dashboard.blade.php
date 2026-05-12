@@ -32,6 +32,186 @@
     $recentNotificationLabels = collect($notifications)->map(function ($item) {
         return $item['title'] ?? $item['body'] ?? $item['description'] ?? null;
     })->filter()->take(3)->values()->all();
+    $launchPlanTaskDestination = function (?array $task): array {
+        if (!$task) {
+            return [
+                'label' => 'Start first action',
+                'href' => route('founder.tasks'),
+            ];
+        }
+
+        $ctaUrl = trim((string) ($task['cta_url'] ?? ''));
+        $label = trim((string) ($task['cta_label'] ?? ''));
+        $haystack = strtolower(trim(implode(' ', array_filter([
+            (string) ($task['title'] ?? ''),
+            (string) ($task['description'] ?? ''),
+            (string) ($task['milestone'] ?? ''),
+        ]))));
+
+        $smartLabel = static function (string $text): string {
+            if (str_contains($text, 'write') || str_contains($text, 'copy') || str_contains($text, 'message') || str_contains($text, 'caption')) {
+                return 'Write with AI';
+            }
+            if (str_contains($text, 'build') || str_contains($text, 'page') || str_contains($text, 'website') || str_contains($text, 'offer')) {
+                return 'Build with AI';
+            }
+            if (str_contains($text, 'campaign') || str_contains($text, 'content') || str_contains($text, 'social')) {
+                return 'Open Marketing';
+            }
+            if (str_contains($text, 'product') || str_contains($text, 'pricing') || str_contains($text, 'checkout') || str_contains($text, 'commerce')) {
+                return 'Open Commerce';
+            }
+
+            return 'Continue in Hatchers';
+        };
+
+        if ($ctaUrl !== '') {
+            return [
+                'label' => $label !== '' ? $label : $smartLabel($haystack),
+                'href' => $ctaUrl,
+            ];
+        }
+
+        if (str_contains($haystack, 'website') || str_contains($haystack, 'landing page') || str_contains($haystack, 'page copy')) {
+            return ['label' => 'Build with AI', 'href' => route('website')];
+        }
+        if (str_contains($haystack, 'campaign') || str_contains($haystack, 'content') || str_contains($haystack, 'social')) {
+            return ['label' => 'Write with AI', 'href' => route('founder.marketing')];
+        }
+        if (str_contains($haystack, 'product') || str_contains($haystack, 'pricing') || str_contains($haystack, 'checkout') || str_contains($haystack, 'commerce')) {
+            return ['label' => 'Open Commerce', 'href' => route('founder.commerce')];
+        }
+
+        return [
+            'label' => $smartLabel($haystack),
+            'href' => route('founder.tasks'),
+        ];
+    };
+    $launchPlanReady = $hasProject && (bool) ($launchPlanState['is_ready'] ?? false);
+    $pendingTaskEntries = collect($taskEntries)
+        ->filter(fn ($task) => ($task['status'] ?? 'pending') !== 'completed')
+        ->values();
+    $nextTask = $pendingTaskEntries->first() ?? ($taskEntries[0] ?? null);
+    $estimatedWeeks = max(1, (int) data_get($launchPlanState, 'pace.estimated_weeks', count($launchMilestones) ?: 1));
+    $hoursPerWeek = max(1, (int) data_get($launchPlanState, 'pace.hours_per_week', 4));
+    $durationLabel = $estimatedWeeks === 1 ? '1 week sprint' : ($estimatedWeeks . ' week sprint');
+    $durationLabel .= ' at ' . $hoursPerWeek . ' hour' . ($hoursPerWeek === 1 ? '' : 's') . ' per week';
+    $launchPlanPrimaryAction = $launchPlanTaskDestination($nextTask);
+    $launchPlanActionHref = (string) ($launchPlanPrimaryAction['href'] ?? route('founder.tasks'));
+    $launchPlanActionLabel = (string) ($launchPlanPrimaryAction['label'] ?? 'Start first action');
+    $launchPlanActionText = trim((string) ($nextTask['title'] ?? $launchPlanState['weekly_focus'] ?? 'Open the next step in your launch plan.'));
+    $launchPlanActionDescription = trim((string) ($nextTask['description'] ?? $launchPlanState['summary'] ?? ''));
+    $nextTaskIndex = $nextTask ? array_search($nextTask, $taskEntries, true) : false;
+    $launchPlanActionWeek = 'Week ' . max(1, (int) ceil(((is_int($nextTaskIndex) ? $nextTaskIndex : 0) + 1) / 2));
+    $launchPlanActionTime = $nextTask && !empty($nextTask['available_on'])
+        ? 'Available ' . \Carbon\Carbon::parse($nextTask['available_on'])->format('M j')
+        : 'Follow the highest-impact next step';
+    $launchPlanPhases = [];
+    $globalWeekNumber = 1;
+
+    foreach ($launchMilestones as $milestoneIndex => $milestone) {
+        $milestoneTitle = trim((string) ($milestone['title'] ?? ('Phase ' . ($milestoneIndex + 1))));
+        $milestoneObjective = trim((string) ($milestone['objective'] ?? ''));
+        $milestoneMetric = trim((string) ($milestone['north_star_metric'] ?? ''));
+        $milestoneHours = (int) ($milestone['estimated_hours'] ?? 0);
+        $milestoneTasks = collect($taskEntries)
+            ->filter(function ($task) use ($milestoneTitle) {
+                return strcasecmp(trim((string) ($task['milestone'] ?? '')), $milestoneTitle) === 0;
+            })
+            ->values();
+
+        $taskChunks = $milestoneTasks->isNotEmpty()
+            ? $milestoneTasks->chunk(2)
+            : collect([collect([])]);
+
+        $weeks = [];
+        foreach ($taskChunks as $chunkIndex => $chunk) {
+            $actionLines = $chunk->map(function ($task) {
+                $title = trim((string) ($task['title'] ?? ''));
+                $description = trim((string) ($task['description'] ?? ''));
+
+                return $description !== ''
+                    ? $title . ' — ' . $description
+                    : $title;
+            })->filter()->values()->all();
+
+            if (empty($actionLines) && $milestoneObjective !== '') {
+                $actionLines[] = $milestoneObjective;
+            }
+
+            $sections = [];
+            if ($chunkIndex === 0 && $milestoneObjective !== '') {
+                $sections[] = ['label' => 'Goal', 'acts' => [$milestoneObjective]];
+            }
+            if (!empty($actionLines)) {
+                $sections[] = ['label' => 'Actions', 'acts' => $actionLines];
+            }
+            if ($chunkIndex === 0 && $milestoneMetric !== '') {
+                $sections[] = ['label' => 'Success metric', 'acts' => [$milestoneMetric]];
+            }
+
+            $tools = $chunk->map(function ($task) {
+                $label = trim((string) ($task['cta_label'] ?? ''));
+                return $label !== '' ? $label : null;
+            })->filter()->unique()->values()->all();
+
+            $kpis = array_values(array_filter([
+                $milestoneMetric !== '' ? ['value' => $milestoneMetric, 'label' => 'North star'] : null,
+                $milestoneHours > 0 ? ['value' => $milestoneHours . 'h', 'label' => 'Planned'] : null,
+            ]));
+
+            $weeks[] = [
+                'number' => 'Week ' . $globalWeekNumber,
+                'goal' => $chunkIndex === 0 ? ($milestoneTitle !== '' ? $milestoneTitle : 'Launch phase') : ('Keep executing ' . $milestoneTitle),
+                'sections' => $sections,
+                'tools' => $tools,
+                'kpis' => $kpis,
+            ];
+
+            $globalWeekNumber++;
+        }
+
+        $phaseStartWeek = max(1, $globalWeekNumber - count($weeks));
+        $phaseEndWeek = max($phaseStartWeek, $globalWeekNumber - 1);
+        $phaseWeekLabel = $phaseStartWeek === $phaseEndWeek
+            ? ('Wk ' . $phaseStartWeek)
+            : ('Wks ' . $phaseStartWeek . '–' . $phaseEndWeek);
+
+        $launchPlanPhases[] = [
+            'label' => 'Phase ' . ($milestoneIndex + 1),
+            'sub' => $phaseWeekLabel . ' · ' . ($milestoneTitle !== '' ? $milestoneTitle : 'Launch phase'),
+            'title' => $milestoneTitle !== '' ? $milestoneTitle : ('Phase ' . ($milestoneIndex + 1)),
+            'objective' => $milestoneObjective,
+            'weeks' => $weeks,
+        ];
+    }
+
+    if (empty($launchPlanPhases) && $launchPlanReady) {
+        $launchPlanPhases[] = [
+            'label' => 'Phase 1',
+            'sub' => 'Wk 1 · Launch plan',
+            'title' => 'Launch plan',
+            'objective' => (string) ($launchPlanState['weekly_focus'] ?? ''),
+            'weeks' => [[
+                'number' => 'Week 1',
+                'goal' => (string) ($launchPlanState['weekly_focus'] ?? 'Start with the highest-impact next step.'),
+                'sections' => [[
+                    'label' => 'Focus',
+                    'acts' => array_values(array_filter([
+                        (string) ($launchPlanState['summary'] ?? ''),
+                        (string) ($launchPlanState['weekly_focus'] ?? ''),
+                    ])),
+                ]],
+                'tools' => [],
+                'kpis' => collect($launchPlanState['north_star_metrics'] ?? [])
+                    ->filter()
+                    ->take(2)
+                    ->map(fn ($metric) => ['value' => (string) $metric, 'label' => 'North star'])
+                    ->values()
+                    ->all(),
+            ]],
+        ];
+    }
 @endphp
 
 @section('head')
@@ -670,6 +850,260 @@
         .project-card-title { margin: 0 0 4px; font-size: 14px; font-weight: 600; color: var(--text); }
         .project-card-meta { margin: 0; font-size: 12px; color: var(--text-muted); }
 
+        .campaign-workspace {
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+            width: min(760px, 100%);
+            margin: 28px auto 0;
+            padding-bottom: 52px;
+        }
+
+        .campaign-workspace-header {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            max-width: 720px;
+        }
+
+        .campaign-workspace-eyebrow {
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.10em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+        }
+
+        .campaign-workspace-title {
+            margin: 0;
+            font-size: 22px;
+            font-weight: 600;
+            letter-spacing: -0.01em;
+            color: var(--text);
+            line-height: 1.25;
+        }
+
+        .campaign-workspace-sub {
+            margin: 0;
+            font-size: 13.5px;
+            color: var(--text-muted);
+            line-height: 1.55;
+        }
+
+        .lp-banner {
+            background: #FAEEDA;
+            border: 0.5px solid #EF9F27;
+            border-radius: 12px;
+            padding: 14px 16px;
+            display: flex;
+            align-items: flex-start;
+            gap: 14px;
+            justify-content: space-between;
+        }
+
+        .lp-banner-body { flex: 1; }
+        .lp-banner-title { font-size: 13px; font-weight: 600; color: #633806; margin-bottom: 4px; }
+        .lp-banner-text { font-size: 12px; color: #854F0B; line-height: 1.55; }
+        .lp-banner-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+
+        .lp-banner-cta {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: #854F0B;
+            color: #fff;
+            border: 0;
+            border-radius: 999px;
+            padding: 7px 14px;
+            font: inherit;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+            text-decoration: none;
+        }
+
+        .lp-banner-cta:hover { background: #633806; }
+
+        .lp-banner-x {
+            background: transparent;
+            border: 0;
+            font-size: 18px;
+            color: #854F0B;
+            cursor: pointer;
+            padding: 0 4px;
+            line-height: 1;
+            font-weight: 400;
+        }
+
+        .lp-banner-x:hover { color: #633806; }
+
+        .lp-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .lp-eyebrow {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+
+        .lp-title {
+            margin: 0;
+            font-size: 22px;
+            font-weight: 600;
+            letter-spacing: -0.01em;
+            color: var(--text);
+        }
+
+        .lp-duration { font-size: 13px; color: var(--text-muted); margin-top: 3px; }
+
+        .lp-next-action {
+            background: var(--surface);
+            border: 0.5px solid var(--border-strong);
+            border-radius: 12px;
+            padding: 14px 18px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .lp-next-left { flex: 1; min-width: 0; }
+        .lp-next-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); margin-bottom: 4px; }
+        .lp-next-week { font-weight: 500; color: var(--text-subtle); margin-left: 6px; }
+        .lp-next-text { font-size: 13.5px; font-weight: 500; color: var(--text); line-height: 1.45; margin-bottom: 4px; }
+        .lp-next-time { font-size: 12px; color: var(--text-muted); }
+
+        .lp-next-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--black);
+            color: #fff;
+            border: 0;
+            border-radius: 999px;
+            padding: 10px 18px;
+            font: inherit;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+            flex-shrink: 0;
+            box-shadow: 0 4px 12px rgba(17,17,16,0.18);
+            text-decoration: none;
+        }
+
+        .lp-next-btn:hover { background: #000; }
+
+        .lp-tabs {
+            display: flex;
+            gap: 0;
+            border-bottom: 0.5px solid var(--border);
+            overflow-x: auto;
+        }
+
+        .lp-tab {
+            padding: 8px 16px 10px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -1px;
+            transition: all .12s;
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+            background: transparent;
+            flex: 0 0 auto;
+        }
+
+        .lp-tab:hover { background: var(--surface-2); }
+        .lp-tab.active { border-bottom-color: var(--text); }
+        .lp-tab-label { font-size: 12px; font-weight: 600; color: var(--text-muted); }
+        .lp-tab.active .lp-tab-label { color: var(--text); }
+        .lp-tab-sub { font-size: 11px; color: var(--text-subtle); }
+        .lp-phase[hidden] { display: none !important; }
+
+        .lp-week-card {
+            background: var(--surface);
+            border: 0.5px solid var(--border);
+            border-radius: 12px;
+            margin-top: 8px;
+            overflow: hidden;
+            transition: border-color .12s;
+        }
+
+        .lp-week-card:hover { border-color: var(--border-strong); }
+        .lp-week-card.open { border-color: var(--text); }
+
+        .lp-week-head {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 11px 14px;
+            width: 100%;
+            background: transparent;
+            border: 0;
+            cursor: pointer;
+            text-align: left;
+        }
+
+        .lp-week-num { font-size: 11px; font-weight: 600; color: var(--text-muted); min-width: 52px; }
+        .lp-week-goal { font-size: 13px; font-weight: 500; color: var(--text); flex: 1; line-height: 1.4; }
+        .lp-caret { font-size: 9px; color: var(--text-subtle); transition: transform .18s; }
+        .lp-week-card.open .lp-caret { transform: rotate(180deg); }
+        .lp-week-body { display: none; padding: 0 14px 14px; border-top: 0.5px solid var(--hairline); padding-top: 10px; }
+        .lp-week-card.open .lp-week-body { display: block; }
+
+        .lp-section-lbl {
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: .06em;
+            color: var(--text-subtle);
+            margin: 10px 0 5px;
+        }
+
+        .lp-section-lbl:first-child { margin-top: 0; }
+
+        .lp-act {
+            font-size: 12.5px;
+            color: var(--text-muted);
+            padding: 3px 0 3px 0;
+            line-height: 1.55;
+        }
+
+        .ws-card-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            padding-top: 12px;
+            border-top: 0.5px solid var(--hairline);
+            margin-top: 12px;
+        }
+
+        .ws-tag {
+            font-size: 11px;
+            color: var(--text-muted);
+            background: var(--surface-2);
+            border: 0.5px solid var(--hairline);
+            border-radius: 6px;
+            padding: 3px 9px;
+            line-height: 1.4;
+        }
+
+        .lp-kpis { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+        .lp-kpi { background: var(--surface-2); border-radius: 8px; padding: 6px 10px; }
+        .lp-kpi-v { font-size: 14px; font-weight: 600; color: var(--text); }
+        .lp-kpi-l { font-size: 11px; color: var(--text-muted); }
+
         .fab {
             position: absolute;
             bottom: 28px;
@@ -1140,6 +1574,11 @@
             .workspace {
                 padding-top: 18px;
             }
+
+            .campaign-workspace {
+                width: 100%;
+                max-width: 100%;
+            }
         }
 
         @media (max-width: 860px) {
@@ -1166,6 +1605,13 @@
             .chat-panel {
                 width: 100%;
                 max-width: 100%;
+            }
+
+            .lp-banner,
+            .lp-header,
+            .lp-next-action {
+                flex-direction: column;
+                align-items: flex-start;
             }
 
             .agent-overlay {
@@ -1195,13 +1641,107 @@
         data-assistant-endpoint="{{ route('assistant.chat') }}"
     >
         <div class="workspace">
-                    <div class="divider"></div>
+                    @if (!$launchPlanReady)
+                        <div class="divider"></div>
+                    @endif
 
                     @if (!$hasProject)
                         <div class="empty-state">
                             <h2>You have no projects yet</h2>
                             <p>Start by creating a new project</p>
                         </div>
+                    @elseif ($launchPlanReady)
+                        <section class="campaign-workspace" id="launchPlanWorkspace" aria-label="Launch plan workspace">
+                            <div class="lp-banner" id="launchPlanBanner">
+                                <div class="lp-banner-body">
+                                    <div class="lp-banner-title">Your plan is live — and it learns as you go.</div>
+                                    <div class="lp-banner-text">Hatchers is tracking your company intelligence, tasks, website progress, and execution signals in real time. As results come in, it updates your next actions automatically so you keep working on the highest-impact move, not just a static checklist.</div>
+                                </div>
+                                <div class="lp-banner-actions">
+                                    <a class="lp-banner-cta" href="#launchPlanNextAction">Got it — show me my first action</a>
+                                    <button class="lp-banner-x" id="launchPlanBannerClose" type="button" aria-label="Dismiss launch plan banner">×</button>
+                                </div>
+                            </div>
+
+                            <div class="lp-header">
+                                <div>
+                                    <div class="lp-eyebrow">Launch plan</div>
+                                    <h2 class="lp-title">{{ $launchPlanState['title'] ?: 'Your launch plan' }}</h2>
+                                    <div class="lp-duration">{{ $durationLabel }}</div>
+                                </div>
+                                <a class="new-project-btn" href="{{ $launchPlanActionHref }}">⚡ {{ $launchPlanActionLabel }}</a>
+                            </div>
+
+                            <div class="lp-next-action" id="launchPlanNextAction">
+                                <div class="lp-next-left">
+                                    <div class="lp-next-label">Your next step <span class="lp-next-week">{{ $launchPlanActionWeek }}</span></div>
+                                    <div class="lp-next-text">{{ $launchPlanActionText }}</div>
+                                    <div class="lp-next-time">
+                                        {{ $launchPlanActionTime }}
+                                        @if ($launchPlanActionDescription !== '')
+                                            · {{ \Illuminate\Support\Str::limit($launchPlanActionDescription, 140) }}
+                                        @endif
+                                    </div>
+                                </div>
+                                <a class="lp-next-btn" href="{{ $launchPlanActionHref }}">{{ $launchPlanActionLabel }} →</a>
+                            </div>
+
+                            <div class="lp-tabs" role="tablist" aria-label="Launch plan phases">
+                                @foreach ($launchPlanPhases as $phaseIndex => $phase)
+                                    <button
+                                        class="lp-tab {{ $phaseIndex === 0 ? 'active' : '' }}"
+                                        type="button"
+                                        role="tab"
+                                        aria-selected="{{ $phaseIndex === 0 ? 'true' : 'false' }}"
+                                        data-launch-phase-tab="{{ $phaseIndex }}"
+                                    >
+                                        <span class="lp-tab-label">{{ $phase['label'] }}</span>
+                                        <span class="lp-tab-sub">{{ $phase['sub'] }}</span>
+                                    </button>
+                                @endforeach
+                            </div>
+
+                            @foreach ($launchPlanPhases as $phaseIndex => $phase)
+                                <div class="lp-phase" data-launch-phase-panel="{{ $phaseIndex }}" @if ($phaseIndex !== 0) hidden @endif>
+                                    @foreach ($phase['weeks'] as $weekIndex => $week)
+                                        <div class="lp-week-card {{ $phaseIndex === 0 && $weekIndex === 0 ? 'open' : '' }}" data-launch-week-card>
+                                            <button class="lp-week-head" type="button" data-launch-week-trigger aria-expanded="{{ $phaseIndex === 0 && $weekIndex === 0 ? 'true' : 'false' }}">
+                                                <span class="lp-week-num">{{ $week['number'] }}</span>
+                                                <span class="lp-week-goal">{{ $week['goal'] }}</span>
+                                                <span class="lp-caret">▼</span>
+                                            </button>
+                                            <div class="lp-week-body">
+                                                @foreach ($week['sections'] as $section)
+                                                    <div class="lp-section-lbl">{{ $section['label'] }}</div>
+                                                    @foreach ($section['acts'] as $act)
+                                                        <div class="lp-act">→ {{ $act }}</div>
+                                                    @endforeach
+                                                @endforeach
+
+                                                @if (!empty($week['tools']))
+                                                    <div class="ws-card-tags">
+                                                        @foreach ($week['tools'] as $tool)
+                                                            <span class="ws-tag">{{ $tool }}</span>
+                                                        @endforeach
+                                                    </div>
+                                                @endif
+
+                                                @if (!empty($week['kpis']))
+                                                    <div class="lp-kpis">
+                                                        @foreach ($week['kpis'] as $kpi)
+                                                            <div class="lp-kpi">
+                                                                <div class="lp-kpi-v">{{ $kpi['value'] }}</div>
+                                                                <div class="lp-kpi-l">{{ $kpi['label'] }}</div>
+                                                            </div>
+                                                        @endforeach
+                                                    </div>
+                                                @endif
+                                            </div>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @endforeach
+                        </section>
                     @else
                         <div class="project-grid">
                             @foreach($projectCards as $project)
@@ -1706,6 +2246,50 @@
                 askFreeformStep('q1');
             }
 
+            function initLaunchPlanWorkspace() {
+                const bannerClose = document.getElementById('launchPlanBannerClose');
+                const bannerCta = document.querySelector('.lp-banner-cta');
+                const phaseTabs = Array.from(document.querySelectorAll('[data-launch-phase-tab]'));
+                const phasePanels = Array.from(document.querySelectorAll('[data-launch-phase-panel]'));
+                const weekCards = Array.from(document.querySelectorAll('[data-launch-week-card]'));
+
+                const dismissBanner = () => {
+                    document.getElementById('launchPlanBanner')?.setAttribute('hidden', 'hidden');
+                };
+
+                bannerClose?.addEventListener('click', dismissBanner);
+                bannerCta?.addEventListener('click', dismissBanner);
+
+                phaseTabs.forEach((tab) => {
+                    tab.addEventListener('click', () => {
+                        const phaseId = tab.getAttribute('data-launch-phase-tab');
+                        phaseTabs.forEach((candidate) => {
+                            const isActive = candidate === tab;
+                            candidate.classList.toggle('active', isActive);
+                            candidate.setAttribute('aria-selected', isActive ? 'true' : 'false');
+                        });
+                        phasePanels.forEach((panel) => {
+                            panel.hidden = panel.getAttribute('data-launch-phase-panel') !== phaseId;
+                        });
+                    });
+                });
+
+                weekCards.forEach((card) => {
+                    const trigger = card.querySelector('[data-launch-week-trigger]');
+                    trigger?.addEventListener('click', () => {
+                        const isOpen = card.classList.contains('open');
+                        weekCards.forEach((candidate) => {
+                            candidate.classList.remove('open');
+                            candidate.querySelector('[data-launch-week-trigger]')?.setAttribute('aria-expanded', 'false');
+                        });
+                        if (!isOpen) {
+                            card.classList.add('open');
+                            trigger.setAttribute('aria-expanded', 'true');
+                        }
+                    });
+                });
+            }
+
             chatFab?.addEventListener('click', () => {
                 if (chatState === 'closed') setChatState('panel');
                 else setChatState('closed');
@@ -1733,6 +2317,8 @@
                 chatStream.innerHTML = '';
                 appendBubble('ai', '<p><strong>Your launch workspace is live.</strong></p><p style="color: var(--text-muted);">Ask Hatchers to refine the offer, improve the website, or break the next milestone into clearer tasks.</p>');
             }
+
+            initLaunchPlanWorkspace();
         })();
     </script>
 @endsection

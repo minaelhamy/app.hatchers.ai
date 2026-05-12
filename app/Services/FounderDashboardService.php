@@ -138,13 +138,15 @@ class FounderDashboardService
         $taskCards = [];
         foreach ($taskActions->take(3) as $index => $action) {
             $isCompleted = $action->completed_at !== null || in_array((string) $action->status, ['completed', 'complete', 'done'], true);
+            $taskDestination = $this->taskWorkspaceDestination($action);
             $taskCards[] = [
                 'id' => $action->id,
                 'label' => 'Task',
                 'due' => $isCompleted ? 'Completed' : ($index === 0 ? 'Priority now' : ($index === 1 ? 'Next up' : 'Queued this week')),
                 'title' => $action->title,
                 'description' => $this->actionSummary($action),
-                'cta' => '',
+                'cta' => $taskDestination['label'],
+                'cta_href' => $taskDestination['href'],
                 'completed' => $isCompleted,
                 'mentor_name' => $mentorLinked ? $mentorName : '',
                 'mentor_context' => $mentorLinked
@@ -167,7 +169,8 @@ class FounderDashboardService
                 'due' => 'Completed',
                 'title' => 'List your first 10 potential customers',
                 'description' => 'Identify specific people you can reach out to for customer discovery conversations.',
-                'cta' => '',
+                'cta' => 'Open in OS',
+                'cta_href' => route('founder.tasks'),
                 'completed' => true,
                 'mentor_name' => $mentorLinked ? $mentorName : '',
                 'mentor_context' => $mentorLinked
@@ -225,6 +228,57 @@ class FounderDashboardService
             'daily_revenue_plan' => $revenueOs['daily_plan'] ?? ['tasks' => []],
             'first_hundred_summary' => $revenueOs,
         ];
+    }
+
+    private function taskWorkspaceDestination(FounderActionPlan $action): array
+    {
+        $metadata = is_array($action->metadata_json) ? $action->metadata_json : [];
+        $platform = strtolower(trim((string) ($metadata['platform'] ?? '')));
+        $ctaUrl = trim((string) ($action->cta_url ?? ($metadata['cta_url'] ?? '')));
+        $title = trim((string) $action->title);
+        $description = trim((string) $this->actionSummary($action));
+        $haystack = strtolower(trim($title . ' ' . $description));
+
+        if ($ctaUrl !== '') {
+            return [
+                'label' => $this->taskWorkspaceLabelForText($haystack),
+                'href' => $ctaUrl,
+            ];
+        }
+
+        if ($platform === 'servio' || str_contains($haystack, 'website') || str_contains($haystack, 'landing page') || str_contains($haystack, 'page copy')) {
+            return ['label' => 'Build with AI', 'href' => route('website')];
+        }
+
+        if ($platform === 'bazaar' || str_contains($haystack, 'product') || str_contains($haystack, 'pricing') || str_contains($haystack, 'offer page') || str_contains($haystack, 'checkout')) {
+            return ['label' => 'Open Commerce', 'href' => route('founder.commerce')];
+        }
+
+        if ($platform === 'atlas' || str_contains($haystack, 'campaign') || str_contains($haystack, 'post') || str_contains($haystack, 'social') || str_contains($haystack, 'content')) {
+            return ['label' => 'Write with AI', 'href' => route('founder.marketing')];
+        }
+
+        if (str_contains($haystack, 'lead') || str_contains($haystack, 'customer') || str_contains($haystack, 'outreach') || str_contains($haystack, 'prospect') || str_contains($haystack, 'follow-up')) {
+            return ['label' => 'Open Tasks', 'href' => route('founder.tasks')];
+        }
+
+        return [
+            'label' => $this->taskWorkspaceLabelForText($haystack),
+            'href' => route('dashboard'),
+        ];
+    }
+
+    private function taskWorkspaceLabelForText(string $haystack): string
+    {
+        if (str_contains($haystack, 'write') || str_contains($haystack, 'copy') || str_contains($haystack, 'message') || str_contains($haystack, 'caption')) {
+            return 'Write with AI';
+        }
+
+        if (str_contains($haystack, 'build') || str_contains($haystack, 'page') || str_contains($haystack, 'website') || str_contains($haystack, 'offer')) {
+            return 'Build with AI';
+        }
+
+        return 'Continue with AI';
     }
 
     private function buildGuidedPath($company, array $execution, array $commerceOperations, array $revenueOs): array
